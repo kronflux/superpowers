@@ -11,3 +11,10 @@ triage/
 # development (see CLAUDE.md / README.md). It is not part of the published
 # plugin, so the whole directory is ignored here.
 evals/
+
+# AI assistant artifacts
+context-snapshot.json
+project-map.md
+session-log.md
+state.md
+known-issues.md

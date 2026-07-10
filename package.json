@@ -1,7 +1,9 @@
 {
   "name": "superpowers",
-  "version": "6.1.1",
+  "version": "7.0.0",
   "description": "Superpowers skills and runtime bootstrap for coding agents",
+  "author": "Richard M <richard@rmoser.ca>",
+  "repository": "https://github.com/kronflux/superpowers",
   "type": "module",
   "main": ".opencode/plugins/superpowers.js",
   "keywords": [
@@ -19,5 +21,11 @@
     "skills": [
       "./skills"
     ]
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
   }
 }
