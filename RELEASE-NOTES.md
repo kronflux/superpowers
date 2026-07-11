@@ -28,6 +28,9 @@ re-adapted the fork's divergent feature set as clean commits on top, plus net-ne
 - **Antigravity overlay** — `.antigravity-plugin` surface synced by `scripts/sync-to-antigravity.sh`.
 - **Four-layer memory architecture** — auto-capture → `state.md` → durable artifacts → harness
   memory, documented in `docs/ARCHITECTURE.md`.
+- **Local-by-default session artifacts** — plans, specs, and `.tasks.json` written by
+  brainstorming/writing-plans now default to the gitignored `.superpowers/` scratch dir and are
+  never committed to the project being worked on unless explicitly requested.
 
 ### Breaking changes
 
