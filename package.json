@@ -23,6 +23,7 @@
     ]
   },
   "scripts": {
+    "pretest": "node tests/lint-skills.mjs",
     "test": "vitest run",
     "compile-hooks": "node scripts/compile-hooks.mjs"
   },

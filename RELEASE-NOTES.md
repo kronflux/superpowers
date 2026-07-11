@@ -1,5 +1,47 @@
 # Superpowers Release Notes
 
+## 7.0.0 (kronflux fork)
+
+Resynced the kronflux fork onto the upstream obra/superpowers v6.1.1 base (`d884ae0`) and
+re-adapted the fork's divergent feature set as clean commits on top, plus net-new capabilities.
+
+### Re-adapted subsystems
+
+- **Context-mode integration.** Skills, hooks, and memory route data work through the
+  context-mode `ctx_*` tools when active; native fallback otherwise. Single source of truth:
+  `skills/shared/context-mode-adapter.md`.
+- **Safety hooks.** PreToolUse blocking of dangerous commands and secret exposure, fail-open.
+- **Output compression.** Bash output compression that yields when context-mode owns Bash routing.
+- **Opt-in verification gates.** Seven task-gate hooks under `hooks/examples/`, off by default.
+- **Coexistence contract.** `sp-*` tmpdir namespace, no `PreCompact`, WebFetch owned by context-mode.
+
+### Net-new in 7.0.0
+
+- **Model-tier routing** — opt-in `docs/superpowers/model-routing.json` enforced by three
+  PreToolUse gates and a session notice.
+- **`/onboard` command** — sets up model-tier routing and fork configuration.
+- **Universal hook manifest** — `plugin.universal.mjs` compiled by `scripts/compile-hooks.mjs`
+  into all three hook manifests; byte-idempotence enforced by test.
+- **Context economy** — SessionStart payload 5,165 B (~1,290 tokens, ≤5,200 asserted); 27 skill
+  descriptions 5,441 B total (≤300 B each, lint-enforced); always-on floor ~2,650 tokens, down
+  from ~6,330 (~58% measured reduction).
+- **Antigravity overlay** — `.antigravity-plugin` surface synced by `scripts/sync-to-antigravity.sh`.
+- **Four-layer memory architecture** — auto-capture → `state.md` → durable artifacts → harness
+  memory, documented in `docs/ARCHITECTURE.md`.
+
+### Breaking changes
+
+- None for end users.
+- For maintainers: `hooks/*.json` are now **generated** from `plugin.universal.mjs` — never
+  hand-edit them; run `npm run compile-hooks` after editing the manifest source.
+
+## 6.x fork line (retrospective)
+
+Correcting the record for the pre-resync fork history: upstream's own 6.x release notes describe
+`commands/` and `agents/` as removed, but **this fork re-added both** and carried them forward.
+The fork's 6.x line also shipped the initial **context-mode integration**, the **safety hooks**,
+and the **opt-in gate workflow** — all of which are re-adapted and preserved in 7.0.0 above.
+
 ## v6.1.1 (2026-07-02)
 
 ### Codex
