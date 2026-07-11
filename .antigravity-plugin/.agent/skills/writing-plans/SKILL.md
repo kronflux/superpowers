@@ -19,7 +19,8 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Context:** If working in an isolated worktree, it should have been created via the `.agent/skills/using-git-worktrees/SKILL.md` skill at execution time.
 
-**Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
+**Save plans to:** `.superpowers/plans/YYYY-MM-DD-<feature-name>.md`
+- Gitignored and local by default. Do NOT commit plans, specs, or `.tasks.json` unless your human partner explicitly asks — they are working artifacts, not project deliverables.
 - (User preferences for plan location override this default)
 
 When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work (analysis reads, count/filter/aggregate greps, unbounded exploratory Bash output) through the ctx tools per `skills/shared/context-mode-adapter.md`. State-probes, mutations, file writes, and git stay native.
@@ -198,7 +199,7 @@ After saving the plan and completing self-review, auto-select the execution appr
 ### Ready Message
 
 ```
-Plan saved to `docs/superpowers/plans/<filename>.md`. Ready to execute with **[Subagent-Driven / Inline Execution]** (<N> tasks[, <one-word reason>]). Reply to start, or say "inline" / "subagent" to switch.
+Plan saved to `.superpowers/plans/<filename>.md`. Ready to execute with **[Subagent-Driven / Inline Execution]** (<N> tasks[, <one-word reason>]). Reply to start, or say "inline" / "subagent" to switch.
 ```
 
 **Stop here.** Do not invoke any execution skill until the user replies.
@@ -264,4 +265,4 @@ Embedded-metadata rationale, `blockedBy` dependencies, and `status` updates duri
 
 ## Task Persistence
 
-At plan completion, write `<plan>.md.tasks.json` next to the plan `.md` (both co-located in `docs/superpowers/plans/`). Schema, worked example, and the resume command (`/.agent/skills/executing-plans/SKILL.md <plan-path>`): `references/native-task-mechanics.md`.
+At plan completion, write `<plan>.md.tasks.json` next to the plan `.md` (both co-located in `.superpowers/plans/`). Schema, worked example, and the resume command (`/.agent/skills/executing-plans/SKILL.md <plan-path>`): `references/native-task-mechanics.md`.

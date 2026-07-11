@@ -45,7 +45,7 @@ this machine. At every save point, review what auto-capture holds (`ctx_search`,
 decisions worth keeping into `[saved]` entries. Capture is context-mode's job; promotion is yours.
 
 **Indexing step (ctx active):** after writing durable artifacts, `ctx_index` them
-(`docs/superpowers/plans`, `docs/superpowers/specs`, `session-log.md`, `known-issues.md`,
+(`.superpowers/plans`, `.superpowers/specs`, `session-log.md`, `known-issues.md`,
 `docs/ARCHITECTURE.md`) so future sessions search instead of re-reading. Idempotent (mtime+SHA refresh).
 
 **Resume protocol:** 1) `ctx_search(sort:"timeline")` for the tail of the prior session;

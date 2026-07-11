@@ -45,11 +45,11 @@ the task.md task list:
 
 At plan completion, write the task persistence file **in the same directory as the plan document**.
 
-If the plan is saved to `docs/superpowers/plans/2026-01-15-feature.md`, the tasks file MUST be saved to `docs/superpowers/plans/2026-01-15-feature.md.tasks.json`.
+If the plan is saved to `.superpowers/plans/2026-01-15-feature.md`, the tasks file MUST be saved to `.superpowers/plans/2026-01-15-feature.md.tasks.json`.
 
 ```json
 {
-  "planPath": "docs/superpowers/plans/2026-01-15-feature.md",
+  "planPath": ".superpowers/plans/2026-01-15-feature.md",
   "tasks": [
     {
       "id": 0,
@@ -69,7 +69,7 @@ If the plan is saved to `docs/superpowers/plans/2026-01-15-feature.md`, the task
 }
 ```
 
-Both the plan `.md` and `.tasks.json` must be co-located in `docs/superpowers/plans/`.
+Both the plan `.md` and `.tasks.json` must be co-located in `.superpowers/plans/`.
 
 ## Resuming Work
 

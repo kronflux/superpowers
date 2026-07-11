@@ -7,7 +7,7 @@ Reference for the `subagent-driven-development` skill. See [SKILL.md](../SKILL.m
 ```
 You: I'm using Subagent-Driven Development to execute this plan.
 
-[Read plan file once: docs/superpowers/plans/feature-plan.md]
+[Read plan file once: .superpowers/plans/feature-plan.md]
 [Create todos for all tasks]
 
 Task 1: Hook installation script

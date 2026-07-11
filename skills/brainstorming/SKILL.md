@@ -31,7 +31,7 @@ You MUST create a task for each of these items and complete them in order:
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
 6. **Failure-mode check** — before writing the doc, actively try to break the approved design; revise for Critical failure modes, document Minor ones as non-goals (see below)
-7. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit
+7. **Write design doc** — save to `.superpowers/specs/YYYY-MM-DD-<topic>-design.md` (gitignored, local by default — do NOT commit it unless your human partner explicitly asks)
 8. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
 9. **User reviews written spec** — ask user to review the spec file before proceeding
 10. **Transition to implementation** — invoke writing-plans skill to create implementation plan
@@ -107,7 +107,7 @@ Do not skip this step. An approach that survives adversarial questioning is an a
 
 **Documentation:**
 
-- Write the validated design (spec) to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
+- Write the validated design (spec) to `.superpowers/specs/YYYY-MM-DD-<topic>-design.md`
   - (User preferences for spec location override this default)
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
@@ -161,7 +161,7 @@ If they agree to the companion, read the detailed guide before proceeding:
 
 - User approved the design.
 - Failure-mode check completed — critical failure modes resolved, minor ones documented as non-goals.
-- Design document exists at the required path (`docs/superpowers/specs/`).
+- Design document exists at the required path (`.superpowers/specs/`).
 - Spec self-review completed — placeholders, contradictions, ambiguity, and scope issues resolved.
 - User reviewed the written spec and approved.
 - `superpowers:writing-plans` is invoked as the next skill.

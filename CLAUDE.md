@@ -37,7 +37,8 @@ manifests by the bump script.
 - `agents/` — `code-reviewer`, `red-team` subagent definitions.
 - `commands/` — slash-command wrappers (`brainstorm`, `write-plan`, `execute-plan`, `onboard`, gate commands).
 - `scripts/` — `compile-hooks.mjs`, `sync-to-codex-plugin.sh`, `sync-to-antigravity.sh`, `bump-version.sh`.
-- `docs/` — harness/porting/testing docs plus `docs/superpowers/{plans,specs}` design history.
+- `docs/` — harness/porting/testing docs plus `docs/superpowers/{plans,specs}` committed design history.
+- `.superpowers/` — gitignored local scratch: active plans/specs/`.tasks.json` (session artifacts, never committed unless explicitly asked), sdd workspace, brainstorm-server state.
 - `tests/` — vitest suites + shell/python integration checks.
 - `plugin.universal.mjs` — single source for all hook manifests.
 - Harness surfaces: `.codex-plugin`, `.cursor-plugin`, `.kimi-plugin`, `.antigravity-plugin`,
