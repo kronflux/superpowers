@@ -136,11 +136,11 @@ CMD couldn't find bash in any of the three locations the dispatcher tries. The d
 
 ### Hook runs on Unix but does nothing on Windows
 
-Check that the script filename is **extensionless** in `hooks.json`. A command like `run-hook.cmd session-start.sh` can trigger Claude Code's `.sh` auto-detection and bypass the intended CMD dispatcher path, or just try to run a non-existent `session-start.sh` script.
+Check that the script filename is **extensionless** in `plugin.universal.mjs`, then run `npm run compile-hooks` to regenerate `hooks/hooks.json`. A command like `run-hook.cmd session-start.sh` can trigger Claude Code's `.sh` auto-detection and bypass the intended CMD dispatcher path, or just try to run a non-existent `session-start.sh` script.
 
 ### Hook doesn't fire at all
 
-Verify the `matcher` in `hooks.json` matches the event type your harness emits. Claude Code uses `startup|clear|compact`; Cursor uses `sessionStart`. Check `hooks-cursor.json` for the Cursor variant.
+Verify the `matcher` in `plugin.universal.mjs` matches the event type your harness emits, then run `npm run compile-hooks` to regenerate `hooks/hooks.json` and `hooks/hooks-cursor.json`. Claude Code uses `startup|clear|compact`; Cursor uses `sessionStart`.
 
 ## Related Issues
 
