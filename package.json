@@ -23,7 +23,8 @@
     ]
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "compile-hooks": "node scripts/compile-hooks.mjs"
   },
   "devDependencies": {
     "vitest": "^2.1.9"

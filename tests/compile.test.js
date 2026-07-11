@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
-// Plugin manifests are hand-authored and canonical (no build/compile step).
+// Hook manifests (hooks/*.json) are GENERATED from plugin.universal.mjs via `npm run compile-hooks`.
+// Never hand-edit them; this suite validates the generated output stays well-formed.
 // This validates that:
 //   - the plugin manifests exist, are valid JSON, and name "superpowers"
 //   - hooks.json / codex-hooks.json each register at least one hook script
@@ -26,7 +27,7 @@ function scriptsFrom(hooksJson) {
   return out;
 }
 
-describe('hand-authored manifests (FALLBACK)', () => {
+describe('generated manifests (validity)', () => {
   it('.claude-plugin/plugin.json exists, is valid JSON, names superpowers', () => {
     const p = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin/plugin.json'), 'utf8'));
     expect(p.name).toBe('superpowers');
