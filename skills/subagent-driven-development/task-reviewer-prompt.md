@@ -18,6 +18,11 @@ Subagent (general-purpose):
     not a merge review — a broad whole-branch review happens separately after
     all tasks are complete.
 
+    You are a focused subagent. Do NOT invoke any skills from the superpowers
+    plugin. Do NOT use the Skill tool for superpowers skills. Your only job is
+    the task described below. You MAY use the context-mode `ctx_*` tools normally
+    for data work.
+
     ## What Was Requested
 
     Read the task brief: [BRIEF_FILE]
@@ -163,6 +168,9 @@ Subagent (general-purpose):
     **Task quality:** [Approved | Needs fixes]
 
     **Reasoning:** [1-2 sentence technical assessment]
+
+    Your final message IS your return value. Return only the structured report
+    specified above — no preamble, no narration of your process.
 ```
 
 **Placeholders:**

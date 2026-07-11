@@ -16,6 +16,10 @@ ledger and the tool results carry the record.
 
 **Continuous execution:** Do not pause to check in with your human partner between tasks. Execute all tasks from the plan without stopping. The only reasons to stop are: BLOCKED status you cannot resolve, ambiguity that genuinely prevents progress, or all tasks complete. "Should I continue?" prompts and progress summaries waste their time — they asked you to execute the plan, so execute it.
 
+## Adapter Link
+
+When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route controller-run data work per `skills/shared/context-mode-adapter.md`; `review-package` and `task-brief` analysis go through `ctx_execute_file`. State-probes, mutations, file writes, and git operations stay native.
+
 ## When to Use
 
 ```dot
@@ -243,6 +247,59 @@ and is re-read on every later turn. Hand artifacts over as files:
 - Fix dispatches append their fix report (with test results) to the same
   report file and return a short summary; re-reviews read the updated file.
 
+## Dispatching with Metadata
+
+Plans written with superpowers:writing-plans embed a `json:metadata` fence
+(files, acceptanceCriteria, verifyCommand) at the end of each task. The
+fence travels inside the brief that `scripts/task-brief` extracts — the
+metadata lands in the task-brief file the implementer receives; never paste
+the task text or bulk metadata into the dispatch prompt. When filling the
+implementer template, parse the fence and fill its Acceptance Criteria,
+Files, and Verify Command sections from those three fields — one checkbox
+per criterion, the `files` list, and the exact `verifyCommand` — so the
+implementer gets its structured checklist without re-parsing prose. The
+brief remains the single source of requirements; the mirrored fields are a
+checklist, not a second authority.
+
+## Parallel Waves (guarded)
+
+Dispatch multiple implementers in one message ONLY when every pair of tasks has provably disjoint
+`files` sets in metadata AND verify commands are side-effect independent. Anything riskier: worktree
+isolation per implementer, or sequential dispatch. (Upstream red-flags parallel implementers because
+of workspace conflicts — these guardrails are the answer to that objection, not an exemption from it.)
+
+## E2E Process Hygiene
+
+When dispatching subagents that start background services (servers, databases, queues):
+
+Subagents are stateless — they do not know about processes started by previous subagents. Accumulated background processes cause port conflicts, stale responses, and false test results.
+
+Include in the subagent prompt for any E2E or service-dependent task:
+
+**Unix/macOS:**
+```
+Before starting any service:
+1. Kill existing instances: pkill -f "<service-pattern>" 2>/dev/null || true
+2. Verify the port is free: lsof -i :<port> && echo "ERROR: port still in use" || echo "Port free"
+
+After tests complete:
+1. Kill the service you started.
+2. Verify cleanup: pgrep -f "<service-pattern>" && echo "WARNING: still running" || echo "Cleanup verified"
+```
+
+**Windows:**
+```
+Before starting any service:
+1. Kill existing instances: taskkill /F /IM "<process-name>" 2>nul || echo "No existing process"
+2. Verify the port is free: netstat -ano | findstr :<port> && echo "ERROR: port still in use" || echo "Port free"
+
+After tests complete:
+1. Kill the service you started.
+2. Verify cleanup: tasklist | findstr "<process-name>" && echo "WARNING: still running" || echo "Cleanup verified"
+```
+
+Exception: persistent dev servers the user explicitly keeps running — document them in `state.md`.
+
 ## Durable Progress
 
 Conversation memory does not survive compaction. In real sessions,
@@ -262,6 +319,17 @@ a ledger file, not only in todos.
   trust the ledger and `git log` over your own recollection.
 - `git clean -fdx` will destroy the ledger (it's git-ignored scratch); if
   that happens, recover from `git log`.
+
+## Task Persistence Sync
+
+After marking each task completed via `TaskUpdate`, update the `.tasks.json` file to stay in sync:
+
+1. Read `<plan-path>.tasks.json`
+2. Set the task's `"status"` to `"completed"`
+3. Set `"lastUpdated"` to current ISO timestamp
+4. Write the file back
+
+This ensures cross-session resume works correctly. Without this, a new session loading `.tasks.json` would see completed tasks as `"pending"`.
 
 ## Prompt Templates
 
@@ -370,7 +438,9 @@ Done!
 - Start implementation on main/master branch without explicit user consent
 - Skip task review, or accept a report missing either verdict (spec compliance AND task quality are both required)
 - Proceed with unfixed issues
-- Dispatch multiple implementation subagents in parallel (conflicts)
+- Dispatch multiple implementation subagents in parallel outside the
+  guardrails of [Parallel Waves (guarded)](#parallel-waves-guarded)
+  (workspace conflicts)
 - Make a subagent read the whole plan file (hand it its task brief —
   `scripts/task-brief` — instead)
 - Skip scene-setting context (subagent needs to understand where task fits)

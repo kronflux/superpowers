@@ -13,6 +13,10 @@ Start by understanding the current project context, then ask questions one at a 
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
 </HARD-GATE>
 
+## Tool Selection (context-mode aware)
+
+When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work — web fetches, build-tool runs, unbounded Bash output, analysis reads, and count/filter/aggregate greps — through the ctx tools per `skills/shared/context-mode-adapter.md`. State-probes, mutations, file writes, and git operations stay native in both modes. When surfacing verification or `PROVEN BY` evidence, echo it into the conversation even if computed via ctx tools.
+
 ## Anti-Pattern: "This Is Too Simple To Need A Design"
 
 Every project goes through this process. A todo list, a single-function utility, a config change — all of them. "Simple" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.
@@ -26,10 +30,11 @@ You MUST create a task for each of these items and complete them in order:
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit
-7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
-8. **User reviews written spec** — ask user to review the spec file before proceeding
-9. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+6. **Failure-mode check** — before writing the doc, actively try to break the approved design; revise for Critical failure modes, document Minor ones as non-goals (see below)
+7. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit
+8. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
+9. **User reviews written spec** — ask user to review the spec file before proceeding
+10. **Transition to implementation** — invoke writing-plans skill to create implementation plan
 
 ## Process Flow
 
@@ -40,6 +45,7 @@ digraph brainstorming {
     "Propose 2-3 approaches" [shape=box];
     "Present design sections" [shape=box];
     "User approves design?" [shape=diamond];
+    "Failure-mode check" [shape=box];
     "Write design doc" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
     "User reviews spec?" [shape=diamond];
@@ -50,7 +56,8 @@ digraph brainstorming {
     "Propose 2-3 approaches" -> "Present design sections";
     "Present design sections" -> "User approves design?";
     "User approves design?" -> "Present design sections" [label="no, revise"];
-    "User approves design?" -> "Write design doc" [label="yes"];
+    "User approves design?" -> "Failure-mode check" [label="yes"];
+    "Failure-mode check" -> "Write design doc";
     "Write design doc" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
     "User reviews spec?" -> "Write design doc" [label="changes requested"];
@@ -93,13 +100,30 @@ digraph brainstorming {
 - Can someone understand what a unit does without reading its internals? Can you change the internals without breaking consumers? If not, the boundaries need work.
 - Smaller, well-bounded units are also easier for you to work with - you reason better about code you can hold in context at once, and your edits are more reliable when files are focused. When a file grows large, that's often a signal that it's doing too much.
 
+**Engineering rigor:**
+
+- Verify requirements are complete and unambiguous before designing.
+- Identify edge cases, error paths, and cross-platform concerns early.
+- Evaluate trade-offs explicitly (performance vs. readability, flexibility vs. simplicity).
+- Prioritize modularity, SOLID principles, and production-ready standards.
+- Flag architectural risks that will be expensive to fix later.
+
 **Working in existing codebases:**
 
 - Explore the current structure before proposing changes. Follow existing patterns.
 - Where existing code has problems that affect the work (e.g., a file that's grown too large, unclear boundaries, tangled responsibilities), include targeted improvements as part of the design - the way a good developer improves code they're working in.
 - Don't propose unrelated refactoring. Stay focused on what serves the current goal.
+- If the repo lacks `CLAUDE.md` / `AGENTS.md` and long-term collaboration is expected, consider using `superpowers:claude-md-creator` to create a minimal, high-signal context file.
 
 ## After the Design
+
+**Failure-mode check:**
+Before writing the doc, state the top 2-3 ways the chosen approach could fail or not cover all cases. This is adversarial reasoning, not a list of known assumptions — actively try to break the design. For each failure mode found, assess severity:
+
+- **Critical** (design fails for a significant user scenario): revise the design before proceeding.
+- **Minor** (edge case, acceptable limitation): document as a non-goal in the design.
+
+Do not skip this step. An approach that survives adversarial questioning is an approach worth approving.
 
 **Documentation:**
 
@@ -157,3 +181,51 @@ A question about a UI topic is not automatically a visual question. "What does p
 
 If they agree to the companion, read the detailed guide before proceeding:
 `skills/brainstorming/visual-companion.md`
+
+## Exit Criteria
+
+- User approved the design.
+- Failure-mode check completed — critical failure modes resolved, minor ones documented as non-goals.
+- Design document exists at the required path (`docs/superpowers/specs/`).
+- Spec self-review completed — placeholders, contradictions, ambiguity, and scope issues resolved.
+- User reviewed the written spec and approved.
+- `superpowers:writing-plans` is invoked as the next skill.
+
+## Native Task Integration
+
+**REQUIRED:** Use native task tools to create structured tasks during design.
+
+### During Design Validation
+
+After each design section is validated, create a task with a structured description:
+
+```yaml
+TaskCreate:
+  subject: "Implement [Component Name]"
+  description: |
+    **Goal:** [What this component produces]
+
+    **Files:**
+    - Create/Modify: [paths identified during design]
+
+    **Acceptance Criteria:**
+    - [ ] [Criterion from design validation]
+    - [ ] [Criterion from design validation]
+
+    **Verify:** [How to test this component works]
+
+    ```json:metadata
+    {"files": ["path/from/design"], "acceptanceCriteria": ["criterion 1", "criterion 2"]}
+    ```
+  activeForm: "Implementing [Component Name]"
+```
+
+These tasks are refined with steps and verify commands during plan writing. See `skills/shared/task-format-reference.md` for the full format. Track all task IDs for dependency setup.
+
+### After All Components Validated
+
+Set up dependency relationships with `TaskUpdate(taskId, addBlockedBy:[prerequisite-ids])`.
+
+### Before Handoff
+
+Run `TaskList` to display the complete task structure with dependencies.

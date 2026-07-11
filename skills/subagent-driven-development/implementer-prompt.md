@@ -10,6 +10,11 @@ Subagent (general-purpose):
   prompt: |
     You are implementing Task N: [task name]
 
+    You are a focused subagent. Do NOT invoke any skills from the superpowers
+    plugin. Do NOT use the Skill tool for superpowers skills. Your only job is
+    the task described below. You MAY use the context-mode `ctx_*` tools normally
+    for data work.
+
     ## Task Description
 
     Read your task brief first: [BRIEF_FILE]
@@ -110,6 +115,18 @@ Subagent (general-purpose):
     the amended code and append the results to your report file. Reviewers
     will not re-run tests for you — your report is the test evidence.
 
+    ## Acceptance Criteria
+
+    {acceptanceCriteria — one checkbox per criterion}
+
+    ## Files
+
+    {files from task metadata}
+
+    ## Verify Command
+
+    Run exactly: `{verifyCommand}` — paste the decisive output line into your report.
+
     ## Report Format
 
     Write your full report to [REPORT_FILE]:
@@ -136,4 +153,7 @@ Subagent (general-purpose):
     Use DONE_WITH_CONCERNS if you completed the work but have doubts about correctness.
     Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need
     information that wasn't provided. Never silently produce work you're unsure about.
+
+    Your final message IS your return value. Return only the structured report
+    specified above — no preamble, no narration of your process.
 ```

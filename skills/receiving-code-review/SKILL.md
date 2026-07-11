@@ -11,6 +11,10 @@ Code review requires technical evaluation, not emotional performance.
 
 **Core principle:** Verify before implementing. Ask before assuming. Technical correctness over social comfort.
 
+## Adapter Link
+
+This skill verifies suggestions against codebase reality (e.g., the YAGNI usage grep, codebase-verification reads). Tool selection follows `skills/shared/context-mode-adapter.md`. When context-mode is active, route the YAGNI usage grep through `ctx_execute` and codebase-verification analysis reads through `ctx_execute_file`. Verification command output reported under `## Completion` MUST be echoed in-transcript — compressed agent results would otherwise drop the evidence backing each addressed item.
+
 ## The Response Pattern
 
 ```
@@ -23,6 +27,15 @@ WHEN receiving code review feedback:
 5. RESPOND: Technical acknowledgment or reasoned pushback
 6. IMPLEMENT: One item at a time, test each
 ```
+
+## Priority
+
+1. Correctness/security regressions
+2. Requirement mismatches
+3. Maintainability issues
+4. Minor polish
+
+Treat Critical and High security findings as blocking until addressed or explicitly deferred by your human partner with documented rationale.
 
 ## Forbidden Responses
 
@@ -203,6 +216,14 @@ You understand 1,2,3,6. Unclear on 4,5.
 ## GitHub Thread Replies
 
 When replying to inline review comments on GitHub, reply in the comment thread (`gh api repos/{owner}/{repo}/pulls/{pr}/comments/{id}/replies`), not as a top-level PR comment.
+
+## Completion
+
+Report:
+- Addressed items
+- Deferred items with reason
+- Verification commands/results
+- Remaining risks
 
 ## The Bottom Line
 

@@ -43,6 +43,11 @@ digraph when_to_use {
 - Failures are related (fix one might fix others)
 - Need to understand full system state
 - Agents would interfere with each other
+- The task is content relay — fetching raw content (file contents, web pages, API responses) to bring back to the parent session. Agent results are compressed; raw content will be lost. Fetch it in the parent instead: local files with `Read`, and web/API content per `skills/shared/context-mode-adapter.md` (when context-mode is active, use `ctx_fetch_and_index` → `ctx_search`; when inactive, `WebFetch`).
+
+## Adapter Link
+
+Tool selection follows `skills/shared/context-mode-adapter.md`. Integration verification (the full project test suite after agents return) routes through the adapter: when context-mode is active, run it via `ctx_execute`; when inactive, run it natively.
 
 ## The Pattern
 
@@ -90,6 +95,7 @@ Good agent prompts are:
 1. **Focused** - One clear problem domain
 2. **Self-contained** - All context needed to understand the problem
 3. **Specific about output** - What should the agent return?
+4. **Leakage-proof** - include: "You are a focused subagent. Do NOT invoke any skills from the superpowers plugin. Do NOT use the Skill tool. Your only job is the task described below."
 
 ```markdown
 Fix the 3 failing tests in src/agents/agent-tool-abort.test.ts:
@@ -108,6 +114,9 @@ These are timing/race condition issues. Your task:
    - Adjusting test expectations if testing changed behavior
 
 Do NOT just increase timeouts - find the real issue.
+
+You are a focused subagent. Do NOT invoke any skills from the superpowers plugin.
+Do NOT use the Skill tool. Your only job is the task described above.
 
 Return: Summary of what you found and what you fixed.
 ```
@@ -132,6 +141,39 @@ Return: Summary of what you found and what you fixed.
 **Need full context:** Understanding requires seeing entire system
 **Exploratory debugging:** You don't know what's broken yet
 **Shared state:** Agents would interfere (editing same files, using same resources)
+
+## Native Task Integration
+
+Track parallel agent work with structured native tasks. Parallel work is independent, so set **no** `blockedBy`. The controller (not the dispatched agents) owns `.tasks.json` sync.
+
+### Before Dispatch
+
+Create a task per agent:
+
+```yaml
+TaskCreate:
+  subject: "[Agent assignment — concrete deliverable]"
+  description: |
+    **Goal:** [What this agent should produce]
+
+    **Files:**
+    - [Expected files to touch]
+
+    **Acceptance Criteria:**
+    - [ ] [Concrete criterion]
+
+    **Verify:** [Command to verify agent's work]
+
+    ```json:metadata
+    {"files": ["expected/files"], "verifyCommand": "test command", "acceptanceCriteria": ["criterion"]}
+    ```
+```
+
+See `skills/shared/task-format-reference.md` for the full format.
+
+### Monitor / Complete
+
+Monitor with `TaskList`. When marking a task completed via `TaskUpdate`, also sync `.tasks.json`: read `<plan-path>.tasks.json`, set the task's `status` to `completed`, set `lastUpdated` to the current ISO timestamp, write back.
 
 ## Real Example from Session
 

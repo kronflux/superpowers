@@ -137,6 +137,36 @@ Concrete results
 ```
 
 
+## Fork Conventions (Superpowers)
+
+This fork extends the base skill format with four conventions every new or edited skill MUST follow.
+
+### Router-style frontmatter `description`
+
+For workflow skills routed by `superpowers:using-superpowers`, write a trigger-rich `description`: start with the imperative use-condition, then list concrete trigger phrases, then `Routed by <skill>`. Do NOT summarize the workflow (SDO rule still applies). Example:
+
+```yaml
+description: >
+  Use when <condition>. Triggers on: "<phrase>", "<phrase>". Routed by
+  using-superpowers or <handoff-skill>.
+```
+
+### Named agents
+
+When a skill dispatches review/analysis agents, reference them by namespace: `superpowers:code-reviewer`, `superpowers:red-team`. Always provide a `general-purpose` Task fallback + inline template for when the named agent is absent. Never set `subagent_type:"Bash"`.
+
+### Context-engine files (existence-gated)
+
+Skills may read context-engine artifacts — `context-snapshot.json`, `project-map.md`, `state.md`, `known-issues.md` — but EVERY reference MUST be gated on existence (`If <file> exists at the project root, …`) with a native fallback, so the skill runs standalone. Internal skills (e.g. `self-consistency-reasoner`) are gated on skill presence (`If the <skill> skill is installed, …`).
+
+### Micro-task exemption
+
+`superpowers:using-superpowers` pre-screens micro tasks (typo fix, single rename, ≤1-line config change) past all workflow ceremony. Process skills MUST respect that exemption — do not force ceremony on typo-level changes.
+
+### context-mode awareness
+
+Any skill with a data-processing surface (web fetch, build runs, unbounded Bash, analysis reads, count/filter greps) MUST link `skills/shared/context-mode-adapter.md` rather than emitting `curl`/`wget`/`WebFetch`/"Read directly"/"Grep to locate" directives — those are hard-blocked or nudged when context-mode is active. State-probes, mutations, file writes, and git stay native.
+
 ## Skill Discovery Optimization (SDO)
 
 **Critical for discovery:** Future agents need to FIND your skill

@@ -127,6 +127,8 @@ Run tests to ensure workspace starts clean:
 npm test / cargo test / pytest / go test ./...
 ```
 
+If context-mode is active, run the baseline test command via `ctx_execute(language:"shell", code:"<test cmd> 2>&1 | tail -30")` per `skills/shared/context-mode-adapter.md`.
+
 **If tests fail:** Report failures, ask whether to proceed or investigate.
 
 **If tests pass:** Report ready.
@@ -200,3 +202,7 @@ Ready to implement <feature-name>
 - Verify directory is ignored for project-local
 - Auto-detect and run project setup
 - Verify clean test baseline
+
+## Integration
+
+Use with `superpowers:writing-plans`, `superpowers:subagent-driven-development` (REQUIRED before executing tasks), and `superpowers:executing-plans` (REQUIRED before executing tasks). Cleanup is handled by `superpowers:finishing-a-development-branch`.

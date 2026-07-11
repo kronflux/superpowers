@@ -5,6 +5,14 @@ description: Use when implementation is complete, all tests pass, and you need t
 
 # Finishing a Development Branch
 
+## Hard Rules
+
+- Never merge with failing tests.
+- Never delete work without explicit confirmation.
+- Never force-push unless explicitly requested.
+- Never remove a worktree before confirming merge success.
+- Never clean up worktrees you did not create (provenance check).
+
 ## Overview
 
 Guide completion of development work by presenting clear options and handling chosen workflow.
@@ -23,6 +31,8 @@ Guide completion of development work by presenting clear options and handling ch
 # Run project's test suite
 npm test / cargo test / pytest / go test ./...
 ```
+
+If context-mode is active, run the test/verification command via `ctx_execute` per `skills/shared/context-mode-adapter.md`, and echo the pass/fail summary in-transcript.
 
 **If tests fail:**
 ```
@@ -112,6 +122,8 @@ git merge <feature-branch>
 # Only after merge succeeds: cleanup worktree (Step 6), then delete branch
 ```
 
+If context-mode is active, run the merged-result verification command via `ctx_execute` per `skills/shared/context-mode-adapter.md`, and echo the pass/fail summary in-transcript.
+
 Then: Cleanup worktree (Step 6), then delete branch:
 
 ```bash
@@ -124,6 +136,8 @@ git branch -d <feature-branch>
 # Push branch
 git push -u origin <feature-branch>
 ```
+
+When creating the PR, include a `## Notable Decisions` section (trade-offs, alternatives rejected, non-obvious choices). If `session-log.md` exists and has `[saved]` entries from this branch's lifetime, extract the Decisions and Rejected bullets from the most recent entry and include them there.
 
 **Do NOT clean up worktree** — user needs it alive to iterate on PR feedback.
 

@@ -44,6 +44,21 @@ Write code before the test? Delete it. Start over.
 
 Implement fresh from tests. Period.
 
+## Test Infrastructure Check
+
+Before writing the first test, verify the project has a test runner:
+
+1. Check for test config: `jest.config.*`, `vitest.config.*`, `pytest.ini`, `pyproject.toml [tool.pytest]`, `go.mod`, `Cargo.toml`, `.rspec`, `phpunit.xml`
+2. Check for test script: `npm test`, `yarn test`, `make test`, or equivalent
+3. If no test infrastructure exists:
+   - Ask your human partner: "No test runner detected. Should I set up [recommended runner for this language/framework]?"
+   - If yes: install and configure the minimal test runner. Write one smoke test to confirm it works.
+   - If no: note that TDD requires a test runner and proceed only if your human partner provides an alternative.
+
+Do not skip this step — a "failing test" that fails because the runner doesn't exist teaches nothing.
+
+If context-mode is active, run test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+
 ## Red-Green-Refactor
 
 ```dot
@@ -127,6 +142,8 @@ Confirm:
 
 **Test errors?** Fix error, re-run until it fails correctly.
 
+If context-mode is active, run test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+
 ### GREEN - Minimal Code
 
 Write simplest code to pass the test.
@@ -182,6 +199,8 @@ Confirm:
 
 **Other tests fail?** Fix now.
 
+If context-mode is active, run test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+
 ### REFACTOR - Clean Up
 
 After green only:
@@ -194,6 +213,24 @@ Keep tests green. Don't add behavior.
 ### Repeat
 
 Next failing test for next feature.
+
+## Right vs Wrong
+
+**Wrong — code first:**
+```
+1. Write the handler function
+2. Write tests to verify it works
+3. All tests pass on first run ← this means the tests prove nothing
+```
+
+**Right — test first:**
+```
+1. Write test: POST /users returns 201 with valid body
+2. Run test → FAILS (handler doesn't exist yet) ← good
+3. Write minimal handler to return 201
+4. Run test → PASSES ← test proved the behavior was missing, now it works
+5. Refactor handler if needed, tests stay green
+```
 
 ## Good Tests
 
@@ -360,6 +397,25 @@ When adding mocks or test utilities, read [testing-anti-patterns.md](testing-ant
 - Testing mock behavior instead of real behavior
 - Adding test-only methods to production classes
 - Mocking without understanding dependencies
+
+## Advanced Test Strategy
+
+For complex, high-risk, or hard-to-test behavior, go beyond basic unit tests while still following RED-GREEN-REFACTOR:
+
+- **Integration tests**: Test real interactions between components (database, API, filesystem). Prefer real dependencies over mocks.
+- **E2E tests**: For user-facing flows, verify the full path from input to output.
+- **Property-based tests**: When behavior has invariants (e.g., "sort output is always ordered"), generate random inputs to find edge cases.
+- **Performance tests**: When latency or throughput matters, add benchmarks with clear thresholds.
+- **Flaky test diagnosis**: If a test passes/fails inconsistently, treat it as a bug — find the race condition, timing dependency, or shared state causing it.
+- **Coverage strategy**: Focus coverage on behavior boundaries and error paths, not line counts. 80% meaningful coverage beats 100% trivial coverage.
+
+Choose appropriate frameworks and libraries for the current stack. Write tests that are fast, deterministic, and maintainable.
+
+## Related
+
+- Use `superpowers:systematic-debugging` to find root cause before writing the fix test.
+- Use `superpowers:verification-before-completion` before success claims.
+- Read `testing-anti-patterns.md` when introducing heavy mocking.
 
 ## Final Rule
 

@@ -9,6 +9,10 @@ Dispatch a code reviewer subagent to catch issues before they cascade. The revie
 
 **Core principle:** Review early, review often.
 
+## Adapter Link
+
+The review scope is derived from `git diff` — a structurally-bounded read that stays native. Tool selection otherwise follows `skills/shared/context-mode-adapter.md`. When context-mode is active and the reviewer or red team computes findings via `ctx` tools, the `PROVEN BY` evidence and severity findings MUST be echoed in-transcript — compressed agent results would otherwise drop the supporting evidence, blocking false-positive triage.
+
 ## When to Request Review
 
 **Mandatory:**
@@ -29,9 +33,13 @@ BASE_SHA=$(git rev-parse HEAD~1)  # or origin/main
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 
-**2. Dispatch code reviewer subagent:**
+**1b. Scope the review (existence-gated):** Check for `context-snapshot.json` at the project root:
+- If present: run `git rev-parse HEAD` and compare to `git_hash` in the file.
+  - **Hashes match (fresh):** use `changed_files` and `blast_radius` as the review scope. Inject this summary into the code-reviewer prompt: *"Changed files: [list]. Also referenced by: [blast_radius callers]."*
+  - **Hashes differ (stale):** note the snapshot is from a previous commit; use `changed_files` as a starting point but do not rely on `blast_radius`.
+- If absent: determine scope from `git diff --name-only BASE_SHA..HEAD_SHA` directly.
 
-Dispatch a `general-purpose` subagent, filling the template at [code-reviewer.md](code-reviewer.md)
+**2. Dispatch code reviewer subagent** per Agent Dispatch & Fallback below, filling the template at [code-reviewer.md](code-reviewer.md) when using the `general-purpose` fallback.
 
 **Placeholders:**
 - `{DESCRIPTION}` - Brief summary of what you built
@@ -44,6 +52,86 @@ Dispatch a `general-purpose` subagent, filling the template at [code-reviewer.md
 - Fix Important issues before proceeding
 - Note Minor issues for later
 - Push back if reviewer is wrong (with reasoning)
+
+## Agent Dispatch & Fallback
+
+Dispatch review subagents via the Task tool. **Never set the subagent type to Bash** — under context-mode it is upgraded to `general-purpose`, so it is never the right choice here.
+
+**Resolution order:**
+
+1. **Named agents present** — if both `superpowers:code-reviewer` and `superpowers:red-team` are registered, dispatch them **in parallel** (two Task calls in one turn):
+   - `superpowers:code-reviewer` for spec/correctness/OWASP/CWE review.
+   - `superpowers:red-team` for adversarial breakage analysis (logic, state, concurrency, production-context).
+   Pass each the scoped file list, SHA range, description, and requirement reference.
+2. **Named agents absent** — fall back to a single `general-purpose` subagent, filling the inline template at [code-reviewer.md](code-reviewer.md) with `{DESCRIPTION}`, `{PLAN_OR_REQUIREMENTS}`, `{BASE_SHA}`, `{HEAD_SHA}`. The red-team pass is skipped in fallback mode unless the change touches state machines, concurrency, or critical data paths — in which case add a second `general-purpose` dispatch carrying the red-team brief inline.
+
+**Detecting presence:** the named agents are resolvable when `agents/code-reviewer.md` and `agents/red-team.md` ship with this plugin and the harness registers them. If a dispatch to a named agent returns an "unknown agent" / unresolved error, treat it as absent and re-dispatch via the `general-purpose` fallback.
+
+**Evidence in-transcript:** when context-mode is active, computed verification output may land in the ctx sandbox rather than the conversation. Each review must still surface its `AC: <criterion> — PROVEN BY <evidence>` and merge-readiness verdict as text in this conversation, not only inside a ctx sandbox.
+
+## Security Review (Built-In)
+
+When changes touch security-relevant areas, the code review **must** include a security pass. This is not a separate step — it's part of every review where applicable.
+
+**Triggers automatically when changes touch:**
+- Authentication or authorization flows
+- Input validation or output encoding
+- API endpoints handling user data
+- Secrets management or credential handling
+- Cryptography, key management, or token generation
+- Infrastructure, deployment, or CI/CD configs
+
+**Security checklist:**
+- OWASP Top 10 and CWE vulnerability scan
+- OWASP API Security Top 10: broken object/function-level authorization, unrestricted resource consumption, SSRF, mass assignment, improper inventory management
+- Input validation and injection risk (SQL, XSS, CSRF, command injection)
+- Auth flow correctness (session handling, token expiry, privilege escalation, rate limiting on auth endpoints)
+- Secrets handling (no hardcoded credentials, proper env var usage)
+- Dependency vulnerabilities (known CVEs in imported packages)
+- API hardening (security headers, CORS configuration, error message sanitization, rate limiting)
+- Logging hygiene (no secrets in logs, adequate audit trail)
+
+**Severity enforcement:**
+- Critical/High security findings **block merge** until addressed or the user explicitly accepts the risk with documented rationale.
+- Medium security findings should be fixed before merge unless explicitly deferred.
+
+## Adversarial Red Team (Optional)
+
+For changes involving complex logic, concurrency, state management, or critical data paths, dispatch `superpowers:red-team` in parallel with the code reviewer.
+
+**Triggers when changes touch:**
+- State machines or multi-step workflows
+- Concurrent access to shared resources
+- Complex business logic with branching conditions
+- Data transformation pipelines
+- Retry/recovery/rollback logic
+- Performance-critical paths handling large inputs
+
+The red team agent finds concrete failure scenarios (specific inputs, race conditions, state corruption, resource exhaustion) that checklist-based review misses. It does NOT duplicate the security review — its focus is adversarial logic analysis, not OWASP/CWE compliance.
+
+**Red team critical findings block merge** alongside security critical findings.
+
+## Auto-Fix Pipeline
+
+When the red team report contains Critical or High findings, run the auto-fix pipeline. The pipeline is **ASI-guided and iterative** — fix one finding at a time, starting from the red team's designated ASI, then re-assess before proceeding. This prevents fixes from conflicting with each other when findings touch shared code.
+
+**Iteration loop:**
+
+1. **Identify the entry point.** Start with the finding marked **ASI** in the red team summary. If no ASI is marked, start with the highest-severity finding.
+2. **Write the failing test.** Flesh out the test skeleton from the red team report into a real test and run it. It MUST fail — this proves the scenario is real. If the test passes, the finding was a false positive; skip it and note it in the triage, then re-identify the next ASI.
+3. **Fix the code.** Make the minimum change to pass the test. Do not refactor or improve surrounding code.
+4. **Run a targeted re-check.** Re-read only the files touched by the fix and check whether: (a) the fix introduced any new issues, and (b) any previously reported findings are now resolved as a side effect.
+5. **Re-assess the remaining findings.** Update your list — remove resolved findings, re-prioritize if the fix changed the risk landscape. Identify the new ASI.
+6. **Repeat** from step 2 until no Critical or High findings remain.
+
+**After the loop completes:**
+- Run the full test suite one final time to confirm no regressions across all fixes.
+- Report: findings fixed, false positives skipped, any regressions introduced and resolved.
+
+**Skip conditions:**
+- If the red team report has zero Critical/High findings, skip the pipeline entirely.
+- Medium findings are tracked for later, not auto-fixed.
+- If the user explicitly says to skip auto-fix, respect that.
 
 ## Example
 
@@ -99,5 +187,9 @@ You: [Fix progress indicators]
 - Push back with technical reasoning
 - Show code/tests that prove it works
 - Request clarification
+
+## Output Requirement
+
+Review must include severity, file references, security findings (if applicable), and merge readiness verdict.
 
 See template at: [code-reviewer.md](code-reviewer.md)

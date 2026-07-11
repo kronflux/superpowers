@@ -47,6 +47,11 @@ Use for ANY technical issue:
 
 You MUST complete each phase before proceeding to the next.
 
+### Phase 0: Check Known Issues
+
+- **If `known-issues.md` exists at the project root**, search it for the error message, error code, or failing test name. If a match is found, try the documented solution first; if it resolves the issue, stop. If no match or it doesn't work, proceed to Phase 1.
+- If `known-issues.md` does not exist, skip Phase 0 and start at Phase 1.
+
 ### Phase 1: Root Cause Investigation
 
 **BEFORE attempting ANY fix:**
@@ -62,12 +67,15 @@ You MUST complete each phase before proceeding to the next.
    - What are the exact steps?
    - Does it happen every time?
    - If not reproducible → gather more data, don't guess
+   - For tests that fail only in certain orderings (test pollution), run `find-polluter.sh` from this skill's directory to identify the corrupting test.
 
 3. **Check Recent Changes**
    - What changed that could cause this?
    - Git diff, recent commits
    - New dependencies, config changes
    - Environmental differences
+   - **If `context-snapshot.json` exists at the project root:** read it; its `changed_files` and `recent_commits` fields answer "what changed" without extra git commands.
+   - **Otherwise:** run `git log --oneline -10` and `git diff HEAD~1..HEAD --name-only`.
 
 4. **Gather Evidence in Multi-Component Systems**
 
@@ -107,6 +115,8 @@ You MUST complete each phase before proceeding to the next.
 
    **This reveals:** Which layer fails (secrets → workflow ✓, workflow → build ✗)
 
+   If context-mode is active, run diagnostic and test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; surface the layer-by-layer evidence in-transcript.
+
 5. **Trace Data Flow**
 
    **WHEN error is deep in call stack:**
@@ -145,6 +155,8 @@ You MUST complete each phase before proceeding to the next.
 ### Phase 3: Hypothesis and Testing
 
 **Scientific method:**
+
+**Self-Consistency Gate (optional):** If the `superpowers:self-consistency-reasoner` skill is installed, apply multi-path reasoning before committing to a hypothesis: generate 3-5 independent root-cause hypotheses, reason each to a conclusion independently, take the majority vote, and report confidence (High 80-100% → test the majority; Moderate 60-79% → test majority, note minority; Low ≤50% → STOP and gather more evidence). If the skill is not installed, form one clearly-stated hypothesis and test it minimally.
 
 1. **Form Single Hypothesis**
    - State clearly: "I think X is the root cause because Y"
@@ -212,6 +224,10 @@ You MUST complete each phase before proceeding to the next.
 
    This is NOT a failed hypothesis - this is a wrong architecture.
 
+## Escalation Rule
+
+If 3 fix attempts fail, **stop**. Do not attempt a fourth. Discuss architecture with your human partner before continuing. The bug may indicate a design flaw, not a code defect.
+
 ## Red Flags - STOP and Follow Process
 
 If you catch yourself thinking:
@@ -259,6 +275,7 @@ If you catch yourself thinking:
 
 | Phase | Key Activities | Success Criteria |
 |-------|---------------|------------------|
+| **0. Known Issues** | Search `known-issues.md` if present | Documented fix found or absent |
 | **1. Root Cause** | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
 | **2. Pattern** | Find working examples, compare | Identify differences |
 | **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
@@ -274,6 +291,12 @@ If systematic investigation reveals issue is truly environmental, timing-depende
 4. Add monitoring/logging for future investigation
 
 **But:** 95% of "no root cause" cases are incomplete investigation.
+
+## Post-Fix: Update Knowledge Base
+
+After resolving a bug:
+1. **Recurring error?** → offer to add the error→solution mapping to `known-issues.md` (create it if absent) using the format from the `superpowers:error-recovery` skill, if installed.
+2. **Permanent constraint discovered?** → offer to add it to `project-map.md` Critical Constraints via `superpowers:context-management`, if that skill is installed and the file exists or the user agrees to create it.
 
 ## Supporting Techniques
 
