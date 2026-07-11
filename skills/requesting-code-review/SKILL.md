@@ -81,15 +81,7 @@ When changes touch security-relevant areas, the code review **must** include a s
 - Cryptography, key management, or token generation
 - Infrastructure, deployment, or CI/CD configs
 
-**Security checklist:**
-- OWASP Top 10 and CWE vulnerability scan
-- OWASP API Security Top 10: broken object/function-level authorization, unrestricted resource consumption, SSRF, mass assignment, improper inventory management
-- Input validation and injection risk (SQL, XSS, CSRF, command injection)
-- Auth flow correctness (session handling, token expiry, privilege escalation, rate limiting on auth endpoints)
-- Secrets handling (no hardcoded credentials, proper env var usage)
-- Dependency vulnerabilities (known CVEs in imported packages)
-- API hardening (security headers, CORS configuration, error message sanitization, rate limiting)
-- Logging hygiene (no secrets in logs, adequate audit trail)
+**Security checklist:** the canonical checklist lives in `agents/code-reviewer.md` (Review dimensions → Security checklist) — the code-reviewer agent runs it as part of every review.
 
 **Severity enforcement:**
 - Critical/High security findings **block merge** until addressed or the user explicitly accepts the risk with documented rationale.
@@ -110,6 +102,8 @@ For changes involving complex logic, concurrency, state management, or critical 
 The red team agent finds concrete failure scenarios (specific inputs, race conditions, state corruption, resource exhaustion) that checklist-based review misses. It does NOT duplicate the security review — its focus is adversarial logic analysis, not OWASP/CWE compliance.
 
 **Red team critical findings block merge** alongside security critical findings.
+
+Severity mapping: red-team High→Important, Medium→Minor; merge-blocking = any Critical from either agent.
 
 ## Auto-Fix Pipeline
 
