@@ -117,6 +117,9 @@ include this section.]
 - Modify: `exact/path/to/existing.py:123-145`
 - Test: `tests/exact/path/to/test.py`
 
+**Security flag:** `none` *(set to `security` if this task handles auth, credentials, input validation,
+permissions, crypto, or data access boundaries — triggers pre-implementation security review before dispatch)*
+
 **Interfaces:**
 - Consumes: [what this task uses from earlier tasks — exact signatures]
 - Produces: [what later tasks rely on — exact function names, parameter
