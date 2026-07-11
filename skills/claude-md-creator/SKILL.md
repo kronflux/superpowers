@@ -1,10 +1,6 @@
 ---
 name: claude-md-creator
-description: >
-  Creates minimal, high-signal CLAUDE.md and AGENTS.md context files
-  based on empirical best practices. Invoke on /init command, "create
-  CLAUDE.md", "update CLAUDE.md", "write AGENTS.md", or "set up Claude Code for this
-  project". Also invoked by superpowers:brainstorming when repo lacks a context file.
+description: 'Creates minimal, high-signal CLAUDE.md and AGENTS.md context files. Invoke on /init, "create CLAUDE.md", "update CLAUDE.md", "write AGENTS.md", "set up Claude Code". Also invoked by brainstorming when a repo lacks a context file.'
 tools: Read, Glob, Grep, Bash, Edit
 ---
 

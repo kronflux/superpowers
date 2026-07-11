@@ -1,11 +1,6 @@
 ---
 name: token-efficiency
-description: >
-  Always-on operational standard. Enforces concise responses, parallel tool
-  execution, no redundant work, exploration tracking, and proactive context
-  compression throughout every session. Distinct from superpowers:context-management
-  (which persists durable state across sessions). Applied automatically at session
-  start. Routed by superpowers:using-superpowers, or invoke directly via /token-efficiency.
+description: 'Always-on operational standard: concise responses, parallel tool execution, no redundant work, exploration tracking, proactive context compression. Distinct from context-management (cross-session state). Applied automatically at session start.'
 ---
 
 # Token Efficiency

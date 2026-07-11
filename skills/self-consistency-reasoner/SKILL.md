@@ -1,11 +1,6 @@
 ---
 name: self-consistency-reasoner
-description: >
-  Internal reasoning technique invoked by superpowers:systematic-debugging and
-  superpowers:verification-before-completion for high-stakes multi-step inference.
-  Generates N independent reasoning paths and takes majority vote to
-  surface confident-but-wrong single-chain failures. DO NOT invoke
-  independently — this skill is embedded in the skills that need it.
+description: 'Internal technique for high-stakes multi-step inference, invoked by systematic-debugging and verification-before-completion. N independent reasoning paths, majority vote. DO NOT invoke independently; embedded in the skills that need it.'
 ---
 
 # Self-Consistency Reasoner

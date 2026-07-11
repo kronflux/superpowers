@@ -1,6 +1,6 @@
 ---
 name: checking-gates
-description: Use when picking up a user-gate task OR when a hook demands re-validation. Runs the "do I know HOW?" self-check; if the HOW is clear, executes the verification and posts evidence; if not, hands off to specifying-gates. Kept deliberately separate from executing-plans so that without the opt-in hook, the main flow stays untouched.
+description: Use when picking up a user-gate task OR a hook demands re-validation. Runs the "do I know HOW?" self-check; if clear, executes the verification and posts evidence; if not, hands off to specifying-gates. Separate from executing-plans; dormant without the opt-in hook.
 ---
 
 # Checking User-Thrown Gates

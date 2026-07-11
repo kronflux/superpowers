@@ -1,15 +1,6 @@
 ---
 name: performance-investigation
-description: >
-  MUST USE when investigating or fixing performance issues: slow responses, high
-  memory usage, CPU spikes, throughput degradation, or optimization requests.
-  Enforces measure-first methodology — profile before guessing, baseline before
-  fixing, re-measure after every change. Distinct from superpowers:systematic-debugging (which
-  changes behavior to fix bugs) and superpowers:brainstorming (which designs new features).
-  Triggers on: "slow", "performance", "optimize", "speed up", "latency", "throughput",
-  "memory leak", "high CPU", "profiling", "benchmark", "bottleneck", "takes too long",
-  "response time", "why is this slow", "make it faster", "reduce memory", "loading time".
-  Routed by superpowers:using-superpowers, or invoke directly via /performance-investigation.
+description: 'MUST USE for performance issues: slow responses, memory/CPU spikes, throughput drops, optimization requests. Measure first: profile, baseline, re-measure after every change. Not for bug fixes or new features. Triggers: "slow", "optimize", "memory leak", "bottleneck", "make it faster".'
 ---
 
 # Performance Investigation

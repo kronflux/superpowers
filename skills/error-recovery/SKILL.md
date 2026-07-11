@@ -1,12 +1,6 @@
 ---
 name: error-recovery
-description: >
-  Maintains a project-specific known-issues.md mapping recurring errors
-  to their solutions. Consulted automatically by superpowers:systematic-debugging
-  before investigation. Saves time by avoiding rediscovery of known
-  problems across sessions. Triggers on: "save this fix", "remember
-  this error", "known issues", or automatically when superpowers:systematic-debugging
-  resolves a recurring error.
+description: 'Maintains project-specific known-issues.md mapping recurring errors to solutions; consulted by systematic-debugging before investigation. Triggers: "save this fix", "remember this error", "known issues", or when systematic-debugging resolves a recurring error.'
 ---
 
 # Error Recovery Intelligence

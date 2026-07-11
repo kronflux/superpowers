@@ -1,15 +1,6 @@
 ---
 name: deliberation
-description: >
-  Use BEFORE brainstorming when facing a complex architectural, technology,
-  or design decision where the options are not yet well-defined or the
-  problem itself may need reframing. Assembles named stakeholder perspectives
-  that each speak once without debate, then surfaces where they converge and
-  where real tension remains — without forcing a premature choice. Triggers
-  on: "should we use X or Y", "not sure which approach", "evaluate these
-  options", "what are the trade-offs between", "help me think through this
-  decision", "architecture decision", "technology choice". Routed by
-  superpowers:using-superpowers before brainstorming when the decision space is unclear.
+description: 'Use BEFORE brainstorming for complex architecture/tech/design decisions with unclear options or framing. Named stakeholder perspectives each speak once; convergence and real tensions surface. Triggers: "should we use X or Y", "not sure which approach", "architecture decision", "technology choice".'
 ---
 
 # Deliberation

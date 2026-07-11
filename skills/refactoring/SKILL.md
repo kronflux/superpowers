@@ -1,14 +1,6 @@
 ---
 name: refactoring
-description: >
-  MUST USE when restructuring existing code without changing behavior: extracting
-  functions/modules, inlining, simplifying, decoupling, reorganizing files, renaming
-  across the codebase, or cleaning up code structure. Enforces behavior-locking tests
-  before any structural change and incremental verification after each move. Distinct
-  from superpowers:brainstorming (which designs new behavior) and bug fixing (which changes behavior).
-  Triggers on: "refactor", "restructure", "reorganize", "clean up this code", "extract
-  into", "inline this", "simplify", "decouple", "modularize", "move these files", "split this module", "consolidate", "reduce complexity".
-  Routed by superpowers:using-superpowers, or invoke directly via /refactoring.
+description: 'MUST USE when restructuring code without changing behavior: extracting, inlining, decoupling, renaming, moving files. Behavior-locking tests first, verify after each move. Not for new behavior or bug fixes. Triggers: "refactor", "restructure", "clean up this code", "simplify", "consolidate".'
 ---
 
 # Refactoring

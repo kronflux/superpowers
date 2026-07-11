@@ -25,14 +25,14 @@
       "skill": "deliberation",
       "type": "workflow",
       "priority": "high",
-      "keywords": ["trade-off", "tradeoff", "trade off", "evaluate options", "compare approaches", "architecture decision", "technology choice", "not sure which", "which approach", "should we use", "help me decide", "weigh the options"],
+      "keywords": ["trade-off", "tradeoff", "trade off", "evaluate options", "compare approaches", "architecture decision", "technology choice", "not sure which", "which approach", "should we use", "help me decide", "weigh the options", "evaluate these options", "help me think through"],
       "intentPatterns": ["should\\s+we\\s+(use|go\\s+with|choose|pick|switch|migrate)", "not\\s+sure\\s+(which|what|whether|if\\s+we)", "(evaluate|compare|weigh)\\s+(these|the|our)\\s+(options|approaches|alternatives)", "what\\s+are\\s+the\\s+trade.?offs", "help\\s+me\\s+(think|decide|choose)\\s+(through|between|among)"]
     },
     {
       "skill": "premise-check",
       "type": "workflow",
       "priority": "high",
-      "keywords": ["design a system", "create a plan", "build out", "should we build", "worth building", "validate the premise", "question the premise"],
+      "keywords": ["design a system", "create a plan", "build out", "should we build", "worth building", "validate the premise", "question the premise", "extend this to handle"],
       "intentPatterns": ["(design|create|build|implement)\\s+(a\\s+)?system", "should\\s+(we|i)\\s+(really\\s+)?build\\s+this", "(is\\s+(this|it)|are\\s+we)\\s+worth\\s+build", "validate\\s+(the\\s+)?premise", "(before|prior\\s+to)\\s+(design|plan|build)"]
     },
     {
@@ -100,7 +100,7 @@
       "skill": "frontend-design",
       "type": "domain",
       "priority": "high",
-      "keywords": ["frontend", "ui", "ux", "website", "landing page", "dashboard", "component", "react", "vue", "svelte", "html", "css", "responsive", "accessibility"],
+      "keywords": ["frontend", "ui", "ux", "website", "landing page", "dashboard", "component", "react", "vue", "svelte", "html", "css", "responsive", "accessibility", "make it look professional"],
       "intentPatterns": ["(build|create|make|design)\\s+(a\\s+)?(ui|frontend|website|page|dashboard|component)", "make\\s+it\\s+look\\s+(good|better|professional|nice)", "(style|design)\\s+(this|the)"]
     },
     {
@@ -114,7 +114,7 @@
       "skill": "context-management",
       "type": "workflow",
       "priority": "high",
-      "keywords": ["map this project", "project map", "map the project", "generate project map", "create project map", "update project map", "context management"],
+      "keywords": ["map this project", "project map", "map the project", "generate project map", "create project map", "update project map", "context management", "save state", "compress context"],
       "intentPatterns": ["map\\s+(this|the)\\s+project", "generate\\s+(a\\s+)?project\\s+map", "(create|update|write)\\s+(the\\s+|a\\s+)?project.?map", "use\\s+(the\\s+)?context.?management"]
     },
     {
@@ -135,21 +135,21 @@
       "skill": "refactoring",
       "type": "process",
       "priority": "high",
-      "keywords": ["refactor", "restructure", "reorganize", "clean up", "extract", "inline", "simplify", "decouple", "modularize", "rename across", "move files", "split module", "consolidate"],
+      "keywords": ["refactor", "restructure", "reorganize", "clean up", "extract", "inline", "simplify", "decouple", "modularize", "rename across", "move files", "split module", "consolidate", "move these files", "split this module", "reduce complexity"],
       "intentPatterns": ["(refactor|restructure|reorganize|simplify|decouple|modularize)\\s+(this|the|my|our|a)", "clean\\s+up\\s+(this|the|my)", "extract\\s+(this|a|the)\\s+(into|to|as)", "inline\\s+(this|the)", "split\\s+(this|the)\\s+(module|file|class|component)", "move\\s+(these|the|this)\\s+files?", "rename\\s+.+\\s+across"]
     },
     {
       "skill": "performance-investigation",
       "type": "process",
       "priority": "medium",
-      "keywords": ["slow", "performance", "optimize", "speed up", "latency", "throughput", "memory leak", "high cpu", "profiling", "benchmark", "bottleneck", "loading time", "response time"],
+      "keywords": ["slow", "performance", "optimize", "speed up", "latency", "throughput", "memory leak", "high cpu", "profiling", "benchmark", "bottleneck", "loading time", "response time", "takes too long", "why is this slow", "make it faster", "reduce memory"],
       "intentPatterns": ["(why\\s+is|make)\\s+(this|it)\\s+(so\\s+)?slow", "speed\\s+(this|it)\\s+up", "make\\s+(this|it)\\s+faster", "reduce\\s+(memory|cpu|latency|load\\s+time)", "optimize\\s+(this|the|my)", "takes\\s+too\\s+long", "performance\\s+(issue|problem|degradation|regression)"]
     },
     {
       "skill": "dependency-management",
       "type": "process",
       "priority": "medium",
-      "keywords": ["dependency", "dependencies", "upgrade packages", "npm update", "pip upgrade", "outdated", "vulnerability", "CVE", "security advisory", "breaking change", "migration guide", "peer dependency", "dependabot", "npm audit"],
+      "keywords": ["dependency", "dependencies", "upgrade packages", "npm update", "pip upgrade", "outdated", "vulnerability", "CVE", "security advisory", "breaking change", "migration guide", "peer dependency", "dependabot", "npm audit", "update dependencies", "dependency conflict", "update to latest", "audit dependencies"],
       "intentPatterns": ["update\\s+(the\\s+)?(dependencies|packages|deps)", "upgrade\\s+(to|packages|deps)", "(fix|resolve|address)\\s+(the\\s+)?(vulnerabilit|CVE|security\\s+advisory)", "npm\\s+(audit|outdated|update)", "pip\\s+(audit|install\\s+--upgrade)", "breaking\\s+change(s)?\\s+(in|from|after)", "migrate\\s+to\\s+(v?\\d|new\\s+version|latest)"]
     },
     {

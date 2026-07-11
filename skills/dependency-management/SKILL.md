@@ -1,16 +1,6 @@
 ---
 name: dependency-management
-description: >
-  MUST USE when updating, migrating, or auditing project dependencies: upgrading
-  packages, fixing security vulnerabilities (CVEs), resolving breaking changes,
-  migrating to new major versions, or auditing outdated dependencies. Enforces
-  incremental updates with verification at each step. Distinct from superpowers:systematic-debugging
-  (which fixes application bugs) and superpowers:refactoring (which restructures application code).
-  Triggers on: "update dependencies", "upgrade packages", "npm update", "pip upgrade",
-  "outdated", "vulnerability", "CVE", "security advisory", "breaking change",
-  "migration guide", "dependency conflict", "peer dependency",
-  "update to latest", "audit dependencies", "npm audit", "dependabot".
-  Routed by superpowers:using-superpowers, or invoke directly via /dependency-management.
+description: 'MUST USE when updating, migrating, or auditing dependencies: upgrades, CVE fixes, breaking-change migrations, conflicts. Incremental updates, verified each step. Not for app bugs or code restructuring. Triggers: "update dependencies", "upgrade packages", "npm audit", "CVE", "breaking change".'
 ---
 
 # Dependency Management

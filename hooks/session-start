@@ -7,8 +7,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Read using-superpowers content
-using_superpowers_content=$(cat "${PLUGIN_ROOT}/skills/using-superpowers/SKILL.md" 2>&1 || echo "Error reading using-superpowers skill")
+# Read using-superpowers content (body only: the YAML frontmatter's
+# name/description are already system-prompt-resident via the skill listing,
+# so injecting them again would duplicate always-on context).
+using_superpowers_content=$(awk 'NR==1 && /^---[[:space:]]*$/ {fm=1; next} fm {if (/^---[[:space:]]*$/) fm=0; next} {print}' \
+    "${PLUGIN_ROOT}/skills/using-superpowers/SKILL.md" 2>&1 || echo "Error reading using-superpowers skill")
 
 # Escape string for JSON embedding using bash parameter substitution.
 # Each ${s//old/new} is a single C-level pass - orders of magnitude
@@ -24,7 +27,7 @@ escape_for_json() {
 }
 
 using_superpowers_escaped=$(escape_for_json "$using_superpowers_content")
-session_context="<EXTREMELY_IMPORTANT>\nYou have superpowers.\n\n**Below is the full content of your 'superpowers:using-superpowers' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_superpowers_escaped}\n</EXTREMELY_IMPORTANT>"
+session_context="<EXTREMELY_IMPORTANT>\nYou have superpowers.\n\n**Your 'superpowers:using-superpowers' skill - how to find and use skills. Invoke all other skills via the 'Skill' tool:**\n\n${using_superpowers_escaped}\n</EXTREMELY_IMPORTANT>"
 
 # Opt-in model routing: when the routing config exists (project first, then
 # user-level fallback) and the kill switch is not set, append a

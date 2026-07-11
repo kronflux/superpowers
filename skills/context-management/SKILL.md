@@ -1,14 +1,6 @@
 ---
 name: context-management
-description: >
-  Use in long or noisy sessions to persist durable state across session
-  boundaries via state.md. Also generates project-map.md when asked to map
-  the project. Distinct from superpowers:token-efficiency (which governs
-  in-session brevity and tool batching). Triggers on: user explicitly asks to
-  "save state", "compress context", "map this project", "generate project map",
-  "create project map", cross-session handoff needed, or repeated failures
-  indicate context is getting stale. Routed by superpowers:using-superpowers,
-  or invoke directly via /context-management.
+description: 'Persists durable state across sessions via state.md; generates project-map.md on request. Not for in-session brevity (token-efficiency). Triggers: "save state", "compress context", "map this project", "generate project map", cross-session handoff.'
 ---
 
 # Context Management
@@ -71,23 +63,7 @@ decisions worth keeping into `[saved]` entries. Capture is context-mode's job; p
 
 ### At the start of any non-trivial task
 
-Before diving in, search `session-log.md` for history relevant to the current task.
-
-**Step 1 — Extract keywords.** Take the 2-3 most distinctive nouns from the task description. Avoid generic words ("fix", "update", "file") — use domain nouns ("hook", "auth", "deploy", "staleness").
-
-**Step 2 — Search each keyword individually first.** Per `superpowers:skills/shared/context-mode-adapter.md`, route the search via `ctx_search`/`ctx_execute_file` over `session-log.md` when context-mode is active; when inactive, use native grep (native fallback):
-```bash
-grep -i "<keyword1>" session-log.md | tail -20
-grep -i "<keyword2>" session-log.md | tail -20
-```
-Check the hit count before reading results. This tells you whether to narrow or widen before committing to any output.
-
-**Step 3 — Adjust based on hit count:**
-- **0 hits on all keywords** → fall back to `project-map.md` Critical Constraints. Relevant history may have been promoted there instead of staying in the log. If still nothing, proceed without history.
-- **1–10 hits** → read them. Surface past decisions, rejected approaches, and constraints.
-- **>10 hits on one keyword** → narrow with a second term (route per the adapter; native shown for fallback): `grep -i "<kw1>" session-log.md | grep -i "<kw2>" | tail -20`
-
-**Step 4 — Surface what matters.** If relevant entries are found, state them explicitly before proceeding: what was decided, what was rejected, what constraints apply. Don't silently absorb them — make them visible so the user can confirm or override.
+Before diving in, search `session-log.md` for history relevant to the current task. Full keyword-search procedure: see [references/details.md](references/details.md#searching-the-log-at-task-start).
 
 ### When saving state (explicit invocation)
 
@@ -97,11 +73,7 @@ Check the hit count before reading results. This tells you whether to narrow or 
    - Verified facts/evidence
    - Open questions/risks
 
-   **state.md vs plan.md:**
-   - `plan.md` (or `docs/.../plans/*.md`): the authoritative task list with checkboxes. Owned by `executing-plans`. Updated as tasks complete.
-   - `state.md`: a session-boundary snapshot of *where you are* in the plan — current task, blockers, what's verified. It references the plan but does not duplicate the task list.
-
-   If a plan exists, state.md should say "Executing plan at docs/.../plan.md, currently on Task 3" — not copy the full task list.
+   For the `state.md` vs `plan.md` distinction, see [references/details.md](references/details.md#statemd-vs-planmd).
 
 2. Write `state.md` at the project root with concise sections (use native Write/Edit — see Adapter Link):
    - `Current Goal`
@@ -110,11 +82,7 @@ Check the hit count before reading results. This tells you whether to narrow or 
    - `Evidence`
    - `Open Issues`
 
-3. **Check for superseded entries before appending.** Search `session-log.md` for 2-3 keywords from the current decision (route per the adapter; native shown for fallback):
-   ```bash
-   grep -i "<keyword>" session-log.md
-   ```
-   Read any matching `[saved]` entries and ask: does the new decision *directly contradict* an old one? If yes, append `[superseded by YYYY-MM-DD]` to the old entry's header line — do not delete it. If the old entry is merely related but not contradicted, leave it unchanged. This is a judgment call, not a mechanical keyword match.
+3. **Check for superseded entries before appending.** If the new decision *directly contradicts* an old `[saved]` entry, append `[superseded by YYYY-MM-DD]` to that entry's header line — do not delete it. Search method and judgment guidance: see [references/details.md](references/details.md#checking-for-superseded-entries).
 
 4. Append a `[saved]` entry to `session-log.md` (native Write/Edit):
 
@@ -159,17 +127,7 @@ Open: <carry-forward items only>
 
 ## session-log.md Format and Maintenance
 
-The log contains a single entry type:
-
-- **[saved]** — written by this skill when explicitly invoked: full decision record including goals, rationale, rejected approaches, and key facts.
-
-**File management:**
-- Lives at the project root alongside `CLAUDE.md` and `package.json`
-- Keep under 200 entries — prune entries older than 6 months when it exceeds this
-- When a decision is permanently superseded (e.g., the approach was replaced), mark it rather than deleting: append `[superseded by YYYY-MM-DD]`
-- Do NOT log trivial sessions (the stop hook already filters these out)
-
-**For cross-project recall** (finding how a similar problem was solved in a different codebase): `session-log.md` is per-project and keyword-searchable only. Cross-project recall is outside the scope of this system.
+Entry type (`[saved]`), file-management rules (root location, 200-entry cap, superseding via `[superseded by …]`, no trivial sessions), and cross-project recall scope: see [references/details.md](references/details.md#session-logmd-format-and-maintenance).
 
 ## Project Map
 
