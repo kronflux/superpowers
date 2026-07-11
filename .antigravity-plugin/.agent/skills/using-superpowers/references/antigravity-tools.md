@@ -19,19 +19,19 @@ SessionStart hook: bootstrap happens through `gemini-extension.json`
 |----------------------|----------------------|
 | Invoke a skill (`Skill` tool) | `view_file` its `SKILL.md` (`IsSkillFile: true`) |
 | Dispatch a subagent | `define_subagent` + `invoke_subagent` (see [Subagent support](#subagent-support)) |
-| Ask the user a question (`AskUserQuestion`) | `ask_question` |
+| Ask the user a question (`ask_question`) | `ask_question` |
 | Task tracking ("create a todo", "mark complete") | a **task artifact** — `write_to_file` with `IsArtifact: true` and `ArtifactType: "task"` (see [Task tracking](#task-tracking)) |
-| Read a file (`Read`) | `view_file` |
-| Create a file (`Write`) | `write_to_file` |
-| Edit a file (`Edit`) | `replace_file_content` |
-| Run a command (`Bash`) | `run_command` |
-| Search file contents (`Grep`) | `grep_search` |
-| Find files by name (`Glob`) | `find_by_name` |
-| Web search (`WebSearch`) | `search_web` |
-| Fetch a URL (`WebFetch`) | `read_url_content` |
-| Isolated workspace (`EnterWorktree`) | `Workspace: "branch"` on `invoke_subagent` |
+| Read a file (`view_file`) | `view_file` |
+| Create a file (`write_to_file`) | `write_to_file` |
+| Edit a file (`replace_file_content`) | `replace_file_content` |
+| Run a command (`run_command`) | `run_command` |
+| Search file contents (`grep_search`) | `grep_search` |
+| Find files by name (`find_by_name`) | `find_by_name` |
+| Web search (`search_web`) | `search_web` |
+| Fetch a URL (`read_url_content`) | `read_url_content` |
+| Isolated workspace (`Workspace: "branch"`) | `Workspace: "branch"` on `invoke_subagent` |
 
-Namespaced skill references (`superpowers:<name>`) resolve to
+Namespaced skill references (`.agent/skills/<name>/SKILL.md`) resolve to
 `.agent/skills/<name>/SKILL.md`.
 
 ## Subagent support

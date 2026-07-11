@@ -28,7 +28,7 @@ If both are true, **pause before proceeding** and tell the user exactly this:
 
 Wait for the user's answer before continuing.
 
-- **If they confirm:** run `git init --quiet` directly (do not ask again — the user just confirmed), then invoke `superpowers:context-management` for map generation only. Return to the next entry-sequence step when done.
+- **If they confirm:** run `git init --quiet` directly (do not ask again — the user just confirmed), then invoke `.agent/skills/context-management/SKILL.md` for map generation only. Return to the next entry-sequence step when done.
 - **If they decline:** write `.superpowers-no-projectmap` to the project root and never offer again; proceed to the next entry-sequence step.
 
 ### Step 2b (only when the gate did not fire)
@@ -45,15 +45,15 @@ Read `project-map.md` to orient without re-globbing known files; when you need a
 
 ## Routing Table Elaboration
 
-- `superpowers:premise-check` — work may not need to exist at all; run before brainstorming or planning.
-- `superpowers:deliberation` — complex decision where options or framing are unclear; then brainstorming → writing-plans.
-- `superpowers:brainstorming` → `superpowers:writing-plans` — new behavior or architecture that is already well-framed.
-- `superpowers:systematic-debugging` → `superpowers:test-driven-development` — any bug or test failure, before proposing fixes.
-- `superpowers:requesting-code-review` / `superpowers:receiving-code-review` — code review includes security review.
-- `superpowers:dispatching-parallel-agents` — independent parallel tasks outside plan execution.
-- `superpowers:claude-md-creator` — CLAUDE.md / AGENTS.md creation or update; never implement these directly.
+- `.agent/skills/premise-check/SKILL.md` — work may not need to exist at all; run before brainstorming or planning.
+- `.agent/skills/deliberation/SKILL.md` — complex decision where options or framing are unclear; then brainstorming → writing-plans.
+- `.agent/skills/brainstorming/SKILL.md` → `.agent/skills/writing-plans/SKILL.md` — new behavior or architecture that is already well-framed.
+- `.agent/skills/systematic-debugging/SKILL.md` → `.agent/skills/test-driven-development/SKILL.md` — any bug or test failure, before proposing fixes.
+- `.agent/skills/requesting-code-review/SKILL.md` / `.agent/skills/receiving-code-review/SKILL.md` — code review includes security review.
+- `.agent/skills/dispatching-parallel-agents/SKILL.md` — independent parallel tasks outside plan execution.
+- `.agent/skills/claude-md-creator/SKILL.md` — CLAUDE.md / AGENTS.md creation or update; never implement these directly.
 - `skills/shared/context-mode-adapter.md` — data processing under context-mode; auto-applied reference, not a Skill-tool invocation.
 
-Internal, never routed directly: `superpowers:self-consistency-reasoner` (invoked by systematic-debugging and verification-before-completion); `superpowers:token-efficiency` (entry-sequence step 1, when available).
+Internal, never routed directly: `.agent/skills/self-consistency-reasoner/SKILL.md` (invoked by systematic-debugging and verification-before-completion); `.agent/skills/token-efficiency/SKILL.md` (entry-sequence step 1, when available).
 
 Antigravity note: worktree isolation maps to `Workspace: "branch"` on `invoke_subagent` (see AGENTS.md) — the using-git-worktrees skill is not shipped in that profile.
