@@ -14,7 +14,10 @@
     "PreToolUse": [
       { "matcher": "Bash", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/safety/block-dangerous-commands.js\"" } ] },
       { "matcher": "Read|Edit|Write|Bash", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/safety/protect-secrets.js\"" } ] },
-      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/bash-compress-hook.js\"" } ] }
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/bash-compress-hook.js\"" } ] },
+      { "matcher": "TaskCreate", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-taskcreate-model-tier.js\"" } ] },
+      { "matcher": "Agent", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-agent-model-routing.js\"" } ] },
+      { "matcher": "AskUserQuestion", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-askuser-handoff-guard.js\"" } ] }
     ],
     "PostToolUse": [
       { "matcher": "Edit|Write", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/track-edits.js\"" } ] },

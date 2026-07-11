@@ -26,6 +26,35 @@ escape_for_json() {
 using_superpowers_escaped=$(escape_for_json "$using_superpowers_content")
 session_context="<EXTREMELY_IMPORTANT>\nYou have superpowers.\n\n**Below is the full content of your 'superpowers:using-superpowers' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_superpowers_escaped}\n</EXTREMELY_IMPORTANT>"
 
+# Opt-in model routing: when the routing config exists (project first, then
+# user-level fallback) and the kill switch is not set, append a
+# <model-routing-active> block. Absent config -> output is byte-identical.
+routing_file=""
+if [ "${SUPERPOWERS_ROUTING_GUARD:-1}" != "0" ]; then
+    if [ -f "${PWD}/docs/superpowers/model-routing.json" ]; then
+        routing_file="${PWD}/docs/superpowers/model-routing.json"
+    elif [ -f "${HOME:-}/.claude/superpowers/model-routing.json" ]; then
+        routing_file="${HOME}/.claude/superpowers/model-routing.json"
+    fi
+fi
+
+if [ -n "$routing_file" ]; then
+    # Strip control chars (keep tab/newline/CR; escape_for_json handles those).
+    routing_mapping=$(tr -d '\000-\010\013\014\016-\037\177' < "$routing_file" 2>/dev/null || true)
+    routing_notice="<model-routing-active>
+This project has opted in to subagent model routing (${routing_file}).
+Tier mapping: ${routing_mapping}
+
+Plan tasks carry \"modelTier\" in their json:metadata fence:
+- \"mechanical\": 1-2 files, complete spec with code in the steps, no design judgment.
+- \"standard\": multi-file coordination, integration, pattern matching, debugging. Reviewers always dispatch at standard.
+- \"frontier\": design judgment, architecture decisions, broad codebase understanding.
+Tie-break: spec completeness wins - complete code in steps means mechanical. Escalation goes up only (mechanical -> standard -> frontier), via TaskUpdate, never silently down. \"inherit\" in the mapping means no constraint. Full rules: docs/model-routing-flow.md. Kill switch: SUPERPOWERS_ROUTING_GUARD=0.
+</model-routing-active>"
+    routing_escaped=$(escape_for_json "$routing_notice")
+    session_context="${session_context}\n\n${routing_escaped}"
+fi
+
 # Output context injection as JSON.
 # Cursor hooks expect additional_context (snake_case).
 # Claude Code hooks expect hookSpecificOutput.additionalContext (nested).
