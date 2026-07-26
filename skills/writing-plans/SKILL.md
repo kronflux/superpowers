@@ -23,7 +23,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 - Gitignored and local by default. Do NOT commit plans, specs, or `.tasks.json` unless your human partner explicitly asks — they are working artifacts, not project deliverables.
 - (User preferences for plan location override this default)
 
-When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work (analysis reads, count/filter/aggregate greps, unbounded exploratory Bash output) through the ctx tools per `skills/shared/conductor/context-mode-adapter.md`. State-probes, mutations, file writes, and git stay native. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first.
+When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work (analysis reads, count/filter/aggregate greps, unbounded exploratory Bash output) through the ctx tools per `skills/shared/conductor/context-mode-adapter.md`. State-probes, mutations, file writes, and git stay native. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first. For version-specific external docs, follow `skills/shared/conductor/context7.md`.
 
 ## Scope Check
 

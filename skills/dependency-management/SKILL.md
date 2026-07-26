@@ -9,7 +9,7 @@ Update one thing at a time. Verify after each. Never batch major upgrades.
 
 ## Adapter Link
 
-Audit-command output (`npm outdated`, `pip list --outdated`, `cargo outdated`, `npm audit`) and codebase API-usage searches are data-processing. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run audit commands via `ctx_batch_execute`/`ctx_execute` (raw flood stays out of context) and run usage searches via `ctx_execute_file`/`ctx_search`; when inactive, run them natively and read the output (native fallback). Installs, test runs, and build runs are mutations/CPU-bound and stay native in both modes.
+Audit-command output (`npm outdated`, `pip list --outdated`, `cargo outdated`, `npm audit`) and codebase API-usage searches are data-processing. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run audit commands via `ctx_batch_execute`/`ctx_execute` (raw flood stays out of context) and run usage searches via `ctx_execute_file`/`ctx_search`; when inactive, run them natively and read the output (native fallback). Installs, test runs, and build runs are mutations/CPU-bound and stay native in both modes. For version-specific external docs, follow `superpowers:skills/shared/conductor/context7.md`.
 
 ## Why This Exists
 

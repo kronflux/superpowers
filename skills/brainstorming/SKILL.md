@@ -15,7 +15,7 @@ Do NOT invoke any implementation skill, write any code, scaffold any project, or
 
 ## Tool Selection (context-mode aware)
 
-When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work — web fetches, build-tool runs, unbounded Bash output, analysis reads, and count/filter/aggregate greps — through the ctx tools per `skills/shared/conductor/context-mode-adapter.md`. State-probes, mutations, file writes, and git operations stay native in both modes. When surfacing verification or `PROVEN BY` evidence, echo it into the conversation even if computed via ctx tools. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first.
+When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work — web fetches, build-tool runs, unbounded Bash output, analysis reads, and count/filter/aggregate greps — through the ctx tools per `skills/shared/conductor/context-mode-adapter.md`. State-probes, mutations, file writes, and git operations stay native in both modes. When surfacing verification or `PROVEN BY` evidence, echo it into the conversation even if computed via ctx tools. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first. For version-specific external docs, follow `skills/shared/conductor/context7.md`.
 
 ## Anti-Pattern: "This Is Too Simple To Need A Design"
 
