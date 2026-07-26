@@ -38,7 +38,7 @@ export function renderTemplate(task, input, cfg = {}) {
   if (!tpl) throw Object.assign(new Error(`unknown task "${task}". Known: ${[...Object.keys(TEMPLATES), ...Object.keys(cfg.templates || {})].join(', ')}`), { exit: EXIT.USAGE });
   const cap = (cfg.max_context_window || 128000) * 3;
   const body = input.length > cap ? `[truncated ${input.length - cap} chars]\n` + input.slice(-cap) : input;
-  return tpl.replace('{{input}}', body);
+  return tpl.replace('{{input}}', () => body);
 }
 
 function parseArgs(argv) {

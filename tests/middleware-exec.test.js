@@ -164,6 +164,12 @@ describe('renderTemplate', () => {
     expect(out).not.toContain('[truncated');
     expect(out).toContain(input);
   });
+
+  it('preserves $-substitution patterns in input verbatim', () => {
+    const input = '$$ pid and $& match and $` before';
+    const out = renderTemplate('scaffold-tests', input, {});
+    expect(out).toContain('$$ pid and $& match and $` before');
+  });
 });
 
 describe('middleware-exec CLI end-to-end', () => {

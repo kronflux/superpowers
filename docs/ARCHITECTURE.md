@@ -95,6 +95,14 @@ Full protocol lives in `skills/context-management/SKILL.md`; summary:
 - **Resume:** `ctx_search(sort:"timeline")` for the prior-session tail → read `state.md` →
   targeted `ctx_search` of durable artifacts, then touch code.
 
+## ADR layer
+
+A fifth layer, additive to the four above: `docs/adr/` holds architecture decision records for
+designs that are irreversible or architectural. Written by `brainstorming` on design approval,
+recalled by the context-management skill. Format is owned by
+`skills/shared/conductor/obsidian.md`. Optional — no `docs/adr/` convention or a user decline
+skips the write silently; never a blocker.
+
 ## Coexistence contract
 
 Superpowers and context-mode run side by side without collision:
