@@ -17,9 +17,9 @@ Load plan, review critically, execute all tasks, report when complete.
 
 **Note:** Tell your human partner that Superpowers works much better with access to subagents. The quality of its work will be significantly higher if run on a platform with subagent support (Claude Code, Codex CLI, Codex App, and Copilot CLI all qualify; see the per-platform tool refs in `../using-superpowers/references/`). If subagents are available, use .agent/skills/subagent-driven-development/SKILL.md instead of this skill.
 
-## Tool Selection (context-mode aware)
+## Tool Selection
 
-When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work — web fetches, build-tool runs, unbounded Bash output, analysis reads, and count/filter/aggregate greps — through the ctx tools per `skills/shared/conductor/context-mode-adapter.md`. State-probes, mutations, file writes, and git operations stay native in both modes. When surfacing verification or `PROVEN BY` evidence, echo it into the conversation even if computed via ctx tools.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. When surfacing verification or `PROVEN BY` evidence, echo it into the conversation even if computed via ctx tools.
 
 ## The Process
 

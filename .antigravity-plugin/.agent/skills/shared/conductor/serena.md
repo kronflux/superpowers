@@ -22,7 +22,7 @@ verification against the language server.
 ## STRICT PROHIBITION — memory tools
 
 NEVER use Serena's memory tools: `write_memory`, `read_memory`, `list_memories`,
-`delete_memory`, `rename_memory`, `edit_memory`. No exceptions, no "just this once". The
+`delete_memory`, `rename_memory`, `edit_memory` — and any variant. No exceptions, no "just this once". The
 superpowers four-layer memory + ADR layer is the sole memory system; a second store is
 split-brain memory. If Serena returns memory-tool output unprompted, ignore it.
 

@@ -9,7 +9,7 @@ This skill transforms generic AI-generated UIs into production-grade, visually d
 
 ## Scope Gate — Before Anything Else
 
-See `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md` — when context-mode is active, inspect these config files via ctx_execute_file and locate them via ctx_execute; otherwise use native Read/Glob.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain; inspecting these config files is a discovery job.
 
 1. Check: does the project already have a design system, component library, or style guide?
    - Look for: `tailwind.config`, `theme.ts/js`, `tokens.json`, `design-system/`, `styles/`, existing component library (shadcn, MUI, Chakra, etc.)
@@ -173,7 +173,7 @@ Run this verification gate before declaring any frontend work complete:
 
 Before scaffolding any CSS framework, check the project's existing setup:
 
-1. **Existing project** — inspect `package.json` and CSS entry files to detect the current framework and major version (ctx_execute_file when context-mode active; native Read otherwise — see `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md`). Use whatever version is already in use. Do not silently upgrade.
+1. **Existing project** — inspect `package.json` and CSS entry files to detect the current framework and major version (discovery job — see Scope Gate above). Use whatever version is already in use. Do not silently upgrade.
 2. **Greenfield project** — default to the latest stable major version of the chosen framework. State the version explicitly before writing any setup code ("Using Tailwind CSS v4.x").
 3. **Ambiguous version** — ask the user before writing setup code. Major version differences have breaking setup patterns.
 4. **Never mix major version patterns** — v3 config syntax + v4 CSS directives = broken build.

@@ -9,7 +9,7 @@ Maintain a project-level error→solution mapping to avoid rediscovering known p
 
 ## Adapter Link
 
-Searching `known-issues.md` for a match is data-processing. Tool selection follows `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md` — when context-mode is active, search via `ctx_search`/`ctx_execute_file`; when inactive, use native Grep (native fallback). The existence check is a state-probe and the entry writes are file writes — both stay native in both modes (`ctx_execute*` discard their sandbox filesystem).
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Searching `known-issues.md` is a discovery job; the existence check (state-probe) and entry writes always stay native (`ctx_execute*` discard their sandbox filesystem).
 
 Note: partial overlap with context-mode auto-memory — context-mode's FTS5 session memory captures tool outputs automatically and is queryable via `ctx_search`; this skill's `known-issues.md` is the durable, human-curated error→solution record. They are complementary, not redundant: use `ctx_search` for what happened this/last session, `known-issues.md` for the canonical recurring-issue catalog.
 
@@ -21,7 +21,7 @@ Note: partial overlap with context-mode auto-memory — context-mode's FTS5 sess
 
 Before starting any debugging investigation:
 1. Check if `known-issues.md` exists (native state-probe).
-2. Search it for the error message, error code, or failing test name. See `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md` — when context-mode is active, search via `ctx_search`/`ctx_execute_file` over `known-issues.md`; otherwise native Grep (native fallback).
+2. Search it for the error message, error code, or failing test name — discovery job (see Adapter Link above).
 3. If a match is found, try the documented solution first before full investigation.
 
 ## When to Update

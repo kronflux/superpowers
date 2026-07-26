@@ -44,6 +44,30 @@ Read any matching `[saved]` entries and ask: does the new decision *directly con
 
 **Writing:** follow `skills/shared/conductor/obsidian.md` Authoring conventions for filename, frontmatter, and links. The ADR distills the approved design — decision, options considered, consequences — it is not a copy of the full spec.
 
+## What belongs in a [saved] entry vs state.md, and hard limits
+
+**What belongs here vs state.md:**
+- `session-log.md [saved]`: permanent decisions, anti-patterns to avoid, carry-forward open items
+- `state.md`: active task status, in-progress plans, checklists, version bump readiness — anything that will be resolved soon
+
+**Never include in a [saved] entry:**
+- Test results or verification confirmations ("11/11 tests pass")
+- Task checklists, file changelogs, or release notes → use `state.md`
+- "How it works" walkthroughs → read the code
+- Speculative analysis not approved for implementation → use a design doc in `docs/`
+- One-time confirmations ("file deleted", "folder removed")
+- Newly discovered permanent architectural constraints → add to `project-map.md` Critical Constraints instead
+
+**Hard limits per component — enforce while writing, not after:**
+- Goal: 1 line, ≤15 words
+- Decisions: ≤5 bullets for multi-subsystem sessions, ≤3 for single-topic. Each bullet: decision + one-sentence why, ≤25 words total. No prose, no rationale beyond the why.
+- Rejected: ≤3 bullets, ≤15 words each. What to avoid — not the full story of why it failed.
+- Open: ≤2 items, ≤12 words each.
+
+If a decision doesn't fit in 25 words, the explanation belongs in a design doc. Cut the explanation, not the decision.
+
+Total entry backstop: 250 words / 1500 chars. If exceeded, a bullet violated its limit — find it and cut it. Typical single-topic sessions should target ~120 words; the higher cap exists for multi-subsystem sessions that genuinely touched 5+ areas.
+
 ## session-log.md Format and Maintenance
 
 The log contains a single entry type:

@@ -97,28 +97,9 @@ You MUST complete each phase before proceeding to the next.
    THEN investigate that specific component
    ```
 
-   **Example (multi-layer system):**
-   ```bash
-   # Layer 1: Workflow
-   echo "=== Secrets available in workflow: ==="
-   echo "IDENTITY: ${IDENTITY:+SET}${IDENTITY:-UNSET}"
+   Worked example (multi-layer CI → build → signing pipeline): see `multi-component-example.md` in this directory.
 
-   # Layer 2: Build script
-   echo "=== Env vars in build script: ==="
-   env | grep IDENTITY || echo "IDENTITY not in environment"
-
-   # Layer 3: Signing script
-   echo "=== Keychain state: ==="
-   security list-keychains
-   security find-identity -v
-
-   # Layer 4: Actual signing
-   codesign --sign "$IDENTITY" --verbose=4 "$APP"
-   ```
-
-   **This reveals:** Which layer fails (secrets → workflow ✓, workflow → build ✗)
-
-   If context-mode is active, run diagnostic and test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; surface the layer-by-layer evidence in-transcript. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first. For symbol navigation and code edits, follow `skills/shared/conductor/serena.md` when serena is available.
+   Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery → `codegraph.md`; symbol edits → `serena.md` when available); surface the layer-by-layer evidence in-transcript regardless.
 
 5. **Trace Data Flow**
 

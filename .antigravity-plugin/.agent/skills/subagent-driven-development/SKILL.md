@@ -18,7 +18,7 @@ ledger and the tool results carry the record.
 
 ## Adapter Link
 
-When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route controller-run data work per `skills/shared/conductor/context-mode-adapter.md`; `review-package` and `task-brief` analysis go through `ctx_execute_file`. State-probes, mutations, file writes, and git operations stay native.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. `review-package` and `task-brief` analysis go through `ctx_execute_file` (discovery job).
 
 ## When to Use
 

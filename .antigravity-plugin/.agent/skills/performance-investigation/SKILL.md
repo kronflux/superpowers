@@ -9,7 +9,7 @@ Measure first. Guess never. Fix once.
 
 ## Adapter Link
 
-Running a profiler, benchmark, or measurement command EXECUTES code — it is CPU-bound and stays NATIVE in both modes. The ANALYSIS of the bulk text output (top consumers, self vs total time) is data-processing. Tool selection follows `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md` — when context-mode is active, gather the profiler/benchmark output via `ctx_batch_execute` (raw flood stays out of context) and derive the top consumers via `ctx_execute`; when inactive, run them natively and analyze the output (native fallback). Test runs are CPU-bound and stay native in both modes.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Running a profiler, benchmark, or measurement command EXECUTES code and stays native regardless of job. Analyzing the bulk output (top consumers, self vs total time) is a discovery job.
 
 ## Why This Exists
 
@@ -44,7 +44,7 @@ Method: wrk -t4 -c100 -d30s http://localhost:3000/api/users
 
 Identify the actual bottleneck — not the guessed one.
 
-1. **Choose the right profiling tool** for the stack. Prefer CLI-based tools that produce text output; running the profiler EXECUTES code and stays native, but the bulk output is then analyzed per `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md` (when context-mode active, gather it via `ctx_batch_execute` so the raw flood stays out of context; native run + analyze when inactive, native fallback). For GUI-only tools, ask the user to run them and share the output.
+1. **Choose the right profiling tool** for the stack. Prefer CLI-based tools that produce text output; running the profiler EXECUTES code and stays native, but the bulk output is then analyzed as a discovery job (see Adapter Link above). For GUI-only tools, ask the user to run them and share the output.
    - Node.js: `node --prof` + `node --prof-process` (text output), `clinic doctor --autocannon` (generates HTML — ask user to share), `0x` (flamegraph — ask user to describe hotspots)
    - Python: `python -m cProfile -s cumulative script.py` (text output), `py-spy top --pid PID` (text output)
    - Go: `go test -bench . -cpuprofile cpu.prof` + `go tool pprof -text cpu.prof` (text output)
@@ -54,7 +54,7 @@ Identify the actual bottleneck — not the guessed one.
 
 2. **Profile under realistic conditions.** A profile with 10 items in the database tells you nothing about production with 10 million. Match the data size, concurrency, and environment as closely as possible. If no profiling infrastructure exists, add lightweight instrumentation (`console.time`/`console.timeEnd`, `Date.now()` deltas, or language-equivalent timing) at suspected boundaries — this is often enough to identify the bottleneck without setting up a full profiler.
 
-3. **Analyze the profile output.** Identify the top 3 time/memory consumers. Tool selection follows `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md` — when context-mode is active, derive the top consumers from the captured profiler output via `ctx_execute` (the bulk output is parsed in the sandbox and only the ranked result enters context); when inactive, analyze the output natively (native fallback). The bottleneck is the thing that takes the most wall-clock time (or memory, if that's the metric) — not the thing with the most calls, not the thing with the worst Big-O notation, not the thing that "looks inefficient." Distinguish between self time (time in the function itself) and total time (including callees) — the optimization target is usually the function with the highest self time.
+3. **Analyze the profile output.** Identify the top 3 time/memory consumers — discovery job (see Adapter Link above). The bottleneck is the thing that takes the most wall-clock time (or memory, if that's the metric) — not the thing with the most calls, not the thing with the worst Big-O notation, not the thing that "looks inefficient." Distinguish between self time (time in the function itself) and total time (including callees) — the optimization target is usually the function with the highest self time.
 
 4. **State the bottleneck explicitly** before proposing any fix:
    > "The profile shows 82% of time is spent in `serializeUser()`, specifically the N+1 query loading user.permissions for each user in the list."
