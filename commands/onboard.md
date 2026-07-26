@@ -192,7 +192,7 @@ AskUserQuestion:
 ```
 
 - **Yes** → print, for the user to run themselves (never execute):
-  1. Install the CLI — Windows: `irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex`; macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh`.
+  1. Install the CLI — Windows: `irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex`; macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh`. Alternative for either OS if `npm` is already on `PATH`: `npm i -g @colbymchenry/codegraph@latest`.
   2. Wire it into installed agents (Claude Code, Cursor, Codex CLI, etc.), once, machine-wide: `codegraph install`.
   3. Per-project (this repo), builds `.codegraph/` and the initial graph, then auto-syncs on every file change: `codegraph init`. This step is separate from step 2 and is also offered once more, on its own, by the CodeGraph adapter itself (`skills/shared/conductor/codegraph.md`, "Init offer") if skipped here.
 - **No** → write `.superpowers-no-codegraph` (empty file) in the project root.
@@ -213,17 +213,18 @@ AskUserQuestion:
 ```
 
 - **Yes** →
-  1. Print the MCP registration commands for the user to run themselves (never execute). Preferred (installs `serena` locally via `uv`, then registers it):
+  1. Print the MCP registration commands for the user to run themselves (never execute). Preferred: install `serena` locally via `uv`, then register it once, machine-wide, for every project:
      ```shell
      uv tool install -p 3.13 serena-agent
      serena init
-     claude mcp add serena -- serena start-mcp-server --context claude-code --project "$(pwd)"
+     claude mcp add --scope user serena -- serena start-mcp-server --context claude-code --project-from-cwd
      ```
-     Use `claude mcp add --scope user serena -- serena start-mcp-server --context claude-code --project-from-cwd` instead of the third line to register Serena once for all projects rather than this one.
-     Alternative (`uvx`, no local install — always runs the latest commit from the repository, slower to start, previously the default way of running Serena):
+     Use `claude mcp add serena -- serena start-mcp-server --context claude-code --project "$(pwd)"` instead of the third line to register Serena for this project only.
+     Alternative (`uvx`, no local install — always runs the latest commit from the repository, slower to start since every run re-syncs against upstream; previously the default way of running Serena, now only recommended if a proper install isn't wanted):
      ```shell
-     claude mcp add serena -- uvx -p 3.13 --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project "$(pwd)"
+     claude mcp add --scope user serena -- uvx -p 3.13 --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project-from-cwd
      ```
+     If Serena is slow to start and Claude Code gives up on the connection, raise the MCP startup timeout: `export MCP_TIMEOUT=60000` in the shell profile.
   2. Write the memory-tool exclusion regardless of whether step 1 has been run yet, so it is already in place once Serena activates this project. Merge into `.serena/project.yml` (create `.serena/` and the file if absent; if the file exists with a different `excluded_tools` list, follow the Ground rules diff-and-confirm):
      ```yaml
      excluded_tools:
@@ -291,18 +292,20 @@ AskUserQuestion:
 
 Pitch: drive a running Obsidian vault (read/search/append notes, ADR index views) from the session, gated on both a `.obsidian` directory above the project and the CLI being on `PATH`.
 
+Not an install offer — the `obsidian` CLI ships with Obsidian itself (there is no separate package-manager install for it); using it requires Obsidian already installed and **running**. This offer is detection guidance only.
+
 ```yaml
 AskUserQuestion:
-  question: "Set up obsidian-cli (drives a running Obsidian instance)?"
+  question: "obsidian-cli wasn't detected. Show setup guidance (drives a running Obsidian instance, no separate install)?"
   header: "Obsidian"
   options:
-    - label: "Yes, point me to install docs"
-      description: "No install command is verified for this fork - points to Obsidian's own CLI docs instead."
+    - label: "Yes, show me the guidance"
+      description: "Points to Obsidian's own CLI docs and the running-instance requirement. Nothing installed by this offer - there is nothing to install."
     - label: "No, don't ask again"
       description: "Writes .superpowers-no-obsidian-cli in the project root. Nothing configured."
 ```
 
-- **Yes** → tell the user: no install command for the CLI is verified against this fork's reference dossier; point them to the canonical docs at `https://help.obsidian.md/cli`. Note the requirement plainly: the CLI shells out to a **running** Obsidian instance — it does nothing if Obsidian isn't open, and it isn't headless or an MCP server. Nothing is written by this offer.
+- **Yes** → tell the user: the CLI ships with Obsidian itself, so there's no separate install step — make sure Obsidian is installed and running, then the `obsidian` command becomes available; full command reference via `obsidian help`, canonical docs at `https://help.obsidian.md/cli`. Note the requirement plainly: it shells out to a **running** Obsidian instance — it does nothing if Obsidian isn't open, and it isn't headless or an MCP server. Nothing is written by this offer.
 - **No** → write `.superpowers-no-obsidian-cli` (empty file) in the project root.
 
 ## Final step: remove the upstream double-install (optional)
