@@ -15,7 +15,7 @@ an error surfaced to the user. Mechanics per tool live in the adapter files in t
 | External framework/API docs | Context7 → other docs MCP (e.g. docfork) → ctx_fetch_and_index / web | [context7.md](context7.md) |
 | Output handling (logs, tests, terminal dumps) | context-mode (unchanged contract) | [context-mode-adapter.md](context-mode-adapter.md) |
 | Mechanical subagent work (log digests, boilerplate) | middleware-exec → Claude mechanical tier → existing methodology | [middleware.md](middleware.md) |
-| Memory / ADR persistence | Obsidian-valid markdown always; obsidian-cli / Basic Memory MCP when present → filesystem | [obsidian.md](obsidian.md) |
+| Memory / ADR persistence | Obsidian-valid markdown always; obsidian-cli first, then Basic Memory MCP, when present → filesystem | [obsidian.md](obsidian.md) |
 
 ## Memory — STRICT PROHIBITION
 

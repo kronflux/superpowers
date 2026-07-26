@@ -23,9 +23,9 @@ This is not negotiable. You cannot rationalize your way out of this.
 
 Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
 
-## Sanctioned Exception (the only one)
+## Complexity Tiers
 
-A true micro-task — typo fix, single rename, ≤1-line config change with zero behavioral ambiguity — may skip the entry sequence. Anything you have to think about is not micro. Stretching "simple" beyond this list is exactly the rationalization the Red Flags table below rejects.
+Classify before the Entry Sequence (criteria: `references/routing-guide.md`): **Micro** (typo/rename/1-line, zero ambiguity) skips entry entirely; **Lightweight** (bounded scope, no new gate, no user-visible change, no migration) skips straight to implementation with one gate (`verification-before-completion`); **Full** (everything else, incl. any hard override) runs `brainstorming` → `writing-plans` → dispatch. Anything you have to think about is not micro.
 
 ## Entry Sequence
 
@@ -60,14 +60,11 @@ Skills: `superpowers:<name>` via Skill tool. Detail: `references/routing-guide.m
 |Deps, CVEs, migrations|dependency-management|
 |UI/frontend work|frontend-design|
 |CLAUDE.md/AGENTS.md work|claude-md-creator|
-|Context-mode data work|context-mode-adapter.md (auto)|
+|Data-work tool selection|routing.md (auto)|
 
 ## Skill Priority
 
-When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
-
-- "Let's build X" → superpowers:brainstorming first, then implementation skills.
-- "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+Process skills come first, then implementation skills carry it out — e.g. "Let's build X" → brainstorming first; "Fix this bug" → systematic-debugging first.
 
 ## Red Flags
 
