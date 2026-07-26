@@ -58,6 +58,20 @@ Tie-break: spec completeness wins - complete code in steps means mechanical. Esc
     session_context="${session_context}\n\n${routing_escaped}"
 fi
 
+# Best-effort conductor capability probe: invokes the ESM capability
+# registry (hooks/lib/capability-registry.js) via a Node subprocess, since
+# this hook is bash and cannot import ESM directly. Failure of any kind
+# (node missing, probe throws, etc.) must never break session start.
+conductor_line=""
+if command -v node >/dev/null 2>&1; then
+    conductor_line=$(node "${PLUGIN_ROOT}/hooks/lib/session-start-probe.mjs" 2>/dev/null || true)
+fi
+
+if [ -n "$conductor_line" ]; then
+    conductor_escaped=$(escape_for_json "$conductor_line")
+    session_context="${session_context}\n\n${conductor_escaped}"
+fi
+
 # Output context injection as JSON.
 # Cursor hooks expect additional_context (snake_case).
 # Claude Code hooks expect hookSpecificOutput.additionalContext (nested).

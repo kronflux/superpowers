@@ -41,6 +41,10 @@ describe('session-start context economy', () => {
     expect(parsed?.hookSpecificOutput?.hookEventName).toBe('SessionStart');
     // Routing must be absent: this measures the always-on core payload only.
     expect(ctx).not.toContain('<model-routing-active>');
-    expect(Buffer.byteLength(ctx)).toBeLessThanOrEqual(5200);
+    // Conductor capability summary line is injected best-effort at session start.
+    // Cap raised from 5200 to 5232: measured payload with the line is 5212 B
+    // (+20 B headroom for minor capability-list variance across machines).
+    expect(ctx).toMatch(/^\[conductor\] /m);
+    expect(Buffer.byteLength(ctx)).toBeLessThanOrEqual(5232);
   });
 });
