@@ -127,7 +127,7 @@ Run tests to ensure workspace starts clean:
 npm test / cargo test / pytest / go test ./...
 ```
 
-If context-mode is active, run the baseline test command via `ctx_execute(language:"shell", code:"<test cmd> 2>&1 | tail -30")` per `skills/shared/conductor/context-mode-adapter.md`.
+If context-mode is active, run the baseline test command via `ctx_execute(language:"shell", code:"<test cmd> 2>&1 | tail -30")` — output job, per `skills/shared/conductor/routing.md`.
 
 **If tests fail:** Report failures, ask whether to proceed or investigate.
 

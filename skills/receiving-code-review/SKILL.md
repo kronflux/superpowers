@@ -13,7 +13,7 @@ Code review requires technical evaluation, not emotional performance.
 
 ## Adapter Link
 
-This skill verifies suggestions against codebase reality (e.g., the YAGNI usage grep, codebase-verification reads). Tool selection follows `skills/shared/conductor/context-mode-adapter.md`. When context-mode is active, route the YAGNI usage grep through `ctx_execute` and codebase-verification analysis reads through `ctx_execute_file`. Verification command output reported under `## Completion` MUST be echoed in-transcript — compressed agent results would otherwise drop the evidence backing each addressed item.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. The YAGNI usage grep and codebase-verification reads are discovery jobs. Verification command output reported under `## Completion` MUST be echoed in-transcript — compressed agent results would otherwise drop the evidence backing each addressed item.
 
 ## The Response Pattern
 

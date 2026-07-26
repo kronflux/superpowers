@@ -9,7 +9,7 @@ Change structure without changing behavior. Prove it at every step.
 
 ## Adapter Link
 
-The Phase 4 import/reference audit runs multiple category searches over the codebase — this is data-processing. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run each audit search via `ctx_execute_file`/`ctx_search` (count/filter over the codebase, raw matches stay out of context); when inactive, use native Grep (native fallback). Running the test suite EXECUTES code — it is CPU-bound and stays native in both modes. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first. For symbol navigation and code edits, follow `skills/shared/conductor/serena.md` when serena is available.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Running the test suite EXECUTES code and stays native regardless of job. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first. For symbol navigation and code edits, follow `skills/shared/conductor/serena.md` when serena is available.
 
 ## Why This Exists
 
@@ -77,7 +77,7 @@ After all structural moves are done:
 
 1. **Full test suite green** — no exceptions, no skipped tests, no "known failures."
 2. **Behavioral equivalence confirmed** — the characterization tests from Phase 1 still pass with identical assertions.
-3. **Import/reference audit** — for each renamed/moved symbol, run separate category searches. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run each search via `ctx_execute_file`/`ctx_search` (the raw matches stay in the sandbox and only the categorized result enters context); when inactive, use native Grep (native fallback). Search separately for:
+3. **Import/reference audit** — for each renamed/moved symbol, run separate category searches (discovery job, see Adapter Link above). Search separately for:
    - Direct calls and type references (the old function/class/variable name)
    - String literals containing old names (config keys, error messages, logs)
    - Dynamic imports and `require()` calls (string-based references the rename didn't catch)

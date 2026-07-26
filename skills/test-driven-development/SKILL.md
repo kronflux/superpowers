@@ -57,7 +57,7 @@ Before writing the first test, verify the project has a test runner:
 
 Do not skip this step — a "failing test" that fails because the runner doesn't exist teaches nothing.
 
-If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+Test commands are an output job (`skills/shared/conductor/routing.md`); echo pass/fail in-transcript.
 
 ## Red-Green-Refactor
 
@@ -142,7 +142,7 @@ Confirm:
 
 **Test errors?** Fix error, re-run until it fails correctly.
 
-If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript. On large failure output with middleware configured, run `summarize-test-failure` per `skills/shared/conductor/middleware.md` for a 5-line digest instead of manually scanning the dump.
+Echo pass/fail in-transcript (output job, see Test Infrastructure Check above). On large failure output with middleware configured, run `summarize-test-failure` per `skills/shared/conductor/middleware.md` for a 5-line digest instead of manually scanning the dump.
 
 ### GREEN - Minimal Code
 
@@ -199,7 +199,7 @@ Confirm:
 
 **Other tests fail?** Fix now.
 
-If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+Echo pass/fail in-transcript (output job, see above).
 
 ### REFACTOR - Clean Up
 
