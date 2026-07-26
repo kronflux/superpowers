@@ -25,7 +25,7 @@ manifests by the bump script.
 - **Budgets (enforced):**
   - Skill `description` ≤ 300 B — `tests/lint-skills.mjs` **FAILs** above.
   - `SKILL.md` core ≤ 12,288 B — lint **WARNs** above (split overflow into `references/`).
-  - SessionStart payload ≤ 5,200 B — `tests/session-start-payload.test.js` **FAILs** above.
+  - SessionStart payload ≤ 5,232 B — `tests/session-start-payload.test.js` **FAILs** above.
     Any edit to `skills/using-superpowers/SKILL.md` (its body is the payload) MUST re-run that spec.
 - Commit style: imperative subject, no attribution trailers (no `Co-Authored-By`, no
   `Generated-with`).

@@ -128,7 +128,7 @@ Each harness gets only what it can execute:
 
 One line each — which suite guards which subsystem:
 
-- `tests/session-start-payload.test.js` — SessionStart payload ≤ 5,200 B, routing block absent.
+- `tests/session-start-payload.test.js` — SessionStart payload ≤ 5,232 B, routing block absent.
 - `tests/lint-skills.mjs` — skill `description` ≤ 300 B (FAIL), `SKILL.md` ≤ 12,288 B (WARN), ref depth.
 - `tests/version-consistency.test.js` — version identical across all 7 manifests.
 - `tests/compile.test.js`, `tests/compile-manifests.test.js` — manifest compile + byte-idempotence.

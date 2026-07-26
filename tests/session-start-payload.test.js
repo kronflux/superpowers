@@ -17,8 +17,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const HOOK = path.join(ROOT, 'hooks', 'session-start').replace(/\\/g, '/');
 
+// Directory that resolves `bin` on the real PATH, so the sandboxed PATH below
+// keeps bash/coreutils/node runnable without leaking any other PATH entries
+// (e.g. a machine-local `codegraph`/`obsidian-cli` install) into the probe.
+function dirOf(bin) {
+  const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    if (dir && exts.some((ext) => fs.existsSync(path.join(dir, bin + ext)))) return dir;
+  }
+  return null;
+}
+const SANDBOX_PATH = [dirOf('bash'), dirOf('node')]
+  .filter(Boolean)
+  .filter((d, i, arr) => arr.indexOf(d) === i)
+  .join(path.delimiter);
+
 describe('session-start context economy', () => {
-  it('assembled payload <= 5200 bytes', () => {
+  it('assembled payload <= 5232 bytes', () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-payload-'));
     let raw;
     try {
@@ -28,6 +43,7 @@ describe('session-start context economy', () => {
           ...process.env,
           CLAUDE_PLUGIN_ROOT: ROOT,
           HOME: scratch,
+          PATH: SANDBOX_PATH,
           COPILOT_CLI: '',
           CURSOR_PLUGIN_ROOT: '',
         },

@@ -132,7 +132,7 @@ The SessionStart payload and skill descriptions are always-on context cost — p
 session. The fork measures and budgets them. Numbers below measured 2026-07-11 on the
 `resync/v7` branch:
 
-- **SessionStart payload: 5,165 B (~1,290 tokens)**, spec-asserted ≤ 5,200 B by
+- **SessionStart payload: 5,165 B (~1,290 tokens)**, spec-asserted ≤ 5,232 B by
   `tests/session-start-payload.test.js`. Old fork baseline: 14,639 B (~3,660 tokens).
 - **All 27 skill descriptions: 5,441 B total, max 298 B**, lint-enforced ≤ 300 B each by
   `tests/lint-skills.mjs`. Old baseline: 10,686 B.
