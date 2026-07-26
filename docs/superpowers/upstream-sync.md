@@ -96,9 +96,11 @@ Grounded in the fork's actual current gap: last synced ref `d884ae0` (upstream `
 mirror is currently at `3dcbd5c` (`v6.2.0`), 51 commits ahead. One hunk of each class, as it would
 be classified today:
 
-**Class 1 — path not in the map.** Upstream added
-`skills/systematic-debugging/find-polluter.sh` (a net-new helper script). This path doesn't exist
-in the fork's tree and isn't in either divergence-map table. Apply directly: copy the file in,
+**Class 1 — path not in the map.** Upstream's
+`skills/systematic-debugging/find-polluter.sh` gained `./`-prefix and `**/`-collapse edge-case
+handling for the find pattern. The fork already carries this file (it was copied in before this
+playbook existed) but is behind that fix, and the path isn't in either divergence-map table — no
+fork-owned section applies to it. Apply directly: pull in upstream's fixed version wholesale,
 check whether `skills/systematic-debugging/SKILL.md` needs a reference to it (that file *is* in
 the map as `router-pointer` — its Tool Selection paragraph is fork-owned, but a "here's a new
 helper script" mention would land outside that paragraph, so it's also a direct apply).

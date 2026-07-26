@@ -22,7 +22,9 @@ the correct three-dot range.
 
 ## Nature legend
 
-The base five categories plus one extension needed for this fork's root identity docs:
+The four base natures from the plan (`router-pointer` / `hook-point` / `net-new` / `overlay`)
+plus two extensions this map needed: `moved` (pure renames that filename-matching alone would
+misclassify) and `identity` (same-named upstream files with fully diverged fork content):
 
 | Nature | Meaning |
 |---|---|
@@ -144,7 +146,7 @@ proposal, never applied wholesale.
 - `git diff main...HEAD --name-only | wc -l` → **87**.
 - Table 1 rows: 1 (`overlay` dedupe, 35 mirror paths) + 52 individually listed non-mirror files
   = **53 rows**, covering all 87 diff paths (35 mirror + 52 non-mirror = 87 — matches).
-- Table 2 adds 32 rows for pre-existing fork-owned files untouched by this branch. These are
+- Table 2 adds 33 rows for pre-existing fork-owned files untouched by this branch. These are
   additive coverage, not part of the 87-file diff count, so they don't change the reconciliation
   above — they exist so the playbook has somewhere to look up a file upstream touches that this
   branch never went near.
