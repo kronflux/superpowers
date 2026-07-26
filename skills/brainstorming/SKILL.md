@@ -13,9 +13,9 @@ Start by understanding the current project context, then ask questions one at a 
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
 </HARD-GATE>
 
-## Tool Selection (context-mode aware)
+## Tool Selection
 
-When the `context-mode` plugin is active (its `ctx_*` MCP tools are present), route data work — web fetches, build-tool runs, unbounded Bash output, analysis reads, and count/filter/aggregate greps — through the ctx tools per `skills/shared/conductor/context-mode-adapter.md`. State-probes, mutations, file writes, and git operations stay native in both modes. When surfacing verification or `PROVEN BY` evidence, echo it into the conversation even if computed via ctx tools. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first. For version-specific external docs, follow `skills/shared/conductor/context7.md`.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery → `codegraph.md`; external docs → `context7.md`). Echo `PROVEN BY` evidence in-transcript when computed via ctx tools.
 
 ## Anti-Pattern: "This Is Too Simple To Need A Design"
 
