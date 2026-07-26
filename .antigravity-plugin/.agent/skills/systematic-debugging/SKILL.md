@@ -61,6 +61,9 @@ You MUST complete each phase before proceeding to the next.
    - They often contain the exact solution
    - Read stack traces completely
    - Note line numbers, file paths, error codes
+   - On large failing-test output with middleware configured, run `summarize-test-failure`
+     per `skills/shared/conductor/middleware.md` for a 5-line digest instead of manually
+     scanning the full dump
 
 2. **Reproduce Consistently**
    - Can you trigger it reliably?

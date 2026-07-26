@@ -102,7 +102,7 @@ conflicts that only emerge from implementation.
 
 ## Model Selection
 
-See [references/controller-operations.md](references/controller-operations.md#model-selection) — Model-tier selection by role, turn-count economics, and task-complexity signals.
+See [references/controller-operations.md](references/controller-operations.md#model-selection) — Model-tier selection by role, turn-count economics, and task-complexity signals. For mechanical vs. symbol-refactor vs. review dispatch decisions, see `skills/shared/conductor/middleware.md`'s Dispatch matrix.
 
 ## Handling Implementer Status
 

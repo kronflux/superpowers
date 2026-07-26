@@ -142,7 +142,7 @@ Confirm:
 
 **Test errors?** Fix error, re-run until it fails correctly.
 
-If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript. On large failure output with middleware configured, run `summarize-test-failure` per `skills/shared/conductor/middleware.md` for a 5-line digest instead of manually scanning the dump.
 
 ### GREEN - Minimal Code
 
