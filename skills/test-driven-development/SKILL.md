@@ -146,7 +146,7 @@ If context-mode is active, run test commands via `ctx_execute` per `skills/share
 
 ### GREEN - Minimal Code
 
-Write simplest code to pass the test.
+Write simplest code to pass the test. For symbol navigation and code edits, follow `skills/shared/conductor/serena.md` when serena is available.
 
 <Good>
 ```typescript
