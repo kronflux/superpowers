@@ -1,8 +1,7 @@
-'use strict';
 // hooks/lib/capability-registry.js — conductor capability probe (absent|configured).
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const STATUS = { ABSENT: 'absent', CONFIGURED: 'configured', VERIFIED: 'verified' };
 
@@ -15,6 +14,14 @@ function onPath(bin, env) {
     .some((d) => d && exts.some((e) => exists(path.join(d, bin + e))));
 }
 
+function normalizeDir(p) {
+  const resolved = path.resolve(p);
+  if (process.platform === 'win32') {
+    return resolved.toLowerCase().replace(/\\/g, '/');
+  }
+  return resolved;
+}
+
 function mcpConfigured(pattern, cwd, home) {
   const re = new RegExp(pattern, 'i');
   const pools = [];
@@ -23,7 +30,12 @@ function mcpConfigured(pattern, cwd, home) {
   const global = readJson(path.join(home, '.claude.json'));
   if (global) {
     pools.push(global.mcpServers || {});
-    for (const p of Object.values(global.projects || {})) pools.push(p.mcpServers || {});
+    const normalizedCwd = normalizeDir(cwd);
+    for (const [key, projCfg] of Object.entries(global.projects || {})) {
+      if (normalizeDir(key) === normalizedCwd) {
+        pools.push(projCfg.mcpServers || {});
+      }
+    }
   }
   return pools.some((pool) => Object.keys(pool).some((k) => re.test(k)));
 }
@@ -68,4 +80,4 @@ function summaryLine(caps) {
     : '[conductor] no optional integrations detected';
 }
 
-module.exports = { probe, summaryLine, STATUS, mcpConfigured, onPath };
+export { probe, summaryLine, STATUS, mcpConfigured, onPath };

@@ -27,6 +27,13 @@ describe('capability-registry', () => {
     expect(probe(tmp, { home: tmp, env: { PATH: '' } }).context7.status).toBe(STATUS.CONFIGURED);
   });
 
+  it('ignores unrelated projects in .claude.json', () => {
+    const otherPath = path.join(tmp, 'other-project');
+    fs.writeFileSync(path.join(tmp, '.claude.json'),
+      JSON.stringify({ projects: { [otherPath]: { mcpServers: { 'context7-mcp': {} } } } }));
+    expect(probe(tmp, { home: tmp, env: { PATH: '' } }).context7.status).toBe(STATUS.ABSENT);
+  });
+
   it('detects codegraph index dir and decline marker', () => {
     fs.mkdirSync(path.join(tmp, '.codegraph'));
     fs.writeFileSync(path.join(tmp, '.superpowers-no-codegraph'), '');
