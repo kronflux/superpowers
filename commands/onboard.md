@@ -9,7 +9,7 @@ Walk the user through this fork's optional features one at a time. For each feat
 ## Ground rules
 
 - **Assume a clean slate.** Do NOT audit existing configuration beyond what each step needs to do its own job (Feature 2's dedupe check and Feature 4's already-enabled check are the only state reads this command performs — both are required by the step itself, not general auditing). Go straight to the questions.
-- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `docs/superpowers/model-routing.json`, `docs/superpowers/workflow.json`, and any settings file being merged.
+- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `docs/superpowers/model-routing.json`, `docs/superpowers/workflow.json`, `.serena/project.yml`, `~/.claude/middleware-config.json`, and any settings file being merged.
 - Each feature is optional. Every question includes a way to decline; declining writes nothing and moves to the next feature.
 - **NEVER commit anything.** Files are written to the working tree only; committing is the user's call.
 - After the last feature, produce the Closing summary (see below) — what was written and where, what was skipped, and how to undo each.
@@ -166,6 +166,145 @@ One-line intro: third-party marketplaces do NOT auto-update by default, so new `
 
 4. **No** → write nothing.
 
+## Conductor integrations
+
+One-line intro: this fork's conductor layer (`skills/shared/conductor/`) adapts its behavior to optional external tools — CodeGraph (macro discovery), Serena (symbol-precise edits), Context7 (live docs), a middleware-exec provider, and obsidian-cli (vault tooling). None of them is required; each adapter falls back to native tools when its capability is absent.
+
+**Detection.** Read `context-snapshot.json`'s `capabilities` key (written by `hooks/lib/session-start-probe.mjs` at session start; falls back to running `probe()` from `hooks/lib/capability-registry.js` directly if the snapshot file or key is missing). For each capability below, offer it only if its `status` is `absent` AND no decline marker for it exists yet in the project root. Never offer a capability already `configured` or `verified`.
+
+**Decline persistence.** Each capability below has its own marker file, following the convention `hooks/lib/capability-registry.js` already uses for CodeGraph (`.superpowers-no-codegraph`): `.superpowers-no-serena`, `.superpowers-no-context7`, `.superpowers-no-middleware`, `.superpowers-no-obsidian-cli`. On "no" / "never ask again", create the empty marker file in the project root and move on; a future `/onboard` run must check for it before asking again. On "yes", proceed with that capability's steps below; no marker is written.
+
+**Never auto-run.** Every install/registration command below is printed for the user to copy-paste and run in their own terminal — never execute it via Bash/PowerShell yourself. Only the local config-file writes explicitly described below (Serena's exclusion list, the middleware config copy) are things you write directly, the same way Features 1-4 write their own config files.
+
+### CodeGraph
+
+Pitch: repo-wide call-graph and blast-radius answers (`codegraph_explore`) for "how does X work" / "what calls Y" questions, instead of manual grep/Read sweeps.
+
+```yaml
+AskUserQuestion:
+  question: "Install CodeGraph (call-graph macro discovery, adapter: skills/shared/conductor/codegraph.md)?"
+  header: "CodeGraph"
+  options:
+    - label: "Yes, show me the install commands"
+      description: "Prints the install script, agent-wiring command, and per-project index command for you to run yourself."
+    - label: "No, don't ask again"
+      description: "Writes .superpowers-no-codegraph in the project root. Nothing installed."
+```
+
+- **Yes** → print, for the user to run themselves (never execute):
+  1. Install the CLI — Windows: `irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex`; macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh`.
+  2. Wire it into installed agents (Claude Code, Cursor, Codex CLI, etc.), once, machine-wide: `codegraph install`.
+  3. Per-project (this repo), builds `.codegraph/` and the initial graph, then auto-syncs on every file change: `codegraph init`. This step is separate from step 2 and is also offered once more, on its own, by the CodeGraph adapter itself (`skills/shared/conductor/codegraph.md`, "Init offer") if skipped here.
+- **No** → write `.superpowers-no-codegraph` (empty file) in the project root.
+
+### Serena
+
+Pitch: symbol-precise navigation and edits (`find_symbol`, `find_referencing_symbols`, `replace_symbol_body`, etc.) that survive formatting drift, in place of string-match Edit during TDD/refactoring/debugging.
+
+```yaml
+AskUserQuestion:
+  question: "Set up Serena (symbol-precise edits, adapter: skills/shared/conductor/serena.md)?"
+  header: "Serena"
+  options:
+    - label: "Yes"
+      description: "Shows the MCP registration command to run yourself, and writes this project's memory-tool exclusion config."
+    - label: "No, don't ask again"
+      description: "Writes .superpowers-no-serena in the project root. Nothing configured."
+```
+
+- **Yes** →
+  1. Print the MCP registration commands for the user to run themselves (never execute). Preferred (installs `serena` locally via `uv`, then registers it):
+     ```shell
+     uv tool install -p 3.13 serena-agent
+     serena init
+     claude mcp add serena -- serena start-mcp-server --context claude-code --project "$(pwd)"
+     ```
+     Use `claude mcp add --scope user serena -- serena start-mcp-server --context claude-code --project-from-cwd` instead of the third line to register Serena once for all projects rather than this one.
+     Alternative (`uvx`, no local install — always runs the latest commit from the repository, slower to start, previously the default way of running Serena):
+     ```shell
+     claude mcp add serena -- uvx -p 3.13 --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project "$(pwd)"
+     ```
+  2. Write the memory-tool exclusion regardless of whether step 1 has been run yet, so it is already in place once Serena activates this project. Merge into `.serena/project.yml` (create `.serena/` and the file if absent; if the file exists with a different `excluded_tools` list, follow the Ground rules diff-and-confirm):
+     ```yaml
+     excluded_tools:
+       - write_memory
+       - read_memory
+       - list_memories
+       - delete_memory
+       - rename_memory
+       - edit_memory
+     ```
+     This blocks Serena's own memory tools so the four-layer superpowers memory stays the only memory system (`skills/shared/conductor/serena.md`, "STRICT PROHIBITION"). A global alternative exists (`excluded_tools` in `serena_config.yml`) but its on-disk location isn't verified here — this offer writes the per-project file only.
+- **No** → write `.superpowers-no-serena` (empty file) in the project root.
+
+### Context7
+
+Pitch: current API surface for version-sensitive external libraries (renamed params, new hooks, breaking changes since training data) during design/planning/dependency work.
+
+```yaml
+AskUserQuestion:
+  question: "Set up Context7 (live docs lookup, adapter: skills/shared/conductor/context7.md)?"
+  header: "Context7"
+  options:
+    - label: "Yes, show me the setup command"
+      description: "Prints the one-command setup (OAuth + API key + agent config) for you to run yourself."
+    - label: "No, don't ask again"
+      description: "Writes .superpowers-no-context7 in the project root. Nothing configured."
+```
+
+- **Yes** → print, for the user to run themselves (never execute): `npx ctx7 setup --claude` (Node.js >= 18; authenticates via OAuth, generates an API key, and wires Claude Code — CLI+Skills or MCP mode, user's choice in the prompt). Removal later: `npx ctx7 remove`. If the user prefers manual MCP wiring instead of the setup command, tell them the two values it would need — server `https://mcp.context7.com/mcp`, API key passed via a `CONTEXT7_API_KEY` header — and point them to Context7's own docs for the exact config file syntax rather than writing `.mcp.json` yourself.
+- **No** → write `.superpowers-no-context7` (empty file) in the project root.
+
+### Middleware (middleware-exec)
+
+Pitch: offload mechanical text-processing (log/error extraction, test-failure summarizing, test scaffolding) to a cheaper model via `middleware-exec`, instead of spending the session model's tokens on it.
+
+```yaml
+AskUserQuestion:
+  question: "Set up middleware-exec (cheap-model text processing)?"
+  header: "Middleware"
+  options:
+    - label: "Yes"
+      description: "Copies the example config to ~/.claude/middleware-config.json and asks which provider you use."
+    - label: "No, don't ask again"
+      description: "Writes .superpowers-no-middleware in the project root. Nothing configured."
+```
+
+- **Yes** →
+  1. Ask which provider:
+     ```yaml
+     AskUserQuestion:
+       question: "Which provider does middleware-exec call?"
+       header: "Provider"
+       options:
+         - label: "openrouter"
+           description: "Routes through OpenRouter's API."
+         - label: "ollama"
+           description: "Local Ollama server."
+         - label: "litellm"
+           description: "Self-hosted LiteLLM proxy."
+     ```
+  2. Copy `docs/superpowers/middleware-config.example.json` to `~/.claude/middleware-config.json` (Ground rules diff-and-confirm applies if the destination already exists), setting `active_provider` to the chosen value and `active_model` to that provider's example `model` (e.g. `openai/gpt-4o-mini` for openrouter). Ask for the API key's environment-variable name (default: the example's `api_key_env` for that provider, e.g. `OPENROUTER_API_KEY`); substitute if the user gives a different name. Never ask for or write the raw key — only its env-var name.
+- **No** → write `.superpowers-no-middleware` (empty file) in the project root.
+
+### obsidian-cli
+
+Pitch: drive a running Obsidian vault (read/search/append notes, ADR index views) from the session, gated on both a `.obsidian` directory above the project and the CLI being on `PATH`.
+
+```yaml
+AskUserQuestion:
+  question: "Set up obsidian-cli (drives a running Obsidian instance)?"
+  header: "Obsidian"
+  options:
+    - label: "Yes, point me to install docs"
+      description: "No install command is verified for this fork - points to Obsidian's own CLI docs instead."
+    - label: "No, don't ask again"
+      description: "Writes .superpowers-no-obsidian-cli in the project root. Nothing configured."
+```
+
+- **Yes** → tell the user: no install command for the CLI is verified against this fork's reference dossier; point them to the canonical docs at `https://help.obsidian.md/cli`. Note the requirement plainly: the CLI shells out to a **running** Obsidian instance — it does nothing if Obsidian isn't open, and it isn't headless or an MCP server. Nothing is written by this offer.
+- **No** → write `.superpowers-no-obsidian-cli` (empty file) in the project root.
+
 ## Final step: remove the upstream double-install (optional)
 
 This fork (`superpowers@superpowers-dev`) is a drop-in replacement for the original `obra/superpowers`. Having both installed at once leaves every shared skill and command doubled under two namespaces and makes session-start skill loading ambiguous.
@@ -196,5 +335,10 @@ Report in one block, per feature: configured or skipped, the exact absolute path
 - **Gate hooks** — remove the hook entries you added from `hooks.PostToolUse` / `hooks.Stop` and the `"EnterPlanMode"` entry from `permissions.deny`, all in the project's `.claude/settings.json`.
 - **Commit strategy** — delete `docs/superpowers/workflow.json`, or remove its `commitStrategy` key.
 - **Auto-update** — set `extraKnownMarketplaces["superpowers-dev"].autoUpdate` back to `false` (or remove the key) in the settings file you wrote it to.
+- **CodeGraph** — nothing written by this offer besides an optional `.superpowers-no-codegraph` decline marker (delete it to be asked again); the CLI/agent-wiring/index steps are all run by the user outside this flow.
+- **Serena** — remove the `excluded_tools` key (or the six memory-tool entries within it) from `.serena/project.yml`; delete `.superpowers-no-serena` to be asked again.
+- **Context7** — nothing written by this offer besides an optional `.superpowers-no-context7` decline marker; `npx ctx7 remove` undoes the setup command itself.
+- **Middleware** — delete `~/.claude/middleware-config.json`; delete `.superpowers-no-middleware` to be asked again.
+- **obsidian-cli** — nothing written besides an optional `.superpowers-no-obsidian-cli` decline marker.
 
 Do not commit. Do not re-ask any question already answered in this run.
