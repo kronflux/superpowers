@@ -9,7 +9,7 @@ Change structure without changing behavior. Prove it at every step.
 
 ## Adapter Link
 
-The Phase 4 import/reference audit runs multiple category searches over the codebase — this is data-processing. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run each audit search via `ctx_execute_file`/`ctx_search` (count/filter over the codebase, raw matches stay out of context); when inactive, use native Grep (native fallback). Running the test suite EXECUTES code — it is CPU-bound and stays native in both modes.
+The Phase 4 import/reference audit runs multiple category searches over the codebase — this is data-processing. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run each audit search via `ctx_execute_file`/`ctx_search` (count/filter over the codebase, raw matches stay out of context); when inactive, use native Grep (native fallback). Running the test suite EXECUTES code — it is CPU-bound and stays native in both modes. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first.
 
 ## Why This Exists
 
