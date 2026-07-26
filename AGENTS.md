@@ -10,7 +10,7 @@ native tools otherwise.
 
 Ships via the Claude Code marketplace **`superpowers-dev`** as plugin **`superpowers`**
 (`/plugin marketplace add kronflux/superpowers`, `/plugin install superpowers@superpowers-dev`).
-Version is authoritative in `package.json` (currently 7.0.0) and mirrored into six other
+Version is authoritative in `package.json` (currently 7.1.0) and mirrored into six other
 manifests by the bump script.
 
 ## Working in this repo
@@ -46,8 +46,10 @@ manifests by the bump script.
 
 ## Load-bearing contracts
 
-- **Context-mode adapter:** `skills/shared/context-mode-adapter.md` is the single source of
-  truth for native-vs-`ctx_*` routing. Skills defer to it; they do not restate its rules.
+- **Conductor:** `skills/shared/conductor/routing.md` is the central tool-selection authority
+  (CodeGraph, Serena, Context7, context-mode, middleware-exec, Obsidian); every integration is
+  optional and capability-gated. `skills/shared/context-mode-adapter.md` remains the
+  single source of truth for native-vs-`ctx_*` routing within that chain.
 - **Evidence rule:** gate verification is asserted in-transcript as
   `AC: <criterion> — PROVEN BY <evidence>`. Non-negotiable; hooks and gate skills key on this token.
 - **Hooks fail open:** every hook allows the action on any internal fault. Only deliberately

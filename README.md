@@ -126,6 +126,26 @@ Capabilities this fork adds on top of the upstream skills library:
   tailored surface (`.codex-plugin`, `.cursor-plugin`, `.kimi-plugin`, `.opencode`, `GEMINI.md`,
   `.pi`), generated/synced from this repo.
 
+## The Conductor
+
+`skills/shared/conductor/routing.md` is the central tool-selection authority. Skills declare
+a job type and follow that row's chain, left to right, using the first capability present:
+
+| Job | Chain (first available wins) |
+|---|---|
+| Macro discovery / flow tracing / blast-radius | CodeGraph → context-mode search → native Grep/Read |
+| Symbol-precise edit (rename, replace body, references) | Serena symbol tools → native Edit |
+| External framework/API docs | Context7 → other docs MCP → `ctx_fetch_and_index` / web |
+| Output handling (logs, tests, terminal dumps) | context-mode (unchanged contract) |
+| Mechanical subagent work (log digests, boilerplate) | middleware-exec → Claude mechanical tier |
+| Memory / ADR persistence | Obsidian-valid markdown always; obsidian-cli / Basic Memory MCP when present → filesystem |
+
+Every row is capability-gated: a hook probes what's installed and configured at session start,
+absent tools are skipped silently, and a tool that fails mid-session is demoted for the rest
+of that session — never surfaced as an error. **Every integration is optional.** Nothing here
+is required, and nothing is skipped when present. Run `/onboard` to review and install any of
+CodeGraph, Serena, Context7, middleware-exec, or obsidian-cli.
+
 ## Context economy
 
 The SessionStart payload and skill descriptions are always-on context cost — paid on every

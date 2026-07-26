@@ -8,7 +8,7 @@
 // Entry order is preserved per platform and determines output order.
 
 export default {
-  meta: { name: 'superpowers', version: '7.0.0' },
+  meta: { name: 'superpowers', version: '7.1.0' },
   hooks: [
     {
       event: 'SessionStart',

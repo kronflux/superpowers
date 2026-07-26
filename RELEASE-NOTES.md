@@ -1,5 +1,80 @@
 # Superpowers Release Notes
 
+## 7.1.0 — the conductor
+
+Introduces the Conductor: a central tool-selection layer that routes skill work to external
+capabilities (CodeGraph, Serena, Context7, middleware-exec, Obsidian) when present, and falls
+back to native tools otherwise. **Governing principle: every integration is optional —
+capability-gated, never required, never skipped when present.**
+
+### Conductor module
+
+- **`skills/shared/conductor/`** — `routing.md` is the central tool-selection authority; a job
+  taxonomy table maps job types (macro discovery, symbol-precise edit, external docs, output
+  handling, mechanical work, memory/ADR persistence) to a chain of capabilities, first available
+  wins. Skills defer to it via one canonical sentence instead of restating routing rules.
+- **Five adapters**, one per capability: `codegraph.md` (macro discovery, blast-radius tracing),
+  `serena.md` (symbol-precise edits; its memory tools are under a strict prohibition — the
+  four-layer memory + ADR layer is the sole memory system), `context7.md` (external framework/API
+  docs), `middleware.md` (mechanical subagent work), `obsidian.md` (memory/ADR persistence in
+  Obsidian-valid markdown). The pre-existing `context-mode-adapter.md` is migrated into the
+  directory as the output-handling adapter.
+
+### Capability probe
+
+- **`hooks/lib/capability-registry.js`** detects each of the five capabilities as `absent` or
+  `configured` at session start, with decline markers so a user's "no" persists across sessions.
+  A `[conductor]` summary line is added to the SessionStart output and to `context-snapshot.json`.
+  A tool becomes `verified` after its first successful call in a session; any failure demotes it
+  for the rest of that session, silently, down the chain.
+- SessionStart payload cap raised to **5,232 B** (measured payload: 5,212 B) to carry the summary
+  line.
+
+### middleware-exec
+
+- **`scripts/middleware-exec.mjs`** — a CLI for routing mechanical work (log digests,
+  boilerplate) to a swappable OpenAI-compatible endpoint, configured via
+  `docs/superpowers/middleware-config.example.json`. Falls back to the existing methodology on
+  any non-zero exit. Endpoint keys are read from environment variables only, never written to
+  config files.
+
+### ADR layer
+
+- A `docs/adr/` convention for architecture decision records. `brainstorming` reads and writes
+  ADRs. Formats are Obsidian-valid per `conductor/obsidian.md` — a comparative Obsidian Flavored
+  Markdown adoption that works whether or not Obsidian is installed.
+
+### Routing and dispatch
+
+- **3-tier complexity routing** (micro/lightweight/full) in `using-superpowers`, adapted from
+  the REPOZY audit (`EnterPlanMode` handling excluded).
+- **SDD dispatch matrix** in `subagent-driven-development`.
+- **Failure digests** added to `test-driven-development` and `systematic-debugging`.
+- **Strict skill lint** — `tests/lint-skills.mjs` now checks for dangling cross-skill links, a
+  duplication guard, and enforces the existing byte budgets.
+
+### `/onboard` extensions
+
+- Guided, clone-verified install offers for CodeGraph, Serena (with the memory-tool exclusion
+  called out explicitly), Context7, middleware-exec, and obsidian-cli. Never auto-runs an
+  install; every offer can be declined, and declines are remembered.
+
+### Upstream-sync playbook
+
+- `docs/superpowers/` gains a review-and-apply playbook for pulling upstream changes and a
+  fork-divergence map, documenting where and why this fork's behavior diverges from
+  obra/superpowers.
+
+### Fixes
+
+- **brainstorming** — presentation now follows a standalone-message rule, decoupling design
+  presentation from the surrounding conversational flow.
+
+### Breaking changes
+
+- None for end users. Every new integration is opt-in and inert until a capability is detected
+  or a user runs `/onboard`.
+
 ## 7.0.0 (kronflux fork)
 
 Resynced the kronflux fork onto the upstream obra/superpowers v6.1.1 base (`d884ae0`) and
