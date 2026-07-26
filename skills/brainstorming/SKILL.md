@@ -87,11 +87,10 @@ digraph brainstorming {
 
 **Presenting the design:**
 
-- Once you believe you understand what you're building, present the design
-- Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced
-- Ask after each section whether it looks right so far
-- Cover: architecture, components, data flow, error handling, testing
-- Be ready to go back and clarify if something doesn't make sense
+- Once you understand what you're building, present the design
+- Scale each section to complexity: a few sentences if simple, up to 200-300 words if nuanced
+- Send each section as its own standalone message ending the turn; ask if it's right only next turn — same-turn coupling hides the design
+- Cover: architecture, components, data flow, errors, testing
 
 **Design quality:** guidance on designing for isolation and clarity, engineering rigor, and working in existing codebases is in `skills/brainstorming/references/design-details.md`.
 
@@ -124,11 +123,11 @@ After writing the spec document, look at it with fresh eyes:
 Fix any issues inline. No need to re-review — just fix and move on.
 
 **User Review Gate:**
-After the spec review loop passes, ask the user to review the written spec before proceeding:
+After the spec review loop passes, send the notice below as its own standalone message ending the turn; ask for approval only next turn — same-turn coupling hides the spec:
 
-> "Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan."
+> "Spec written and committed to `<path>`. Please review and flag changes before the plan is written."
 
-Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves.
+Wait for the response next turn. If changes are requested, re-run the review loop. Proceed only once approved.
 
 **Implementation:**
 
