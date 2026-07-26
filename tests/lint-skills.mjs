@@ -15,6 +15,11 @@ const ALLOW_CONTEXT = [
 ];
 const BAD_NS = /superpowers-(extended-cc|optimized):/g;
 
+// Conductor tool-selection sweep (Task 13): every swept SKILL.md must defer to the
+// canonical sentence instead of restating a legacy per-skill ctx tool-selection chain.
+const CANONICAL_SENTENCE = /Tool selection is governed by `skills\/shared\/conductor\/routing\.md`/;
+const LEGACY_CHAIN = /ctx_fetch_and_index.*ctx_search|route data work.*ctx_/i;
+
 // Context economy budgets (Task 12).
 const DESCRIPTION_BUDGET = 300; // bytes, FAIL above
 const SKILL_SIZE_BUDGET = 12288; // bytes, WARN above
@@ -64,6 +69,14 @@ function lintDir(dir) {
   const ns = src.match(BAD_NS);
   if (ns) errors.push(`non-superpowers namespace: ${[...new Set(ns)].join(", ")}`);
 
+  // Duplication guard: canonical sentence + a legacy fetch/tool chain paragraph means
+  // the sweep missed a spot — the skill both defers to routing.md AND restates a
+  // per-skill ctx chain inline.
+  if (CANONICAL_SENTENCE.test(src)) {
+    const legacyLine = src.split("\n").find((line) => LEGACY_CHAIN.test(line));
+    if (legacyLine) errors.push(`canonical sentence + legacy tool-selection chain: ${legacyLine.trim()}`);
+  }
+
   src.split("\n").forEach((line, i) => {
     if (ALLOW_CONTEXT.some((r) => r.test(line))) return;
     for (const r of BLOCKED) {
@@ -94,8 +107,22 @@ const ADAPTER_BUDGET = 6000; // bytes, FAIL above (excludes context-mode-adapter
 if (existsSync(CONDUCTOR_DIR)) {
   for (const name of readdirSync(CONDUCTOR_DIR).filter((n) => n.endsWith(".md"))) {
     const p = join(CONDUCTOR_DIR, name);
-    const size = Buffer.byteLength(readFileSync(p, "utf8"));
+    const src = readFileSync(p, "utf8");
+    const size = Buffer.byteLength(src);
     const budget = name === "routing.md" ? ROUTING_BUDGET : name === "context-mode-adapter.md" ? null : ADAPTER_BUDGET;
+
+    // Strict dangling-link check: every relative markdown link inside a conductor
+    // adapter must resolve (all six adapters + routing.md exist as of Task 12).
+    const links = [...src.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]);
+    for (const link of links) {
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(link) || link.startsWith("#")) continue; // absolute URL / in-file anchor
+      const filePart = link.split("#")[0];
+      if (!filePart || !existsSync(join(CONDUCTOR_DIR, filePart))) {
+        failed = true;
+        console.error(`shared/conductor/${name}: FAIL\n  - dangling link: ${link}`);
+      }
+    }
+
     if (budget === null) continue;
     if (size > budget) { failed = true; console.error(`shared/conductor/${name}: FAIL\n  - ${size}B > ${budget}B budget`); }
     else console.log(`shared/conductor/${name}: ${size}B within ${budget}B budget`);

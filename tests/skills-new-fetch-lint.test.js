@@ -39,8 +39,9 @@ describe('skills blocked-fetch lint (criterion 8)', () => {
     );
     expect(src).not.toMatch(/\bcurl\s+-sf\b/i);
     expect(src).not.toMatch(/WebFetch returns AI-generated summaries/i);
-    // The deferral must be wired to the adapter, not orphaned.
-    expect(src).toMatch(/superpowers:skills\/shared\/conductor\/context-mode-adapter\.md/);
+    // The deferral must be wired to the router (Task 13 canonical sentence), not orphaned.
+    // routing.md's job taxonomy chains to context-mode-adapter.md for output handling.
+    expect(src).toMatch(/skills\/shared\/conductor\/routing\.md/);
   });
 
   it('the blocked-fetch check BITES: a fixture with a curl directive fails', () => {
