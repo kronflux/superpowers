@@ -58,4 +58,14 @@ describe('capability-registry', () => {
     for (const v of Object.values(caps)) v.status = STATUS.CONFIGURED;
     expect(summaryLine(caps).length).toBeLessThanOrEqual(120);
   });
+
+  it('probes decline markers for serena, context7, middleware, obsidian-cli', () => {
+    fs.writeFileSync(path.join(tmp, '.superpowers-no-serena'), '');
+    fs.writeFileSync(path.join(tmp, '.superpowers-no-middleware'), '');
+    const caps = probe(tmp, { home: tmp, env: { PATH: '' } });
+    expect(caps.serena.declined).toBe(true);
+    expect(caps.middleware.declined).toBe(true);
+    expect(caps.context7.declined).toBe(false);
+    expect(caps['obsidian-cli'].declined).toBe(false);
+  });
 });

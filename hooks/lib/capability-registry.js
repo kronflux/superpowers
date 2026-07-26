@@ -60,14 +60,25 @@ function probe(cwd = process.cwd(), opts = {}) {
       indexed: exists(path.join(cwd, '.codegraph')),
       declined: exists(path.join(cwd, '.superpowers-no-codegraph')),
     },
-    serena: { status: st(mcpConfigured('serena', cwd, home)) },
-    context7: { status: st(mcpConfigured('context7', cwd, home)) },
+    serena: {
+      status: st(mcpConfigured('serena', cwd, home)),
+      declined: exists(path.join(cwd, '.superpowers-no-serena')),
+    },
+    context7: {
+      status: st(mcpConfigured('context7', cwd, home)),
+      declined: exists(path.join(cwd, '.superpowers-no-context7')),
+    },
     docfork: { status: st(mcpConfigured('docfork', cwd, home)) },
     'basic-memory': { status: st(mcpConfigured('basic-?memory', cwd, home)) },
-    'obsidian-cli': { status: st(onPath('obsidian-cli', env)), vault: vaultAbove(cwd) },
+    'obsidian-cli': {
+      status: st(onPath('obsidian-cli', env)),
+      vault: vaultAbove(cwd),
+      declined: exists(path.join(cwd, '.superpowers-no-obsidian-cli')),
+    },
     middleware: {
       status: st([path.join(cwd, '.claude', 'middleware-config.json'),
                   path.join(home, '.claude', 'middleware-config.json')].some(exists)),
+      declined: exists(path.join(cwd, '.superpowers-no-middleware')),
     },
   };
 }
