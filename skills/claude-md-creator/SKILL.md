@@ -14,7 +14,7 @@ Empirical research (Gloaguen et al., 2026 — "Evaluating AGENTS.md") shows that
 
 ## Adapter Link
 
-Scanning config files to draft the context file is Read-for-analysis. Tool selection follows `superpowers:skills/shared/context-mode-adapter.md` — when context-mode is active, inspect config files via `ctx_execute_file` (raw bytes stay in the sandbox); when inactive, use the native fallback (Read/Glob). State-probes and file writes stay native in both modes.
+Scanning config files to draft the context file is Read-for-analysis. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, inspect config files via `ctx_execute_file` (raw bytes stay in the sandbox); when inactive, use the native fallback (Read/Glob). State-probes and file writes stay native in both modes.
 
 ## Trigger Conditions
 
@@ -77,7 +77,7 @@ Unnecessary requirements make tasks harder. Every rule you add has a cost — th
 
 ## Process
 
-1. **Scan the repo** — read key config files (`package.json`, `tsconfig.json`, `Makefile`, CI configs) and source structure. See `superpowers:skills/shared/context-mode-adapter.md` — when context-mode is active, inspect these via `ctx_execute_file`; otherwise use native Read (native fallback).
+1. **Scan the repo** — read key config files (`package.json`, `tsconfig.json`, `Makefile`, CI configs) and source structure. See `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, inspect these via `ctx_execute_file`; otherwise use native Read (native fallback).
 2. **Identify gaps** — what would an agent get wrong without explicit guidance? Focus on commands, env setup, and constraints that cause breakage.
 3. **Ask minimal questions** — only ask about things that can't be inferred from the repo.
 4. **Draft a short, high-signal context file** — aim for under ~50 lines. Every line should pass the test: *"would the agent produce incorrect output without this?"*

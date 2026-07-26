@@ -145,7 +145,7 @@ Skills may read context-engine artifacts — `context-snapshot.json`, `project-m
 
 ### context-mode awareness
 
-Any skill with a data-processing surface (web fetch, build runs, unbounded Bash, analysis reads, count/filter greps) MUST link `skills/shared/context-mode-adapter.md` rather than emitting `curl`/`wget`/`read_url_content`/"Read directly"/"Grep to locate" directives — those are hard-blocked or nudged when context-mode is active. State-probes, mutations, file writes, and git stay native.
+Any skill with a data-processing surface (web fetch, build runs, unbounded Bash, analysis reads, count/filter greps) MUST link `skills/shared/conductor/context-mode-adapter.md` rather than emitting `curl`/`wget`/`read_url_content`/"Read directly"/"Grep to locate" directives — those are hard-blocked or nudged when context-mode is active. State-probes, mutations, file writes, and git stay native.
 
 Skill discovery optimization — description field, keyword coverage, descriptive naming, token efficiency, cross-referencing other skills: `references/discovery-optimization.md`.
 

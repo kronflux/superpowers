@@ -32,7 +32,7 @@ Guide completion of development work by presenting clear options and handling ch
 npm test / cargo test / pytest / go test ./...
 ```
 
-If context-mode is active, run the test/verification command via `ctx_execute` per `skills/shared/context-mode-adapter.md`, and echo the pass/fail summary in-transcript.
+If context-mode is active, run the test/verification command via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`, and echo the pass/fail summary in-transcript.
 
 **If tests fail:**
 ```
@@ -122,7 +122,7 @@ git merge <feature-branch>
 # Only after merge succeeds: cleanup worktree (Step 6), then delete branch
 ```
 
-If context-mode is active, run the merged-result verification command via `ctx_execute` per `skills/shared/context-mode-adapter.md`, and echo the pass/fail summary in-transcript.
+If context-mode is active, run the merged-result verification command via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`, and echo the pass/fail summary in-transcript.
 
 Then: Cleanup worktree (Step 6), then delete branch:
 

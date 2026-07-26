@@ -71,5 +71,5 @@ than block it. Errors never cascade into blocking a session.
 
 The evidence tokens these hooks look for (`AC: <criterion> — PROVEN BY
 <evidence>`) are the same contract documented in
-`skills/shared/context-mode-adapter.md`'s Evidence rule and in
+`skills/shared/conductor/context-mode-adapter.md`'s Evidence rule and in
 `docs/user-gate-flow.md` (the flow doc lands in a later resync commit; until then, pre-resync-main:docs/user-gate-flow.md is the reference).

@@ -40,7 +40,7 @@ describe('skills blocked-fetch lint (criterion 8)', () => {
     expect(src).not.toMatch(/\bcurl\s+-sf\b/i);
     expect(src).not.toMatch(/WebFetch returns AI-generated summaries/i);
     // The deferral must be wired to the adapter, not orphaned.
-    expect(src).toMatch(/superpowers:skills\/shared\/context-mode-adapter\.md/);
+    expect(src).toMatch(/superpowers:skills\/shared\/conductor\/context-mode-adapter\.md/);
   });
 
   it('the blocked-fetch check BITES: a fixture with a curl directive fails', () => {

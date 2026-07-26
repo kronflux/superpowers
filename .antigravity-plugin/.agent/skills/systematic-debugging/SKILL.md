@@ -115,7 +115,7 @@ You MUST complete each phase before proceeding to the next.
 
    **This reveals:** Which layer fails (secrets → workflow ✓, workflow → build ✗)
 
-   If context-mode is active, run diagnostic and test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; surface the layer-by-layer evidence in-transcript.
+   If context-mode is active, run diagnostic and test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; surface the layer-by-layer evidence in-transcript.
 
 5. **Trace Data Flow**
 

@@ -9,7 +9,7 @@ Update one thing at a time. Verify after each. Never batch major upgrades.
 
 ## Adapter Link
 
-Audit-command output (`npm outdated`, `pip list --outdated`, `cargo outdated`, `npm audit`) and codebase API-usage searches are data-processing. Tool selection follows `superpowers:skills/shared/context-mode-adapter.md` — when context-mode is active, run audit commands via `ctx_batch_execute`/`ctx_execute` (raw flood stays out of context) and run usage searches via `ctx_execute_file`/`ctx_search`; when inactive, run them natively and read the output (native fallback). Installs, test runs, and build runs are mutations/CPU-bound and stay native in both modes.
+Audit-command output (`npm outdated`, `pip list --outdated`, `cargo outdated`, `npm audit`) and codebase API-usage searches are data-processing. Tool selection follows `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run audit commands via `ctx_batch_execute`/`ctx_execute` (raw flood stays out of context) and run usage searches via `ctx_execute_file`/`ctx_search`; when inactive, run them natively and read the output (native fallback). Installs, test runs, and build runs are mutations/CPU-bound and stay native in both modes.
 
 ## Why This Exists
 
@@ -26,7 +26,7 @@ Before changing any versions, understand what needs updating and why.
    - Rust: `cargo outdated`
    - General: check the package manager's audit/outdated command
 
-   These produce bounded structured output. See `superpowers:skills/shared/context-mode-adapter.md` — when context-mode is active, run them via `ctx_batch_execute`/`ctx_execute` so the raw output is parsed in the sandbox and only the categorized result enters context; when inactive, run natively and read the output (native fallback). The same applies to `npm audit`.
+   These produce bounded structured output. See `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run them via `ctx_batch_execute`/`ctx_execute` so the raw output is parsed in the sandbox and only the categorized result enters context; when inactive, run natively and read the output (native fallback). The same applies to `npm audit`.
 
 2. **Categorize each update by urgency:**
    - **Security** — CVE or advisory with known exploit. Update immediately.
@@ -46,9 +46,9 @@ For each dependency to update (especially major versions):
    - Peer dependency changes (requires React 18, drops support for React 16)
    - Changed default behavior (opt-in → opt-out, strict mode, new warnings)
 
-   When the changelog is a URL, fetch it per `superpowers:skills/shared/context-mode-adapter.md` — `ctx_fetch_and_index` then `ctx_search` when context-mode is active; native fetch when inactive (native fallback).
+   When the changelog is a URL, fetch it per `superpowers:skills/shared/conductor/context-mode-adapter.md` — `ctx_fetch_and_index` then `ctx_search` when context-mode is active; native fetch when inactive (native fallback).
 
-2. **Search the codebase for usage of changed APIs.** See `superpowers:skills/shared/context-mode-adapter.md` — when context-mode is active, run these searches via `ctx_execute_file`/`ctx_search` (count/filter over the codebase); when inactive, use native Grep (native fallback). For each renamed/removed API, run separate searches for:
+2. **Search the codebase for usage of changed APIs.** See `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, run these searches via `ctx_execute_file`/`ctx_search` (count/filter over the codebase); when inactive, use native Grep (native fallback). For each renamed/removed API, run separate searches for:
    - Direct calls and type references
    - String literals and dynamic access (`obj["methodName"]`)
    - Import statements and re-exports

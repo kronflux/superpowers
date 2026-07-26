@@ -7,7 +7,7 @@ description: 'Persists durable state across sessions via state.md; generates pro
 
 ## Adapter Link
 
-This skill writes durable human-curated files (`state.md`, `session-log.md`, `project-map.md`) and probes git state. Per `superpowers:skills/shared/context-mode-adapter.md`: all file writes use **native** Write/Edit and all git state-probes (`git rev-parse`, `git init`) stay **native** in both modes — `ctx_execute*` discard their sandbox filesystem, so writes must not be routed through them. Only the **query** side is data-processing: searching `session-log.md` / `project-map.md` is routed via `ctx_search`/`ctx_execute_file` when context-mode is active, and native grep when inactive (native fallback).
+This skill writes durable human-curated files (`state.md`, `session-log.md`, `project-map.md`) and probes git state. Per `superpowers:skills/shared/conductor/context-mode-adapter.md`: all file writes use **native** Write/Edit and all git state-probes (`git rev-parse`, `git init`) stay **native** in both modes — `ctx_execute*` discard their sandbox filesystem, so writes must not be routed through them. Only the **query** side is data-processing: searching `session-log.md` / `project-map.md` is routed via `ctx_search`/`ctx_execute_file` when context-mode is active, and native grep when inactive (native fallback).
 
 **Overlap with context-mode session memory:** context-mode auto-capture and this skill's curated files are distinct layers with different owners and lifetimes. See [The Four Memory Layers](#the-four-memory-layers) for the authoritative contract — which layer holds what, and when to query each.
 

@@ -11,7 +11,7 @@ Dispatch a code reviewer subagent to catch issues before they cascade. The revie
 
 ## Adapter Link
 
-The review scope is derived from `git diff` — a structurally-bounded read that stays native. Tool selection otherwise follows `skills/shared/context-mode-adapter.md`. When context-mode is active and the reviewer or red team computes findings via `ctx` tools, the `PROVEN BY` evidence and severity findings MUST be echoed in-transcript — compressed agent results would otherwise drop the supporting evidence, blocking false-positive triage.
+The review scope is derived from `git diff` — a structurally-bounded read that stays native. Tool selection otherwise follows `skills/shared/conductor/context-mode-adapter.md`. When context-mode is active and the reviewer or red team computes findings via `ctx` tools, the `PROVEN BY` evidence and severity findings MUST be echoed in-transcript — compressed agent results would otherwise drop the supporting evidence, blocking false-positive triage.
 
 ## When to Request Review
 

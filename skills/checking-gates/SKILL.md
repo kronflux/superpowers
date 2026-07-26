@@ -44,7 +44,7 @@ If none of these apply, return to `superpowers:executing-plans` without running 
 
 ### Step 3 — Execute and post evidence
 
-1. Run the `verifyCommand` (or dispatch the subagent with `subagentBrief`). Capture exact output. See `superpowers:skills/shared/context-mode-adapter.md` — when context-mode is active, you MAY run the `verifyCommand` via `ctx_execute` so the raw flood stays out of context, BUT you MUST then echo the per-criterion evidence into your assistant message (next step). The gate hooks scan the TRANSCRIPT for `AC:` / `PROVEN BY`; evidence that lives only in a ctx sandbox will false-positive-block the gate.
+1. Run the `verifyCommand` (or dispatch the subagent with `subagentBrief`). Capture exact output. See `superpowers:skills/shared/conductor/context-mode-adapter.md` — when context-mode is active, you MAY run the `verifyCommand` via `ctx_execute` so the raw flood stays out of context, BUT you MUST then echo the per-criterion evidence into your assistant message (next step). The gate hooks scan the TRANSCRIPT for `AC:` / `PROVEN BY`; evidence that lives only in a ctx sandbox will false-positive-block the gate.
 2. Map each `acceptanceCriteria` entry to an observable in the output.
 3. Post one block of text back to the user, using EXACTLY this format (the sibling hooks key off the `AC:` + `PROVEN BY` markers):
 
@@ -84,7 +84,7 @@ If any of the three is missing for any criterion, HOW is NOT clear → Path A.
 
 ## Adapter Link
 
-This skill interacts with context-mode. The single source of native-vs-ctx tool selection — and the gate evidence rule — is `superpowers:skills/shared/context-mode-adapter.md`. Under context-mode, computing the `verifyCommand` output in a ctx sandbox keeps the raw flood out of context, but the `Gate:` / `AC: <criterion> — PROVEN BY <evidence>` lines MUST be echoed IN THE TRANSCRIPT (the conversation), not left only in the sandbox. Evidence trapped in a sandbox triggers a false-positive gate block.
+This skill interacts with context-mode. The single source of native-vs-ctx tool selection — and the gate evidence rule — is `superpowers:skills/shared/conductor/context-mode-adapter.md`. Under context-mode, computing the `verifyCommand` output in a ctx sandbox keeps the raw flood out of context, but the `Gate:` / `AC: <criterion> — PROVEN BY <evidence>` lines MUST be echoed IN THE TRANSCRIPT (the conversation), not left only in the sandbox. Evidence trapped in a sandbox triggers a false-positive gate block.
 
 ## Integration
 

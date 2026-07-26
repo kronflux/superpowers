@@ -155,7 +155,7 @@ After all questions answered:
 
 3. **Sync `.tasks.json`.** Update the task entry's description and metadata, set `lastUpdated`.
 
-   Do NOT route metadata writes through `ctx_execute` — ctx sandboxes discard their FS. Use native TaskUpdate / file write. See `superpowers:skills/shared/context-mode-adapter.md`: file mutations stay native in both modes.
+   Do NOT route metadata writes through `ctx_execute` — ctx sandboxes discard their FS. Use native TaskUpdate / file write. See `superpowers:skills/shared/conductor/context-mode-adapter.md`: file mutations stay native in both modes.
 
 4. **Announce:** "Specification locked. Returning control to executing-plans to run the gate."
 

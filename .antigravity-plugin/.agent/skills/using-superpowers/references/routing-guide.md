@@ -37,7 +37,7 @@ If the request is non-trivial AND `project-map.md` does not exist AND the projec
 
 ## Context-Mode Detection
 
-The session-start hook injects a context-mode-active flag. When active, data-processing work in routed skills follows `skills/shared/context-mode-adapter.md` — prefer ctx tools per the mapping; state-probes, mutations, and file writes stay native. When inactive, use native tools.
+The session-start hook injects a context-mode-active flag. When active, data-processing work in routed skills follows `skills/shared/conductor/context-mode-adapter.md` — prefer ctx tools per the mapping; state-probes, mutations, and file writes stay native. When inactive, use native tools.
 
 ## Stale Project Map Refresh
 
@@ -52,7 +52,7 @@ Read `project-map.md` to orient without re-globbing known files; when you need a
 - `.agent/skills/requesting-code-review/SKILL.md` / `.agent/skills/receiving-code-review/SKILL.md` — code review includes security review.
 - `.agent/skills/dispatching-parallel-agents/SKILL.md` — independent parallel tasks outside plan execution.
 - `.agent/skills/claude-md-creator/SKILL.md` — CLAUDE.md / AGENTS.md creation or update; never implement these directly.
-- `skills/shared/context-mode-adapter.md` — data processing under context-mode; auto-applied reference, not a Skill-tool invocation.
+- `skills/shared/conductor/context-mode-adapter.md` — data processing under context-mode; auto-applied reference, not a Skill-tool invocation.
 
 Internal, never routed directly: `.agent/skills/self-consistency-reasoner/SKILL.md` (invoked by systematic-debugging and verification-before-completion); `.agent/skills/token-efficiency/SKILL.md` (entry-sequence step 1, when available).
 

@@ -57,7 +57,7 @@ Before writing the first test, verify the project has a test runner:
 
 Do not skip this step — a "failing test" that fails because the runner doesn't exist teaches nothing.
 
-If context-mode is active, run test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
 
 ## Red-Green-Refactor
 
@@ -142,7 +142,7 @@ Confirm:
 
 **Test errors?** Fix error, re-run until it fails correctly.
 
-If context-mode is active, run test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
 
 ### GREEN - Minimal Code
 
@@ -199,7 +199,7 @@ Confirm:
 
 **Other tests fail?** Fix now.
 
-If context-mode is active, run test commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
+If context-mode is active, run test commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`; echo the failure/pass summary in-transcript.
 
 ### REFACTOR - Clean Up
 

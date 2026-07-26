@@ -37,7 +37,7 @@ BEFORE claiming any status or expressing satisfaction:
 Skip any step = lying, not verifying
 ```
 
-If context-mode is active, run verification commands via `ctx_execute` per `skills/shared/context-mode-adapter.md`, and ECHO the fresh output (exit code, failure count) in-transcript — the completion claim's evidence must be visible in the conversation, not only in a ctx sandbox (§8 gate-evidence rule).
+If context-mode is active, run verification commands via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md`, and ECHO the fresh output (exit code, failure count) in-transcript — the completion claim's evidence must be visible in the conversation, not only in a ctx sandbox (§8 gate-evidence rule).
 
 ## Common Failures
 
@@ -119,7 +119,7 @@ grep -rn "TODO\|FIXME\|placeholder\|NotImplementedError\|raise NotImplementedErr
 
 Adjust `<src-dir>` and `--include` patterns to the project's language and source structure. If any match falls in a file this task created or modified: the task is not done. Remove the stub or confirm with your human partner it is intentional before claiming completion.
 
-When context-mode is active, run this stub scan via `ctx_execute` per `skills/shared/context-mode-adapter.md` (Grep-for-filter → `ctx_execute`); surface any matching file:line in-transcript.
+When context-mode is active, run this stub scan via `ctx_execute` per `skills/shared/conductor/context-mode-adapter.md` (Grep-for-filter → `ctx_execute`); surface any matching file:line in-transcript.
 
 ## Configuration Change Verification
 

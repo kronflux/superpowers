@@ -43,11 +43,11 @@ digraph when_to_use {
 - Failures are related (fix one might fix others)
 - Need to understand full system state
 - Agents would interfere with each other
-- The task is content relay — fetching raw content (file contents, web pages, API responses) to bring back to the parent session. Agent results are compressed; raw content will be lost. Fetch it in the parent instead: local files with `view_file`, and web/API content per `skills/shared/context-mode-adapter.md` (when context-mode is active, use `ctx_fetch_and_index` → `ctx_search`; when inactive, `read_url_content`).
+- The task is content relay — fetching raw content (file contents, web pages, API responses) to bring back to the parent session. Agent results are compressed; raw content will be lost. Fetch it in the parent instead: local files with `view_file`, and web/API content per `skills/shared/conductor/context-mode-adapter.md` (when context-mode is active, use `ctx_fetch_and_index` → `ctx_search`; when inactive, `read_url_content`).
 
 ## Adapter Link
 
-Tool selection follows `skills/shared/context-mode-adapter.md`. Integration verification (the full project test suite after agents return) routes through the adapter: when context-mode is active, run it via `ctx_execute`; when inactive, run it natively.
+Tool selection follows `skills/shared/conductor/context-mode-adapter.md`. Integration verification (the full project test suite after agents return) routes through the adapter: when context-mode is active, run it via `ctx_execute`; when inactive, run it natively.
 
 ## The Pattern
 

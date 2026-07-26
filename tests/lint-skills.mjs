@@ -86,4 +86,20 @@ for (const t of targets) {
   if (errors.length) { failed = true; console.error(`${name}: FAIL\n  - ${errors.join("\n  - ")}`); }
   else console.log(`${name}: frontmatter OK; cross-refs OK; no blocked fetch patterns`);
 }
+
+// Conductor module byte budgets (Task 5).
+const CONDUCTOR_DIR = join("skills", "shared", "conductor");
+const ROUTING_BUDGET = 4000; // bytes, FAIL above
+const ADAPTER_BUDGET = 6000; // bytes, FAIL above (excludes context-mode-adapter.md)
+if (existsSync(CONDUCTOR_DIR)) {
+  for (const name of readdirSync(CONDUCTOR_DIR).filter((n) => n.endsWith(".md"))) {
+    const p = join(CONDUCTOR_DIR, name);
+    const size = Buffer.byteLength(readFileSync(p, "utf8"));
+    const budget = name === "routing.md" ? ROUTING_BUDGET : name === "context-mode-adapter.md" ? null : ADAPTER_BUDGET;
+    if (budget === null) continue;
+    if (size > budget) { failed = true; console.error(`shared/conductor/${name}: FAIL\n  - ${size}B > ${budget}B budget`); }
+    else console.log(`shared/conductor/${name}: ${size}B within ${budget}B budget`);
+  }
+}
+
 process.exit(failed ? 1 : 0);
