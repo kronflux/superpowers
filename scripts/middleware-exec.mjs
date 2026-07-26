@@ -27,7 +27,8 @@ export function endpointFor(cfg, env = process.env) {
   const ep = cfg.endpoints?.[cfg.active_provider];
   if (!ep) throw Object.assign(new Error(`active_provider "${cfg.active_provider}" not defined in endpoints`), { exit: EXIT.UNCONFIGURED });
   const key = ep.api_key_env ? env[ep.api_key_env] : undefined;
-  const local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/.test(ep.base_url);
+  let local = false;
+  try { const h = new URL(ep.base_url).hostname; local = h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]'; } catch { /* invalid URL treated as remote */ }
   if (!key && !local) throw Object.assign(new Error(`env var ${ep.api_key_env} not set for remote endpoint`), { exit: EXIT.UNCONFIGURED });
   return { baseUrl: ep.base_url.replace(/\/+$/, ''), model: cfg.active_model || ep.model, key };
 }

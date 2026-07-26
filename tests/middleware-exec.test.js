@@ -75,6 +75,35 @@ describe('endpointFor', () => {
     expect(result.key).toBeUndefined();
   });
 
+  it('treats a userinfo-authority host as remote, not localhost, requiring a key', () => {
+    const cfg = {
+      active_provider: 'sneaky',
+      endpoints: { sneaky: { model: 'x', base_url: 'https://localhost:1@evil.example/v1', api_key_env: 'MISSING_KEY' } },
+    };
+    try {
+      endpointFor(cfg, {});
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect(e.exit).toBe(2);
+    }
+  });
+
+  it('still allows keyless http://localhost:11434/v1', () => {
+    const cfg = {
+      active_provider: 'ollama',
+      endpoints: { ollama: { model: 'llama3', base_url: 'http://localhost:11434/v1', api_key_env: 'UNSET_KEY' } },
+    };
+    expect(() => endpointFor(cfg, {})).not.toThrow();
+  });
+
+  it('still allows keyless http://127.0.0.1:4000', () => {
+    const cfg = {
+      active_provider: 'litellm',
+      endpoints: { litellm: { model: 'x', base_url: 'http://127.0.0.1:4000', api_key_env: 'UNSET_KEY' } },
+    };
+    expect(() => endpointFor(cfg, {})).not.toThrow();
+  });
+
   it('resolves key from env when present for a remote endpoint', () => {
     const cfg = {
       active_provider: 'openrouter',
@@ -183,6 +212,77 @@ describe('middleware-exec CLI end-to-end', () => {
       expect(receivedAuth).toBe('Bearer test');
       expect(receivedBody.model).toBe('test-model');
       expect(receivedBody.messages[0].content).toContain('some log content');
+    } finally {
+      server.close();
+    }
+  });
+
+  it('exits 1 for an unknown --task with a valid config', async () => {
+    const projectDir = path.join(tmp, 'project-unknown-task');
+    fs.mkdirSync(path.join(projectDir, '.claude'), { recursive: true });
+    const config = {
+      active_provider: 'ollama',
+      active_model: 'llama3',
+      endpoints: { ollama: { model: 'llama3', base_url: 'http://localhost:11434/v1', api_key_env: 'UNSET_KEY' } },
+    };
+    fs.writeFileSync(path.join(projectDir, '.claude', 'middleware-config.json'), JSON.stringify(config));
+    const tmpLog = path.join(tmp, 'input-unknown.log');
+    fs.writeFileSync(tmpLog, 'irrelevant content\n');
+    const cliPath = path.join(process.cwd(), 'scripts', 'middleware-exec.mjs');
+
+    await expect(
+      execFileAsync(process.execPath, [cliPath, '--task', 'nonexistent-task', '--input-file', tmpLog], { cwd: projectDir, env: process.env }),
+    ).rejects.toMatchObject({ code: 1 });
+  });
+
+  it('exits 2 when no config exists in project or home', async () => {
+    const homeConfigPath = path.join(os.homedir(), '.claude', 'middleware-config.json');
+    if (fs.existsSync(homeConfigPath)) {
+      // Not hermetic on this machine — skip rather than assert against a config we don't control.
+      return;
+    }
+    const projectDir = path.join(tmp, 'project-no-config');
+    fs.mkdirSync(projectDir, { recursive: true });
+    const tmpLog = path.join(tmp, 'input-noconfig.log');
+    fs.writeFileSync(tmpLog, 'irrelevant content\n');
+    const cliPath = path.join(process.cwd(), 'scripts', 'middleware-exec.mjs');
+
+    await expect(
+      execFileAsync(process.execPath, [cliPath, '--task', 'extract-log-error', '--input-file', tmpLog], { cwd: projectDir, env: process.env }),
+    ).rejects.toMatchObject({ code: 2 });
+  });
+
+  it('exits 3 with stderr containing "endpoint 500" on a non-2xx response', async () => {
+    const server = http.createServer((req, res) => {
+      req.on('data', () => {});
+      req.on('end', () => {
+        res.writeHead(500, { 'content-type': 'text/plain' });
+        res.end('internal server error');
+      });
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = server.address().port;
+
+    const projectDir = path.join(tmp, 'project-500');
+    fs.mkdirSync(path.join(projectDir, '.claude'), { recursive: true });
+    const config = {
+      active_provider: 'teststub',
+      active_model: 'test-model',
+      endpoints: { teststub: { model: 'test-model', base_url: `http://127.0.0.1:${port}`, api_key_env: 'MW_TEST_KEY' } },
+    };
+    fs.writeFileSync(path.join(projectDir, '.claude', 'middleware-config.json'), JSON.stringify(config));
+    const tmpLog = path.join(tmp, 'input-500.log');
+    fs.writeFileSync(tmpLog, 'irrelevant content\n');
+    const cliPath = path.join(process.cwd(), 'scripts', 'middleware-exec.mjs');
+
+    try {
+      await expect(
+        execFileAsync(
+          process.execPath,
+          [cliPath, '--task', 'extract-log-error', '--input-file', tmpLog],
+          { cwd: projectDir, env: { ...process.env, MW_TEST_KEY: 'test' } },
+        ),
+      ).rejects.toMatchObject({ code: 3, stderr: expect.stringContaining('endpoint 500') });
     } finally {
       server.close();
     }
