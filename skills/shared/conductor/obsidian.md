@@ -58,6 +58,9 @@ additive on top, never a requirement.
 - **defuddle:** only when the user explicitly wants a clean copy of a web page saved as a vault
   note. `ctx_fetch_and_index` remains the default fetch path per
   `skills/shared/conductor/context-mode-adapter.md` for all other web-content retrieval.
+- **basic-memory MCP:** when detected (routing.md capability chain), it may serve vault search/read
+  for ADR lookup in place of obsidian-cli — same optional, never-required footing. Absent or the
+  call fails → fall through to plain filesystem, same as every other tool in this section.
 
 ## Absent
 

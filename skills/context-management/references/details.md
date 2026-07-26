@@ -36,6 +36,14 @@ grep -i "<keyword>" session-log.md
 ```
 Read any matching `[saved]` entries and ask: does the new decision *directly contradict* an old one? If yes, append `[superseded by YYYY-MM-DD]` to the old entry's header line — do not delete it. If the old entry is merely related but not contradicted, leave it unchanged. This is a judgment call, not a mechanical keyword match.
 
+## ADR write — detection and skip conditions
+
+**Detecting the convention:** before writing, check for an existing `docs/adr/` directory or an established `docs/` pattern (e.g. `docs/design/`, `docs/rfcs/`). No `docs/` directory and no ADR precedent → no convention to extend; skip silently.
+
+**Offering when ambiguous:** `docs/` exists but no `docs/adr/` precedent → offer once, e.g. *"Want this design captured as an ADR under `docs/adr/`? A short, committable file distilled from the spec."* Declined → skip silently, do not re-offer in the same session.
+
+**Writing:** follow `skills/shared/conductor/obsidian.md` Authoring conventions for filename, frontmatter, and links. The ADR distills the approved design — decision, options considered, consequences — it is not a copy of the full spec.
+
 ## session-log.md Format and Maintenance
 
 The log contains a single entry type:

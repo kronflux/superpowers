@@ -25,7 +25,7 @@ Every project goes through this process. A todo list, a single-function utility,
 
 You MUST create a task for each of these items and complete them in order:
 
-1. **Explore project context** — check files, docs, recent commits
+1. **Explore project context** — check files, docs, recent commits, and `docs/adr/` if present
 2. **Offer the visual companion just-in-time** — NOT upfront. The first time a question would genuinely be clearer shown than described, offer it then (its own message); on approval its browser tab opens for you. If no visual question ever arises, never offer it. See the Visual Companion section below.
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
@@ -111,6 +111,7 @@ Do not skip this step. An approach that survives adversarial questioning is an a
   - (User preferences for spec location override this default)
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
+- Distill the approved design into an ADR in `docs/adr/` (committable), per `skills/shared/conductor/obsidian.md` conventions, in addition to the local spec — skip silently if the project has no `docs/` convention or the user declines
 
 **Spec Self-Review:**
 After writing the spec document, look at it with fresh eyes:

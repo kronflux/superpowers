@@ -51,6 +51,23 @@ decisions worth keeping into `[saved]` entries. Capture is context-mode's job; p
 **Resume protocol:** 1) `ctx_search(sort:"timeline")` for the tail of the prior session;
 2) Read `state.md`; 3) targeted `ctx_search` of durable artifacts. Only then touch code.
 
+## ADR Layer
+
+A fifth layer, additive to the four above: ADRs for approved designs that are irreversible or
+architectural, owned by brainstorming (write, on approval) and this skill (recall). Detection,
+offer wording, and skip conditions: see [references/details.md](references/details.md#adr-write--detection-and-skip-conditions).
+
+- **Qualifies:** irreversible/architectural designs (new subsystem, data-model change,
+  cross-cutting convention) — not routine features; trivial designs stay in `.superpowers/specs/`
+  only (brainstorming's judgment call).
+- **Format:** filename, frontmatter, links owned by
+  [`obsidian.md`](../shared/conductor/obsidian.md#authoring-conventions) — not duplicated here.
+- **Read trigger:** brainstorming's context-exploration step checks `docs/adr/` if present.
+- **Search chain:** obsidian-cli/basic-memory MCP when detected, else grep/`ctx_search` —
+  filesystem is the universal fallback.
+- **Never a blocker:** no `docs/` convention or the user declines → skip the write silently; the
+  spec in `.superpowers/specs/` remains the record of truth.
+
 ## When to Use
 
 - User explicitly asks to save state or compress context
