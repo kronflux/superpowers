@@ -10,7 +10,7 @@ afterEach(() => { fs.rmSync(tmp, { recursive: true, force: true }); });
 
 describe('capability-registry', () => {
   it('returns all seven capabilities as absent in an empty dir', () => {
-    const caps = probe(tmp, { home: tmp, env: { PATH: '' } });
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
     expect(Object.keys(caps).sort()).toEqual(
       ['basic-memory', 'codegraph', 'context7', 'docfork', 'middleware', 'obsidian-cli', 'serena'].sort());
     for (const v of Object.values(caps)) expect(v.status).toBe(STATUS.ABSENT);
@@ -18,26 +18,26 @@ describe('capability-registry', () => {
 
   it('detects serena from project .mcp.json', () => {
     fs.writeFileSync(path.join(tmp, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
-    expect(probe(tmp, { home: tmp, env: { PATH: '' } }).serena.status).toBe(STATUS.CONFIGURED);
+    expect(probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).serena.status).toBe(STATUS.CONFIGURED);
   });
 
   it('detects context7 from home .claude.json project scope', () => {
     fs.writeFileSync(path.join(tmp, '.claude.json'),
       JSON.stringify({ projects: { [tmp]: { mcpServers: { 'context7-mcp': {} } } } }));
-    expect(probe(tmp, { home: tmp, env: { PATH: '' } }).context7.status).toBe(STATUS.CONFIGURED);
+    expect(probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).context7.status).toBe(STATUS.CONFIGURED);
   });
 
   it('ignores unrelated projects in .claude.json', () => {
     const otherPath = path.join(tmp, 'other-project');
     fs.writeFileSync(path.join(tmp, '.claude.json'),
       JSON.stringify({ projects: { [otherPath]: { mcpServers: { 'context7-mcp': {} } } } }));
-    expect(probe(tmp, { home: tmp, env: { PATH: '' } }).context7.status).toBe(STATUS.ABSENT);
+    expect(probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).context7.status).toBe(STATUS.ABSENT);
   });
 
   it('detects codegraph index dir and decline marker', () => {
     fs.mkdirSync(path.join(tmp, '.codegraph'));
     fs.writeFileSync(path.join(tmp, '.superpowers-no-codegraph'), '');
-    const cg = probe(tmp, { home: tmp, env: { PATH: '' } }).codegraph;
+    const cg = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).codegraph;
     expect(cg.indexed).toBe(true);
     expect(cg.declined).toBe(true);
   });
@@ -45,16 +45,16 @@ describe('capability-registry', () => {
   it('detects middleware config in project .claude dir', () => {
     fs.mkdirSync(path.join(tmp, '.claude'));
     fs.writeFileSync(path.join(tmp, '.claude', 'middleware-config.json'), '{}');
-    expect(probe(tmp, { home: tmp, env: { PATH: '' } }).middleware.status).toBe(STATUS.CONFIGURED);
+    expect(probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).middleware.status).toBe(STATUS.CONFIGURED);
   });
 
   it('survives corrupt config json', () => {
     fs.writeFileSync(path.join(tmp, '.mcp.json'), '{not json');
-    expect(() => probe(tmp, { home: tmp, env: { PATH: '' } })).not.toThrow();
+    expect(() => probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } })).not.toThrow();
   });
 
   it('summaryLine stays within 120 chars with everything present', () => {
-    const caps = probe(tmp, { home: tmp, env: { PATH: '' } });
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
     for (const v of Object.values(caps)) v.status = STATUS.CONFIGURED;
     expect(summaryLine(caps).length).toBeLessThanOrEqual(120);
   });
@@ -62,7 +62,7 @@ describe('capability-registry', () => {
   it('probes decline markers for serena, context7, middleware, obsidian-cli', () => {
     fs.writeFileSync(path.join(tmp, '.superpowers-no-serena'), '');
     fs.writeFileSync(path.join(tmp, '.superpowers-no-middleware'), '');
-    const caps = probe(tmp, { home: tmp, env: { PATH: '' } });
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
     expect(caps.serena.declined).toBe(true);
     expect(caps.middleware.declined).toBe(true);
     expect(caps.context7.declined).toBe(false);
