@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -34,6 +34,37 @@ function makeProject(config) {
   return dir;
 }
 
+function makeProfile(config) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-profile-'));
+  tmpDirs.push(dir);
+  const cfgDir = path.join(dir, 'superpowers');
+  fs.mkdirSync(cfgDir, { recursive: true });
+  const body = typeof config === 'string' ? config : JSON.stringify(config);
+  fs.writeFileSync(path.join(cfgDir, 'model-routing.json'), body);
+  return dir;
+}
+
+// Probe script: calls loadRouting/routingSource in a fresh subprocess so
+// os.homedir()-backed legacy-candidate resolution honours the subprocess's
+// own HOME/USERPROFILE rather than this test runner's real environment.
+const routingLibUrl = pathToFileURL(path.join(__dirname, '..', 'hooks', 'lib', 'routing-config.js')).href;
+const probeScript = path.join(tmpHome, 'load-routing-probe.mjs');
+fs.writeFileSync(
+  probeScript,
+  `import { loadRouting, routingSource } from '${routingLibUrl}';\n` +
+    'const routing = loadRouting(process.argv[2], process.env);\n' +
+    'process.stdout.write(JSON.stringify({ routing, source: routingSource() }));\n'
+);
+
+function loadRoutingProbe(cwd, envOverrides = {}) {
+  const env = { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome };
+  delete env.SUPERPOWERS_ROUTING_GUARD;
+  delete env.CLAUDE_CONFIG_DIR;
+  Object.assign(env, envOverrides);
+  const out = execFileSync('node', [probeScript, cwd], { encoding: 'utf8', env });
+  return JSON.parse(out);
+}
+
 let transcriptCount = 0;
 function makeTranscript(lines) {
   const file = path.join(tmpHome, `transcript-${transcriptCount++}.jsonl`);
@@ -62,6 +93,12 @@ function run(hook, payload, envOverrides = {}) {
   delete env.SUPERPOWERS_ROUTING_GUARD;
   if (envOverrides.SUPERPOWERS_ROUTING_GUARD !== undefined) {
     env.SUPERPOWERS_ROUTING_GUARD = envOverrides.SUPERPOWERS_ROUTING_GUARD;
+  }
+  // Isolate from any real CLAUDE_CONFIG_DIR inherited from the outer shell —
+  // otherwise routing-config's source log would land outside tmpHome.
+  delete env.CLAUDE_CONFIG_DIR;
+  if (envOverrides.CLAUDE_CONFIG_DIR !== undefined) {
+    env.CLAUDE_CONFIG_DIR = envOverrides.CLAUDE_CONFIG_DIR;
   }
   const out = execFileSync('node', [HOOKS[hook]], {
     input: JSON.stringify(payload),
@@ -156,6 +193,44 @@ describe('self-gating (all three hooks)', () => {
       });
       expect(out.trim()).toBe('{}');
     }
+  });
+});
+
+describe('loadRouting profile-scoped candidate', () => {
+  it('uses the CLAUDE_CONFIG_DIR profile file when no project file exists', () => {
+    const cwd = makeProject(undefined);
+    const profileDir = makeProfile(ROUTING);
+    const result = loadRoutingProbe(cwd, { CLAUDE_CONFIG_DIR: profileDir });
+    expect(result.routing).toEqual(ROUTING);
+    expect(result.source).toBe(path.join(profileDir, 'superpowers', 'model-routing.json'));
+  });
+
+  it('project file still beats the profile file', () => {
+    const projectRouting = { mechanical: 'haiku', standard: 'sonnet', frontier: 'opus' };
+    const cwd = makeProject(projectRouting);
+    const profileDir = makeProfile(ROUTING);
+    const result = loadRoutingProbe(cwd, { CLAUDE_CONFIG_DIR: profileDir });
+    expect(result.routing).toEqual(projectRouting);
+    expect(result.source).toBe(path.join(cwd, 'docs', 'superpowers', 'model-routing.json'));
+  });
+
+  it('unset CLAUDE_CONFIG_DIR: legacy home fallback behaves as in v7.1.0', () => {
+    const cwd = makeProject(undefined);
+    const legacyDir = path.join(tmpHome, '.claude', 'superpowers');
+    fs.mkdirSync(legacyDir, { recursive: true });
+    fs.writeFileSync(path.join(legacyDir, 'model-routing.json'), JSON.stringify(ROUTING));
+    const result = loadRoutingProbe(cwd);
+    expect(result.routing).toEqual(ROUTING);
+    expect(result.source).toBe(path.join(tmpHome, '.claude', 'superpowers', 'model-routing.json'));
+  });
+
+  it('appends the winning source path to hooks-logs/routing-config.log under the config dir', () => {
+    const cwd = makeProject(undefined);
+    const profileDir = makeProfile(ROUTING);
+    loadRoutingProbe(cwd, { CLAUDE_CONFIG_DIR: profileDir });
+    const logPath = path.join(profileDir, 'hooks-logs', 'routing-config.log');
+    const contents = fs.readFileSync(logPath, 'utf8');
+    expect(contents).toContain(`routing-config: using ${path.join(profileDir, 'superpowers', 'model-routing.json')}`);
   });
 });
 
