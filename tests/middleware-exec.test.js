@@ -38,6 +38,48 @@ describe('resolveConfig', () => {
     expect(resolved.cfg.active_provider).toBe('home');
     expect(resolved.source).toBe(path.join(tmp, 'home', '.claude', 'middleware-config.json'));
   });
+
+  it('prefers profile config (CLAUDE_CONFIG_DIR) over home config', () => {
+    const profileCfg = { active_provider: 'profile' };
+    const homeCfg = { active_provider: 'home' };
+    const profileDir = path.join(tmp, 'profile');
+    fs.mkdirSync(path.join(profileDir, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(profileDir, '.claude', 'middleware-config.json'), JSON.stringify(profileCfg));
+    fs.mkdirSync(path.join(tmp, 'home', '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'home', '.claude', 'middleware-config.json'), JSON.stringify(homeCfg));
+    const env = { CLAUDE_CONFIG_DIR: path.join(profileDir, '.claude') };
+    const resolved = resolveConfig(path.join(tmp, 'project'), path.join(tmp, 'home'), env);
+    expect(resolved.cfg.active_provider).toBe('profile');
+  });
+
+  it('still prefers project config over profile config', () => {
+    const projectCfg = { active_provider: 'project' };
+    const profileCfg = { active_provider: 'profile' };
+    const homeCfg = { active_provider: 'home' };
+    const profileDir = path.join(tmp, 'profile');
+    fs.mkdirSync(path.join(tmp, 'project', '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'project', '.claude', 'middleware-config.json'), JSON.stringify(projectCfg));
+    fs.mkdirSync(path.join(profileDir, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(profileDir, '.claude', 'middleware-config.json'), JSON.stringify(profileCfg));
+    fs.mkdirSync(path.join(tmp, 'home', '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'home', '.claude', 'middleware-config.json'), JSON.stringify(homeCfg));
+    const env = { CLAUDE_CONFIG_DIR: path.join(profileDir, '.claude') };
+    const resolved = resolveConfig(path.join(tmp, 'project'), path.join(tmp, 'home'), env);
+    expect(resolved.cfg.active_provider).toBe('project');
+  });
+
+  it('falls through from corrupt profile config to home config', () => {
+    const profileCfg = '{bad';
+    const homeCfg = { active_provider: 'home' };
+    const profileDir = path.join(tmp, 'profile');
+    fs.mkdirSync(path.join(profileDir, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(profileDir, '.claude', 'middleware-config.json'), profileCfg);
+    fs.mkdirSync(path.join(tmp, 'home', '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'home', '.claude', 'middleware-config.json'), JSON.stringify(homeCfg));
+    const env = { CLAUDE_CONFIG_DIR: path.join(profileDir, '.claude') };
+    const resolved = resolveConfig(path.join(tmp, 'project'), path.join(tmp, 'home'), env);
+    expect(resolved.cfg.active_provider).toBe('home');
+  });
 });
 
 describe('endpointFor', () => {

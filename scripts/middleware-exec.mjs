@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { configDir } from '../hooks/lib/config-dir.js';
 
 const EXIT = { OK: 0, USAGE: 1, UNCONFIGURED: 2, ENDPOINT: 3 };
 
@@ -15,9 +16,13 @@ const TEMPLATES = {
     'Write unit-test boilerplate for the following code. Output tests only, no prose.\n\n{{input}}',
 };
 
-export function resolveConfig(cwd = process.cwd(), home = os.homedir()) {
-  for (const p of [path.join(cwd, '.claude', 'middleware-config.json'),
-                   path.join(home, '.claude', 'middleware-config.json')]) {
+export function resolveConfig(cwd = process.cwd(), home = os.homedir(), env = process.env) {
+  const candidates = [
+    path.join(cwd, '.claude', 'middleware-config.json'),
+    path.join(configDir(env), 'middleware-config.json'),
+    path.join(home, '.claude', 'middleware-config.json'),
+  ].filter((p, i, a) => a.findIndex((q) => path.resolve(q) === path.resolve(p)) === i);
+  for (const p of candidates) {
     try { return { cfg: JSON.parse(fs.readFileSync(p, 'utf8')), source: p }; } catch { /* next */ }
   }
   return null;
