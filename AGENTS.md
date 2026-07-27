@@ -58,8 +58,9 @@ manifests by the bump script.
   to avoid colliding with context-mode. No hook uses `PreCompact`; WebFetch is owned by context-mode.
 - **Four-layer memory** (auto-capture → `state.md` → durable git-committed artifacts → harness
   memory) is documented in `docs/ARCHITECTURE.md`.
-- **Model-tier routing** is opt-in via `docs/superpowers/model-routing.json` (or
-  `~/.claude/superpowers/model-routing.json`); see `/onboard`.
+- **Model-tier routing** is opt-in via `docs/superpowers/model-routing.json` →
+  `$CLAUDE_CONFIG_DIR/superpowers/model-routing.json` → `~/.claude/superpowers/model-routing.json`
+  (first match wins); see `/onboard`.
 
 ## Releases
 

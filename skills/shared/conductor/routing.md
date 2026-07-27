@@ -1,8 +1,9 @@
 # Conductor Routing
 
 Central tool-selection authority. Skills declare a job type and follow that row's chain
-left→right: use the first capability whose status is not `absent` (see the session
-`[conductor]` line / `context-snapshot.json.capabilities`); on tool failure, demote it for
+left→right: use the first capability whose status is not `absent`, per the session
+`[conductor]` line (`probe()`'s live detection, authoritative for the session); `context-snapshot.json.capabilities`
+mirrors it only when that file already exists in the project. On tool failure, demote it for
 the session and continue down the chain. Presence is advisory — failure is graceful, never
 an error surfaced to the user. Mechanics per tool live in the adapter files in this directory.
 
