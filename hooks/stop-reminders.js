@@ -23,12 +23,9 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
+import { configDir } from './lib/config-dir.js';
 
-const LOG_DIR = path.join(
-  process.env.HOME || process.env.USERPROFILE || '.',
-  '.claude',
-  'hooks-logs'
-);
+const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 const EDIT_LOG = path.join(LOG_DIR, 'edit-log.txt');
 const LAST_SAVED_FILE = path.join(LOG_DIR, 'last-saved-entry.txt');
 const STATS_FILE = path.join(LOG_DIR, 'session-stats.json');

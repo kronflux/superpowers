@@ -13,6 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { configDir } from '../lib/config-dir.js';
 
 const SAFETY_LEVEL = 'high';
 
@@ -51,11 +52,7 @@ const PATTERNS = [
 const LEVELS = { critical: 1, high: 2, strict: 3 };
 const EMOJIS = { critical: '🚨', high: '⛔', strict: '⚠️' };
 
-const LOG_DIR = path.join(
-  process.env.HOME || process.env.USERPROFILE || '.',
-  '.claude',
-  'hooks-logs'
-);
+const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
 function log(data) {
   try {

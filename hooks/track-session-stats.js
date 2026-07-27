@@ -15,12 +15,9 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { configDir } from './lib/config-dir.js';
 
-const LOG_DIR = path.join(
-  process.env.HOME || process.env.USERPROFILE || '.',
-  '.claude',
-  'hooks-logs'
-);
+const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
 const STATS_FILE = path.join(LOG_DIR, 'session-stats.json');
 

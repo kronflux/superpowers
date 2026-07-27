@@ -19,12 +19,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ensureGitignored } from './lib/gitignore.js';
+import { configDir } from './lib/config-dir.js';
 
-const LOG_DIR = path.join(
-  process.env.HOME || process.env.USERPROFILE || '.',
-  '.claude',
-  'hooks-logs'
-);
+const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
 // AI-generated workspace artifacts that should never be committed
 const AI_ARTIFACTS = ['project-map.md', 'session-log.md', 'state.md', 'known-issues.md'];

@@ -22,6 +22,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { configDir } from './lib/config-dir.js';
 
 // MUST stay in sync with the skill directories under skills/ (excluding
 // shared/). One entry per shipped superpowers skill. Sorted alphabetically for
@@ -74,7 +75,7 @@ const VIOLATION_PATTERNS = [
 
 function logViolation(agentId, agentType, matchedPattern) {
   try {
-    const logDir = path.join(process.env.HOME || process.env.USERPROFILE || '', '.claude', 'hooks-logs');
+    const logDir = path.join(configDir(process.env), 'hooks-logs');
     fs.mkdirSync(logDir, { recursive: true });
     const entry = JSON.stringify({
       timestamp: new Date().toISOString(),

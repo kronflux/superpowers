@@ -20,6 +20,7 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { ensureGitignored } from './lib/gitignore.js';
+import { configDir } from './lib/config-dir.js';
 
 const MAX_FILES = 10;    // cap blast radius queries to avoid slowness on large diffs
 const MIN_NAME_LEN = 3;  // skip very short filenames to avoid false-positive grep hits
@@ -30,10 +31,7 @@ const TIMEOUT_MS = 5000; // max time for any single git command
 // Per-project: hashes the cwd so multi-project users don't clobber each other's watermarks.
 function getLastHeadFile(cwd) {
   const hash = createHash('md5').update(cwd).digest('hex').slice(0, 12);
-  return path.join(
-    process.env.HOME || process.env.USERPROFILE || '.',
-    '.claude', 'hooks-logs', `last-session-head-${hash}.txt`
-  );
+  return path.join(configDir(process.env), 'hooks-logs', `last-session-head-${hash}.txt`);
 }
 
 // Generic basenames that match too many files and produce noisy blast radius results

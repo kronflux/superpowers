@@ -17,12 +17,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadRouting, fenceMeta, TIERS } from './lib/routing-config.js';
+import { configDir } from './lib/config-dir.js';
 
-const LOG_DIR = path.join(
-  process.env.HOME || process.env.USERPROFILE || '.',
-  '.claude',
-  'hooks-logs'
-);
+const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
 function log(data) {
   try {
