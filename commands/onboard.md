@@ -207,13 +207,24 @@ AskUserQuestion:
   header: "Serena"
   options:
     - label: "Yes"
-      description: "Shows the MCP registration command to run yourself, and writes this project's memory-tool exclusion config."
+      description: "Shows the plugin-install command and the non-plugin alternative to run yourself, and writes this project's memory-tool exclusion config."
     - label: "No, don't ask again"
       description: "Writes .superpowers-no-serena in the project root. Nothing configured."
 ```
 
 - **Yes** →
-  1. Print the MCP registration commands for the user to run themselves (never execute). Preferred: install `serena` locally via `uv`, then register it once, machine-wide, for every project:
+  1. Print the registration commands for the user to run themselves (never execute).
+
+     **Plugin install (this fork's plugin-first policy — see caveat below):** verified live in this fork's own profile (`installed_plugins.json`) — Serena runs as a Claude Code plugin via Anthropic's curated marketplace:
+     ```shell
+     /plugin marketplace add anthropics/claude-plugins-official
+     /plugin install serena@claude-plugins-official
+     ```
+     Skip the `marketplace add` line if `claude-plugins-official` is already registered (check via `/plugin`). Once installed, its files resolve under this harness's standard plugin-cache layout: `$CLAUDE_CONFIG_DIR/plugins/cache/claude-plugins-official/serena/<version>/` first, `$HOME/.claude/plugins/cache/claude-plugins-official/serena/<version>/` as fallback when no custom config root is active — the same location this command's own capability detection reads to mark Serena `configured` on the next run.
+
+     **Caveat — tell the user this before they choose:** Serena's own README (`_reference/serena/README.md`) explicitly advises against this route: "Do not install Serena via an MCP or plugin marketplace! They contain outdated and suboptimal installation commands. Instead, follow our Quick Start instructions." No `/plugin marketplace add` command for Serena is published anywhere in its own repository — the marketplace above is Anthropic's third-party packaging, not something Serena's maintainers endorse. The uv/uvx route below is what Serena's own docs recommend.
+
+     **Alternative (non-plugin install) — Serena's own documented Quick Start:** install `serena` locally via `uv`, then register it once, machine-wide, for every project:
      ```shell
      uv tool install -p 3.13 serena-agent
      serena init
@@ -225,7 +236,7 @@ AskUserQuestion:
      claude mcp add --scope user serena -- uvx -p 3.13 --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project-from-cwd
      ```
      If Serena is slow to start and Claude Code gives up on the connection, raise the MCP startup timeout: `export MCP_TIMEOUT=60000` in the shell profile.
-  2. Write the memory-tool exclusion regardless of whether step 1 has been run yet, so it is already in place once Serena activates this project. Merge into `.serena/project.yml` (create `.serena/` and the file if absent; if the file exists with a different `excluded_tools` list, follow the Ground rules diff-and-confirm):
+  2. Write the memory-tool exclusion regardless of which route above was used (plugin or non-plugin) and regardless of whether step 1 has even been run yet, so it is already in place once Serena activates this project. This exclusion applies the same way under the plugin route — it is still `.serena/project.yml` in the project root, unaffected by how the MCP server itself was installed. Merge into `.serena/project.yml` (create `.serena/` and the file if absent; if the file exists with a different `excluded_tools` list, follow the Ground rules diff-and-confirm):
      ```yaml
      excluded_tools:
        - write_memory
@@ -247,32 +258,41 @@ AskUserQuestion:
   question: "Set up Context7 (live docs lookup, adapter: skills/shared/conductor/context7.md)?"
   header: "Context7"
   options:
-    - label: "Yes, show me the setup command"
-      description: "Prints the one-command setup (OAuth + API key + agent config) for you to run yourself."
+    - label: "Yes, show me the setup commands"
+      description: "Prints the plugin-install command (recommended) and the non-plugin setup command for you to run yourself."
     - label: "No, don't ask again"
       description: "Writes .superpowers-no-context7 in the project root. Nothing configured."
 ```
 
-- **Yes** → print, for the user to run themselves (never execute): `npx ctx7 setup --claude` (Node.js >= 18; authenticates via OAuth, generates an API key, and wires Claude Code — CLI+Skills or MCP mode, user's choice in the prompt). Removal later: `npx ctx7 remove`. If the user prefers manual MCP wiring instead of the setup command, tell them the two values it would need — server `https://mcp.context7.com/mcp`, API key passed via a `CONTEXT7_API_KEY` header — and point them to Context7's own docs for the exact config file syntax rather than writing `.mcp.json` yourself.
+- **Yes** → print, for the user to run themselves (never execute):
+
+  **Plugin install (recommended):** verified against Context7's own published docs (`_reference/context7/docs/clients/claude-code.mdx`, "Installing the Plugin") — bundles the MCP server (`resolve-library-id`, `query-docs`) with a documentation-lookup skill, a `docs-researcher` agent, and the `/context7:docs` command:
+  ```shell
+  /plugin marketplace add upstash/context7
+  /plugin install context7@context7-marketplace
+  ```
+  Once installed, its files resolve under this harness's standard plugin-cache layout: `$CLAUDE_CONFIG_DIR/plugins/cache/context7-marketplace/context7/<version>/` first, `$HOME/.claude/plugins/cache/context7-marketplace/context7/<version>/` as fallback when no custom config root is active. Without an API key the plugin works anonymously at lower rate limits; to use a personal plan, create a key at the Context7 dashboard (`https://context7.com/dashboard`) and export it before launching Claude Code: `export CONTEXT7_API_KEY="your-api-key"` (restart Claude Code after setting it). Note: this fork's own profile also has Context7 pre-registered under Anthropic's curated `claude-plugins-official` marketplace (verified live in `installed_plugins.json` as `context7@claude-plugins-official`) — if that marketplace is already added, `/plugin install context7@claude-plugins-official` is the shortcut; otherwise use the upstream-published commands above.
+
+  **Alternative (non-plugin install):** `npx ctx7 setup --claude` (Node.js >= 18; authenticates via OAuth, generates an API key, and wires Claude Code — CLI+Skills or MCP mode, user's choice in the prompt). Removal later: `npx ctx7 remove`. If the user prefers manual MCP wiring instead of either route above, tell them the two values it would need — server `https://mcp.context7.com/mcp`, API key passed via a `CONTEXT7_API_KEY` header — and point them to Context7's own docs for the exact config file syntax rather than writing `.mcp.json` yourself.
 - **No** → write `.superpowers-no-context7` (empty file) in the project root.
 
 ### Middleware (middleware-exec)
 
-Pitch: offload mechanical text-processing (log/error extraction, test-failure summarizing, test scaffolding) to a cheaper model via `middleware-exec`, instead of spending the session model's tokens on it.
+What it's for: `middleware-exec` offloads mechanical, non-judgment text processing — log/error digests, test-failure summaries, test-scaffolding boilerplate — to a cheap or local model, so the session model's tokens aren't spent on it. It is **unconfigured by default** in this fork; nothing installs or activates it automatically. While unconfigured, that mechanical work does not go unhandled — it simply falls back to the Claude mechanical-tier subagent via the existing `modelTier` routing (see `skills/shared/conductor/middleware.md`, "Fallback policy"), which still works but spends session-model (or routed-tier) tokens instead of a cheaper external one. Context-heavy digests (summarizing large logs or search results into the conversation) stay opt-in through the existing `ctx_search`/`ctx_execute` methodology either way — middleware is never a substitute for that, configured or not.
 
 ```yaml
 AskUserQuestion:
-  question: "Set up middleware-exec (cheap-model text processing)?"
+  question: "Set up middleware-exec (cheap-model text processing, currently unconfigured)?"
   header: "Middleware"
   options:
     - label: "Yes"
-      description: "Copies the example config to ~/.claude/middleware-config.json and asks which provider you use."
+      description: "Copies the example config to the active config root and asks which provider you use."
     - label: "No, don't ask again"
-      description: "Writes .superpowers-no-middleware in the project root. Nothing configured."
+      description: "Writes .superpowers-no-middleware in the project root. Stays unconfigured; mechanical work keeps falling back to Claude model tiers."
 ```
 
 - **Yes** →
-  1. Ask which provider:
+  1. Ask which provider, per the choices documented in `docs/superpowers/middleware-config.example.json`:
      ```yaml
      AskUserQuestion:
        question: "Which provider does middleware-exec call?"
@@ -285,7 +305,7 @@ AskUserQuestion:
          - label: "litellm"
            description: "Self-hosted LiteLLM proxy."
      ```
-  2. Copy `docs/superpowers/middleware-config.example.json` to `~/.claude/middleware-config.json` (Ground rules diff-and-confirm applies if the destination already exists), setting `active_provider` to the chosen value and `active_model` to that provider's example `model` (e.g. `openai/gpt-4o-mini` for openrouter). Ask for the API key's environment-variable name (default: the example's `api_key_env` for that provider, e.g. `OPENROUTER_API_KEY`); substitute if the user gives a different name. Never ask for or write the raw key — only its env-var name.
+  2. Copy target is the active config root, never a hardcoded path: `$CLAUDE_CONFIG_DIR/middleware-config.json` if `CLAUDE_CONFIG_DIR` is set in this session's environment, otherwise `~/.claude/middleware-config.json`. State this explicitly to the user: **under a custom config root (e.g. a multi-profile launcher), nothing is written to `~/.claude` — the active profile's config root is the only write target.** Copy `docs/superpowers/middleware-config.example.json` to that target (Ground rules diff-and-confirm applies if the destination already exists), setting `active_provider` to the chosen value and `active_model` to that provider's example `model` (e.g. `openai/gpt-4o-mini` for openrouter). Ask for the API key's environment-variable name (default: the example's `api_key_env` for that provider, e.g. `OPENROUTER_API_KEY`); substitute if the user gives a different name, then have them `export` it in their shell profile — never ask for or write the raw key, only its env-var name.
 - **No** → write `.superpowers-no-middleware` (empty file) in the project root.
 
 ### obsidian-cli
@@ -341,7 +361,7 @@ Report in one block, per feature: configured or skipped, the exact absolute path
 - **CodeGraph** — nothing written by this offer besides an optional `.superpowers-no-codegraph` decline marker (delete it to be asked again); the CLI/agent-wiring/index steps are all run by the user outside this flow.
 - **Serena** — remove the `excluded_tools` key (or the six memory-tool entries within it) from `.serena/project.yml`; delete `.superpowers-no-serena` to be asked again.
 - **Context7** — nothing written by this offer besides an optional `.superpowers-no-context7` decline marker; `npx ctx7 remove` undoes the setup command itself.
-- **Middleware** — delete `~/.claude/middleware-config.json`; delete `.superpowers-no-middleware` to be asked again.
+- **Middleware** — delete `middleware-config.json` from wherever it was written (`$CLAUDE_CONFIG_DIR/` if a custom config root was active, else `~/.claude/`); delete `.superpowers-no-middleware` to be asked again.
 - **obsidian-cli** — nothing written besides an optional `.superpowers-no-obsidian-cli` decline marker.
 
 Do not commit. Do not re-ask any question already answered in this run.
