@@ -13,11 +13,14 @@ const HOOK = path.join(__dirname, '..', 'hooks', 'skill-activator.js');
 const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-activator-'));
 afterAll(() => { fs.rmSync(tmpHome, { recursive: true, force: true }); });
 
-function run(payload) {
+function run(payload, env = {}) {
+  const baseEnv = { ...process.env };
+  delete baseEnv.CLAUDE_CONFIG_DIR;
+  const fullEnv = { ...baseEnv, HOME: tmpHome, USERPROFILE: tmpHome, ...env };
   return execFileSync('node', [HOOK], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
-    env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
+    env: fullEnv,
   });
 }
 
@@ -48,12 +51,36 @@ describe('skill-activator', () => {
   });
 
   it('fails open to {} on invalid input', () => {
+    const fullEnv = { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome };
+    delete fullEnv.CLAUDE_CONFIG_DIR;
     const out = execFileSync('node', [HOOK], {
       input: 'not json',
       encoding: 'utf8',
-      env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
+      env: fullEnv,
     });
     expect(out.trim()).toBe('{}');
+  });
+});
+
+describe('skill-activator config root isolation', () => {
+  it('writes telemetry under CLAUDE_CONFIG_DIR, not HOME/.claude, when both are set', () => {
+    const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-activator-profile-'));
+    const otherHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-activator-otherhome-'));
+    try {
+      const out = run(
+        { prompt: 'there is a bug, the app crashes with an exception', cwd: '/tmp' },
+        { CLAUDE_CONFIG_DIR: profileDir, HOME: otherHome, USERPROFILE: otherHome },
+      );
+      expect(JSON.parse(out).hookSpecificOutput).toBeDefined();
+
+      const statsInProfile = path.join(profileDir, 'hooks-logs', 'session-stats.json');
+      const statsInOtherHome = path.join(otherHome, '.claude', 'hooks-logs', 'session-stats.json');
+      expect(fs.existsSync(statsInProfile)).toBe(true);
+      expect(fs.existsSync(statsInOtherHome)).toBe(false);
+    } finally {
+      fs.rmSync(profileDir, { recursive: true, force: true });
+      fs.rmSync(otherHome, { recursive: true, force: true });
+    }
   });
 });
 

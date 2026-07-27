@@ -27,6 +27,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { configDir, userCandidates } from './lib/config-dir.js';
 
 // Resolve hooks directory from this script's location
 const __filename = fileURLToPath(import.meta.url);
@@ -422,15 +423,18 @@ function getContextPressure(cwd, sessionId) {
   if (!sessionId) return null;
 
   const projectDir = cwdToProjectDir(cwd);
-  const homeDir = process.env.USERPROFILE || process.env.HOME || '';
-  const jsonlPath = path.join(homeDir, '.claude', 'projects', projectDir, sessionId + '.jsonl');
+  const candidates = userCandidates(['projects', projectDir, sessionId + '.jsonl'], process.env);
 
-  let content;
-  try {
-    content = fs.readFileSync(jsonlPath, 'utf8');
-  } catch {
-    return null; // File absent or unreadable — silent no-op
+  let content = null;
+  for (const candidate of candidates) {
+    try {
+      content = fs.readFileSync(candidate, 'utf8');
+      break;
+    } catch {
+      // Try the next candidate (legacy home fallback)
+    }
   }
+  if (content === null) return null; // No candidate readable — silent no-op
 
   // Use the last assistant turn's input total as context size.
   // input + cache_creation + cache_read = total tokens in context window for that turn.
@@ -522,11 +526,7 @@ const STATS_EXPIRY_MS = 2 * 60 * 60 * 1000;
 function recordInjectedBytes(bytes) {
   if (!bytes) return;
   try {
-    const logDir = path.join(
-      process.env.HOME || process.env.USERPROFILE || '.',
-      '.claude',
-      'hooks-logs'
-    );
+    const logDir = path.join(configDir(process.env), 'hooks-logs');
     const statsFile = path.join(logDir, 'session-stats.json');
     let stats = null;
     try {
