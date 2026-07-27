@@ -65,6 +65,28 @@ function loadRoutingProbe(cwd, envOverrides = {}) {
   return JSON.parse(out);
 }
 
+// Sequence probe: two loadRouting calls in the SAME process, to check that
+// routingSource() reflects only the most recent call (no stale carry-over).
+const probeSequenceScript = path.join(tmpHome, 'load-routing-probe-sequence.mjs');
+fs.writeFileSync(
+  probeSequenceScript,
+  `import { loadRouting, routingSource } from '${routingLibUrl}';\n` +
+    'const results = process.argv.slice(2).map((cwd) => {\n' +
+    '  const routing = loadRouting(cwd, process.env);\n' +
+    '  return { routing, source: routingSource() };\n' +
+    '});\n' +
+    'process.stdout.write(JSON.stringify(results));\n'
+);
+
+function loadRoutingSequenceProbe(cwds, envOverrides = {}) {
+  const env = { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome };
+  delete env.SUPERPOWERS_ROUTING_GUARD;
+  delete env.CLAUDE_CONFIG_DIR;
+  Object.assign(env, envOverrides);
+  const out = execFileSync('node', [probeSequenceScript, ...cwds], { encoding: 'utf8', env });
+  return JSON.parse(out);
+}
+
 let transcriptCount = 0;
 function makeTranscript(lines) {
   const file = path.join(tmpHome, `transcript-${transcriptCount++}.jsonl`);
@@ -231,6 +253,26 @@ describe('loadRouting profile-scoped candidate', () => {
     const logPath = path.join(profileDir, 'hooks-logs', 'routing-config.log');
     const contents = fs.readFileSync(logPath, 'utf8');
     expect(contents).toContain(`routing-config: using ${path.join(profileDir, 'superpowers', 'model-routing.json')}`);
+  });
+
+  it('routingSource() reflects only the most recent call, not a stale prior hit', () => {
+    const hitCwd = makeProject(ROUTING);
+    const missCwd = makeProject(undefined);
+    // Empty, dedicated HOME and CLAUDE_CONFIG_DIR for both calls: no legacy
+    // or profile candidate exists anywhere, so the second call is a true miss.
+    const emptyHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-stale-home-'));
+    tmpDirs.push(emptyHome);
+    const emptyProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-stale-profile-'));
+    tmpDirs.push(emptyProfile);
+    const [hit, miss] = loadRoutingSequenceProbe([hitCwd, missCwd], {
+      HOME: emptyHome,
+      USERPROFILE: emptyHome,
+      CLAUDE_CONFIG_DIR: emptyProfile,
+    });
+    expect(hit.routing).toEqual(ROUTING);
+    expect(hit.source).toBe(path.join(hitCwd, 'docs', 'superpowers', 'model-routing.json'));
+    expect(miss.routing).toBeNull();
+    expect(miss.source).toBeNull();
   });
 });
 

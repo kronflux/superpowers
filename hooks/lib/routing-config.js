@@ -36,7 +36,8 @@ function logSource(p, env) {
 }
 
 export function loadRouting(cwd, env = process.env) {
-  if (process.env.SUPERPOWERS_ROUTING_GUARD === '0') return null;
+  lastSource = null;
+  if (env.SUPERPOWERS_ROUTING_GUARD === '0') return null;
   const candidates = [
     path.join(cwd || process.cwd(), 'docs', 'superpowers', 'model-routing.json'),
     ...userCandidates(['superpowers', 'model-routing.json'], env),
