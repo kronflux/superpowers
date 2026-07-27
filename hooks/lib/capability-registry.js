@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { configDir } from './config-dir.js';
 
 const STATUS = { ABSENT: 'absent', CONFIGURED: 'configured', VERIFIED: 'verified' };
 
@@ -22,22 +23,48 @@ function normalizeDir(p) {
   return resolved;
 }
 
-function mcpConfigured(pattern, cwd, home) {
+function pluginServers(root) {
+  const idx = readJson(path.join(root, 'plugins', 'installed_plugins.json'));
+  if (!idx || !idx.plugins) return [];
+  const enabled = readJson(path.join(root, 'settings.json'))?.enabledPlugins;
+  const names = [];
+  for (const [key, entries] of Object.entries(idx.plugins)) {
+    if (!Array.isArray(entries) || entries.length === 0) continue;
+    if (enabled && enabled[key] === false) continue;
+    names.push(key.split('@')[0]);
+    const mcp = readJson(path.join(entries[entries.length - 1].installPath || '', '.mcp.json'));
+    if (mcp && mcp.mcpServers) names.push(...Object.keys(mcp.mcpServers));
+  }
+  return names;
+}
+
+function mcpConfigured(pattern, cwd, home, env = {}) {
   const re = new RegExp(pattern, 'i');
   const pools = [];
   const proj = readJson(path.join(cwd, '.mcp.json'));
   if (proj) pools.push(proj.mcpServers || {});
+  const normalizedCwd = normalizeDir(cwd);
   const global = readJson(path.join(home, '.claude.json'));
   if (global) {
     pools.push(global.mcpServers || {});
-    const normalizedCwd = normalizeDir(cwd);
     for (const [key, projCfg] of Object.entries(global.projects || {})) {
       if (normalizeDir(key) === normalizedCwd) {
         pools.push(projCfg.mcpServers || {});
       }
     }
   }
-  return pools.some((pool) => Object.keys(pool).some((k) => re.test(k)));
+  const root = configDir(env);
+  const rootConfig = readJson(path.join(root, '.claude.json'));
+  if (rootConfig) {
+    pools.push(rootConfig.mcpServers || {});
+    for (const [key, projCfg] of Object.entries(rootConfig.projects || {})) {
+      if (normalizeDir(key) === normalizedCwd) {
+        pools.push(projCfg.mcpServers || {});
+      }
+    }
+  }
+  if (pools.some((pool) => Object.keys(pool).some((k) => re.test(k)))) return true;
+  return pluginServers(root).some((name) => re.test(name));
 }
 
 function vaultAbove(cwd) {
@@ -56,22 +83,22 @@ function probe(cwd = process.cwd(), opts = {}) {
   const st = (cond) => (cond ? STATUS.CONFIGURED : STATUS.ABSENT);
   return {
     codegraph: {
-      status: st(onPath('codegraph', env) || mcpConfigured('codegraph', cwd, home)),
+      status: st(onPath('codegraph', env) || mcpConfigured('codegraph', cwd, home, env)),
       indexed: exists(path.join(cwd, '.codegraph')),
       declined: exists(path.join(cwd, '.superpowers-no-codegraph')),
     },
     serena: {
-      status: st(mcpConfigured('serena', cwd, home)),
+      status: st(mcpConfigured('serena', cwd, home, env)),
       declined: exists(path.join(cwd, '.superpowers-no-serena')),
     },
     context7: {
-      status: st(mcpConfigured('context7', cwd, home)),
+      status: st(mcpConfigured('context7', cwd, home, env)),
       declined: exists(path.join(cwd, '.superpowers-no-context7')),
     },
-    docfork: { status: st(mcpConfigured('docfork', cwd, home)) },
-    'basic-memory': { status: st(mcpConfigured('basic-?memory', cwd, home)) },
+    docfork: { status: st(mcpConfigured('docfork', cwd, home, env)) },
+    'basic-memory': { status: st(mcpConfigured('basic-?memory', cwd, home, env)) },
     'obsidian-cli': {
-      status: st(onPath('obsidian-cli', env)),
+      status: st(onPath('obsidian', env) || onPath('obsidian-cli', env)),
       vault: vaultAbove(cwd),
       declined: exists(path.join(cwd, '.superpowers-no-obsidian-cli')),
     },

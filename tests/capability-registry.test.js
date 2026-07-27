@@ -68,4 +68,65 @@ describe('capability-registry', () => {
     expect(caps.context7.declined).toBe(false);
     expect(caps['obsidian-cli'].declined).toBe(false);
   });
+
+  it('detects serena from configRoot .claude.json via CLAUDE_CONFIG_DIR', () => {
+    const prof = path.join(tmp, 'prof'); fs.mkdirSync(prof, { recursive: true });
+    fs.writeFileSync(path.join(prof, '.claude.json'), JSON.stringify({ mcpServers: { serena: {} } }));
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.serena.status).toBe(STATUS.CONFIGURED);
+  });
+
+  it('detects a plugin-installed MCP server via installed_plugins.json', () => {
+    const prof = path.join(tmp, 'prof');
+    const inst = path.join(prof, 'plugins', 'cache', 'm', 'serena', '1.0.0');
+    fs.mkdirSync(inst, { recursive: true });
+    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
+    fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
+      JSON.stringify({ version: 1, plugins: { 'serena@m': [{ installPath: inst }] } }));
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.serena.status).toBe(STATUS.CONFIGURED);
+  });
+
+  it('excludes a disabled plugin', () => {
+    const prof = path.join(tmp, 'prof');
+    const inst = path.join(prof, 'plugins', 'cache', 'm', 'serena', '1.0.0');
+    fs.mkdirSync(inst, { recursive: true });
+    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
+    fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
+      JSON.stringify({ version: 1, plugins: { 'serena@m': [{ installPath: inst }] } }));
+    fs.writeFileSync(path.join(prof, 'settings.json'),
+      JSON.stringify({ enabledPlugins: { 'serena@m': false } }));
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.serena.status).toBe(STATUS.ABSENT);
+  });
+
+  it('treats installed as enabled when settings.json or the field is absent', () => {
+    const prof = path.join(tmp, 'prof');
+    const inst = path.join(prof, 'plugins', 'cache', 'm', 'serena', '1.0.0');
+    fs.mkdirSync(inst, { recursive: true });
+    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
+    fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
+      JSON.stringify({ version: 1, plugins: { 'serena@m': [{ installPath: inst }] } }));
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.serena.status).toBe(STATUS.CONFIGURED);
+  });
+
+  it('detects obsidian by bare binary name', () => {
+    const bin = path.join(tmp, 'bin'); fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, process.platform === 'win32' ? 'obsidian.exe' : 'obsidian'), '');
+    const caps = probe(tmp, { home: tmp, env: { PATH: bin, CLAUDE_CONFIG_DIR: path.join(tmp, 'none') } });
+    expect(caps['obsidian-cli'].status).toBe(STATUS.CONFIGURED);
+  });
+
+  it('survives corrupt installed_plugins.json and settings.json', () => {
+    const prof = path.join(tmp, 'prof'); fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'), '{bad');
+    fs.writeFileSync(path.join(prof, 'settings.json'), '{bad');
+    let caps;
+    expect(() => { caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } }); }).not.toThrow();
+    expect(caps.serena.status).toBe(STATUS.ABSENT);
+  });
 });
