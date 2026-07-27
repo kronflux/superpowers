@@ -15,7 +15,7 @@ afterEach(() => { fs.rmSync(tmp, { recursive: true, force: true }); });
 
 describe('resolveConfig', () => {
   it('returns null when neither project nor home config exists', () => {
-    expect(resolveConfig(tmp, tmp)).toBeNull();
+    expect(resolveConfig(tmp, tmp, {})).toBeNull();
   });
 
   it('prefers project .claude/middleware-config.json over home', () => {
@@ -25,7 +25,7 @@ describe('resolveConfig', () => {
     fs.writeFileSync(path.join(tmp, 'project', '.claude', 'middleware-config.json'), JSON.stringify(projectCfg));
     fs.mkdirSync(path.join(tmp, 'home', '.claude'), { recursive: true });
     fs.writeFileSync(path.join(tmp, 'home', '.claude', 'middleware-config.json'), JSON.stringify(homeCfg));
-    const resolved = resolveConfig(path.join(tmp, 'project'), path.join(tmp, 'home'));
+    const resolved = resolveConfig(path.join(tmp, 'project'), path.join(tmp, 'home'), {});
     expect(resolved.cfg.active_provider).toBe('project');
   });
 
@@ -34,7 +34,7 @@ describe('resolveConfig', () => {
     fs.mkdirSync(path.join(tmp, 'project'), { recursive: true });
     fs.mkdirSync(path.join(tmp, 'home', '.claude'), { recursive: true });
     fs.writeFileSync(path.join(tmp, 'home', '.claude', 'middleware-config.json'), JSON.stringify(homeCfg));
-    const resolved = resolveConfig(path.join(tmp, 'project'), path.join(tmp, 'home'));
+    const resolved = resolveConfig(path.join(tmp, 'project'), path.join(tmp, 'home'), {});
     expect(resolved.cfg.active_provider).toBe('home');
     expect(resolved.source).toBe(path.join(tmp, 'home', '.claude', 'middleware-config.json'));
   });
