@@ -28,16 +28,28 @@ ships no env-based escape hatch — remove its `hooks.json` entry to disable it.
 ## Registering a hook
 
 Add an entry under the matching event in your project's `.claude/settings.json`.
-Replace `<marketplace>` and `<version>` with your actual plugin install path
-— run `ls "$HOME/.claude/plugins/cache"` (or `%USERPROFILE%\.claude\plugins\cache`
-on Windows) to find them.
+
+A literal `<version>` in a registered command breaks silently the next time
+the plugin auto-updates — version directories accumulate side by side
+(`6.6.2`, `7.0.0`, `7.1.0`, ...) and a pinned path starts pointing at a stale
+or missing copy. `scripts/resolve-plugin-script.sh` is the durable
+registration form: given a hook script's path relative to the version
+directory, it resolves the config root (`$CLAUDE_CONFIG_DIR`, falling back to
+`$HOME/.claude`), picks the highest installed version under it via `sort -V`,
+and `exec`s the hook script from there. Only the shim's own bootstrap
+path — below — ever needs a literal `<version>`; the hook script it launches
+is re-resolved on every run, so plugin auto-updates don't break it. Run
+`ls "$CLAUDE_CONFIG_DIR/plugins/cache"` (or `ls "$HOME/.claude/plugins/cache"`
+if `CLAUDE_CONFIG_DIR` is unset; on Windows,
+`%USERPROFILE%\.claude\plugins\cache`) to find your `<marketplace>` and
+current `<version>`:
 
 **PreToolUse** — `pre-task-blockedby-enforce.sh`, matcher `TaskUpdate`:
 
 ```json
 { "hooks": { "PreToolUse": [ { "matcher": "TaskUpdate",
   "hooks": [ { "type": "command",
-    "command": "bash \"$HOME/.claude/plugins/cache/<marketplace>/superpowers/<version>/hooks/examples/pre-task-blockedby-enforce.sh\"" } ] } ] } }
+    "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/<marketplace>/superpowers/<version>/scripts/resolve-plugin-script.sh\" hooks/examples/pre-task-blockedby-enforce.sh" } ] } ] } }
 ```
 
 **PostToolUse** — `post-task-complete-revalidate.sh`, matcher `TaskUpdate`:
@@ -45,7 +57,7 @@ on Windows) to find them.
 ```json
 { "hooks": { "PostToolUse": [ { "matcher": "TaskUpdate",
   "hooks": [ { "type": "command",
-    "command": "bash \"$HOME/.claude/plugins/cache/<marketplace>/superpowers/<version>/hooks/examples/post-task-complete-revalidate.sh\"" } ] } ] } }
+    "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/<marketplace>/superpowers/<version>/scripts/resolve-plugin-script.sh\" hooks/examples/post-task-complete-revalidate.sh" } ] } ] } }
 ```
 
 **Stop** — `stop-revalidate-user-gates.sh` (Stop hooks take no matcher):
@@ -53,11 +65,33 @@ on Windows) to find them.
 ```json
 { "hooks": { "Stop": [
   { "hooks": [ { "type": "command",
-    "command": "bash \"$HOME/.claude/plugins/cache/<marketplace>/superpowers/<version>/hooks/examples/stop-revalidate-user-gates.sh\"" } ] } ] } }
+    "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/<marketplace>/superpowers/<version>/scripts/resolve-plugin-script.sh\" hooks/examples/stop-revalidate-user-gates.sh" } ] } ] } }
 ```
 
-**Windows note:** if `bash` is not on `PATH` when hooks run, invoke Git Bash
-explicitly instead of relying on the bare `bash` command:
+The `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` expansion above requires the
+command to run through a shell — true here since the command already starts
+with `bash`. It still leaves a literal `<version>` in the shim's own
+bootstrap path; that segment needs re-editing on a plugin major-version
+bump or marketplace migration, but every hook script the shim launches after
+that resolves fresh, with no further edits.
+
+If you'd rather skip the shim, register the hook script directly the same
+way, leading with `$CLAUDE_CONFIG_DIR` and falling back to `$HOME/.claude`:
+
+```json
+"command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/<marketplace>/superpowers/<version>/hooks/examples/pre-task-blockedby-enforce.sh\""
+```
+
+**Windows note (single quotes):** inline single-quoted Bash such as
+`bash -c '...'` cannot be registered on Windows — Windows argv parsing does
+not honor single quotes, so the command splits apart before Bash ever sees
+it. Register a shim *file* by quoted path instead (as in the examples
+above), never an inline single-quoted script body.
+
+**Windows note (WSL bash):** if `bash` on `PATH` resolves to WSL's bash, it
+cannot read Windows-style paths (`C:\...`) — it only sees its own Linux
+filesystem view. Invoke Git Bash explicitly instead of relying on the bare
+`bash` command:
 
 ```json
 "command": "\"C:\\Program Files\\Git\\bin\\bash.exe\" \"<script>\""
