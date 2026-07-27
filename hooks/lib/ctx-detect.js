@@ -1,17 +1,12 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { configDir } from './config-dir.js';
 
 const MCP_MARKER = 'mcp__plugin_context-mode_context-mode__ctx_';
 
 function _cacheFile(sessionId) {
   return path.join(os.tmpdir(), `sp-ctx-${sessionId || 'default'}.json`);
-}
-
-function defaultConfigDir(env) {
-  if (env.CLAUDE_CONFIG_DIR) return env.CLAUDE_CONFIG_DIR;
-  const home = env.HOME || env.USERPROFILE || '.';
-  return path.join(home, '.claude');
 }
 
 // Signal 1: an MCP tool marker for context-mode is visible in the environment.
@@ -60,10 +55,10 @@ function isContextModeActive(opts = {}) {
   if (process.env.SP_TEST_FORCE_CTX === '1') return true;
   const env = opts.env || process.env;
   const sessionId = opts.sessionId;
-  const configDir = opts.configDir || defaultConfigDir(env);
+  const configDirPath = opts.configDir || configDir(env);
   const installedPluginsPath =
     opts.installedPluginsPath ||
-    path.join(defaultConfigDir(env), 'plugins', 'installed_plugins.json');
+    path.join(configDir(env), 'plugins', 'installed_plugins.json');
 
   const cacheFile = _cacheFile(sessionId);
   try {
@@ -75,7 +70,7 @@ function isContextModeActive(opts = {}) {
 
   let active = false;
   try {
-    active = detect({ env, configDir, installedPluginsPath });
+    active = detect({ env, configDir: configDirPath, installedPluginsPath });
   } catch {
     active = false;
   }
