@@ -9,7 +9,7 @@ Walk the user through this fork's optional features one at a time. For each feat
 ## Ground rules
 
 - **Assume a clean slate.** Do NOT audit existing configuration beyond what each step needs to do its own job (Feature 2's dedupe check and Feature 4's already-enabled check are the only state reads this command performs — both are required by the step itself, not general auditing). Go straight to the questions.
-- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `docs/superpowers/model-routing.json`, `docs/superpowers/workflow.json`, `.serena/project.yml`, `~/.claude/middleware-config.json`, and any settings file being merged.
+- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `docs/superpowers/model-routing.json`, `docs/superpowers/workflow.json`, `.serena/project.yml`, `$CLAUDE_CONFIG_DIR/middleware-config.json` (or `~/.claude/middleware-config.json` when no custom config root is active), and any settings file being merged.
 - Each feature is optional. Every question includes a way to decline; declining writes nothing and moves to the next feature.
 - **NEVER commit anything.** Files are written to the working tree only; committing is the user's call.
 - After the last feature, produce the Closing summary (see below) — what was written and where, what was skipped, and how to undo each.
