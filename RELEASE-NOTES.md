@@ -1,5 +1,63 @@
 # Superpowers Release Notes
 
+## 7.2.0 — config-dir isolation
+
+Superpowers works out of the box in any Claude Code environment. Custom config roots
+(`CLAUDE_CONFIG_DIR`, multi-profile launchers such as `ccw`) are now first-class; standard
+single-profile installs are unchanged. Nothing is ever written outside the active config root.
+
+### Shared config-root resolver
+
+- **`hooks/lib/config-dir.js`** — single `CLAUDE_CONFIG_DIR`-aware resolver, adopted uniformly
+  across capability detection, model-routing config, middleware-exec config, and all ten hook
+  telemetry log roots. Precedence is consistent everywhere: project path → active config root →
+  `~/.claude` legacy fallback.
+
+### Plugin-aware capability detection
+
+- `hooks/lib/capability-registry.js` now detects `/plugin-installed` MCP servers (via
+  `installed_plugins.json` plus each plugin's own `.mcp.json`, gated on enabled state) alongside
+  the active root's `.claude.json`. Fixes a false-negative where plugin-provided servers (e.g.
+  Serena, Context7) were invisible to the probe under a non-legacy config root.
+- Obsidian detection fixed to accept either the `obsidian` or `obsidian-cli` binary.
+
+### Model routing
+
+- `routingSource()` exposes which candidate path satisfied `loadRouting()`, logged on a
+  fail-open basis for diagnosability. Candidate precedence follows the shared resolver.
+
+### `/onboard` rework
+
+- Plugin-first install offers: `serena@claude-plugins-official` and
+  `context7@claude-plugins-official` are offered as verified marketplace plugins (Serena's
+  README tension with the memory-tool prohibition is disclosed up front).
+- New middleware-exec education section — what it is, why it exists, its cost, and how to
+  configure it.
+- All write targets are config-root-aware; probe-primary detection wording clarified.
+
+### Hook registration
+
+- **`scripts/resolve-plugin-script.sh`** — version-resolving shim so hook registration doesn't
+  hardcode a plugin version directory.
+- Registration docs updated to recommend `$CLAUDE_CONFIG_DIR`-first paths, with Windows-specific
+  notes.
+
+### Docs
+
+- Probe-primary capability-detection docs and the profile-scoped routing contract documented in
+  `CLAUDE.md`, `AGENTS.md`, and `docs/ARCHITECTURE.md`.
+
+### Test hardening
+
+- Hermetic test-env fixes across the capability-registry, middleware-exec, model-routing, and
+  hook-telemetry suites — `CLAUDE_CONFIG_DIR` is stripped so suite behavior no longer depends on
+  the ambient environment.
+
+### Breaking changes
+
+- None. Standard, single-profile installs behave exactly as before; every code path added this
+  release is additive and fails open to prior behavior when no custom config root is present.
+
 ## 7.1.0 — the conductor
 
 Introduces the Conductor: a central tool-selection layer that routes skill work to external
