@@ -43,6 +43,7 @@ describe('session-start context economy', () => {
           ...process.env,
           CLAUDE_PLUGIN_ROOT: ROOT,
           HOME: scratch,
+          CLAUDE_CONFIG_DIR: scratch,
           PATH: SANDBOX_PATH,
           COPILOT_CLI: '',
           CURSOR_PLUGIN_ROOT: '',
