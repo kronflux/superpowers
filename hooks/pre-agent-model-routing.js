@@ -10,6 +10,17 @@
  * resolve("standard"). Any member resolving to "inherit" stands the gate down.
  * A task's concrete "model" pin adds that literal to the allowed set.
  *
+ * The "frontier" tier is gated separately and never joins that allowed set. A
+ * dispatch on the frontier model is denied unless TWO independent signals
+ * agree: a "frontierConsent": "FRONTIER-APPROVED:task-<N>" token in the fence
+ * of an in-progress frontier task, AND the same token in a transcript
+ * tool_result. Fences are agent-writable, so they prove nothing alone;
+ * tool_result blocks are authored by the harness (the user picking an
+ * AskUserQuestion option whose label carries the token), which is what makes
+ * this corroboration rather than self-assertion. The consent check is the
+ * first statement in checkDispatch, ahead of the "inherit" stand-down:
+ * standing down relaxes tier matching, never consent.
+ *
  * Tasks are keyed strictly by their NATIVE id, extracted from the TaskCreate
  * tool_result text ("Task #N created successfully") — never by creation
  * order, which mis-keys tiers when result ids do not match create sequence.
@@ -43,6 +54,11 @@ function log(data) {
 
 const CREATE_RE = /Task #(\d+) created/;
 
+// Consent tokens are read ONLY from tool_result blocks, which are authored by
+// the harness. An agent can emit a tool_use but cannot forge a tool_result,
+// which is what makes this corroboration rather than self-assertion.
+const CONSENT_RE = /FRONTIER-APPROVED:task-\d+/g;
+
 function resultText(content) {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -56,13 +72,15 @@ function resultText(content) {
 
 /**
  * Stream the transcript and build the task table.
- * Returns { tasks: Map<nativeId, {subject, description}>, inProgress: string[] }.
+ * Returns { tasks: Map<nativeId, {subject, description}>, inProgress: string[],
+ * consentTokens: Set<string> }.
  */
 export async function scanTranscript(transcriptPath) {
   const creates = [];        // [toolUseId, {subject, description}] in stream order
   const realId = new Map();  // toolUseId -> native id from the create result
   const inProgress = [];     // native ids, most recent last
   const updDesc = new Map(); // native id -> description carried on a TaskUpdate
+  const consentTokens = new Set(); // harness-authored frontier approval tokens
 
   const rl = readline.createInterface({
     input: fs.createReadStream(transcriptPath, { encoding: 'utf8' }),
@@ -73,7 +91,8 @@ export async function scanTranscript(transcriptPath) {
     // Pre-filter: only lines that can affect the table get JSON-parsed.
     // 'Task #' catches create-result lines without coupling to the harness's
     // exact result wording (CREATE_RE only needs "Task #N created").
-    if (!line.includes('TaskCreate') && !line.includes('TaskUpdate') && !line.includes('Task #')) {
+    if (!line.includes('TaskCreate') && !line.includes('TaskUpdate')
+        && !line.includes('Task #') && !line.includes('FRONTIER-APPROVED')) {
       continue;
     }
     let event;
@@ -110,8 +129,10 @@ export async function scanTranscript(transcriptPath) {
           if (i !== -1) inProgress.splice(i, 1);
         }
       } else if (block.type === 'tool_result') {
-        const m = CREATE_RE.exec(resultText(block.content));
+        const text = resultText(block.content);
+        const m = CREATE_RE.exec(text);
         if (m) realId.set(block.tool_use_id, m[1]);
+        for (const tok of text.match(CONSENT_RE) || []) consentTokens.add(tok);
       }
     }
   }
@@ -129,14 +150,68 @@ export async function scanTranscript(transcriptPath) {
     tasks.set(taskId, existing);
   }
 
-  return { tasks, inProgress };
+  return { tasks, inProgress, consentTokens };
+}
+
+/**
+ * Frontier dispatches require BOTH a fence token on an in-progress frontier
+ * task AND a matching harness-authored token in the transcript. Runs before
+ * the "inherit" stand-down: standing down relaxes tier matching, never consent.
+ */
+function frontierConsentBlock(routing, tasks, inProgress, dispatchModel, consentTokens) {
+  const frontierModel = routing.frontier;
+  if (typeof frontierModel !== 'string' || !frontierModel) return null;
+  if (frontierModel === 'off' || frontierModel === 'inherit') return null;
+  if (dispatchModel !== frontierModel) return null;
+
+  for (const taskId of inProgress) {
+    const task = tasks.get(taskId);
+    if (!task) continue;
+    const meta = fenceMeta(task.description) || {};
+    if (meta.modelTier !== 'frontier') continue;
+    const token = typeof meta.frontierConsent === 'string' ? meta.frontierConsent : '';
+    if (token && consentTokens.has(token)) return null;
+  }
+
+  return {
+    blocked: true,
+    allowed: null,
+    constrainedBy: null,
+    reason: [
+      'FRONTIER DISPATCH WITHOUT RECORDED USER APPROVAL',
+      '',
+      `This dispatch requests model='${dispatchModel}', the frontier tier. Frontier costs 2x`,
+      'the advanced tier, so it requires explicit per-task user approval that this session',
+      'has no record of.',
+      '',
+      'Approval requires BOTH:',
+      '  1. "frontierConsent": "FRONTIER-APPROVED:task-<N>" in the task\'s json:metadata fence',
+      '  2. A matching AskUserQuestion answer in this transcript',
+      '',
+      'To obtain it, run the frontier offer from skills/writing-plans. The offer MUST state:',
+      '  - which task, named',
+      '  - why frontier is better here, citing the specific qualifying signal for THIS task',
+      '  - the cost, plainly: 2x the advanced tier',
+      '  - the counter-case: what advanced would very likely handle, and what is at risk',
+      '  - two options, with advanced as the default',
+      'The approval option label must contain the token verbatim; the question text and the',
+      'other option must NOT contain it.',
+      '',
+      'Or simply re-issue this dispatch at the advanced tier, which needs no approval.',
+      '',
+      'Tier rules: docs/model-routing-flow.md. Runtime disable: SUPERPOWERS_ROUTING_GUARD=0.',
+    ].join('\n'),
+  };
 }
 
 /**
  * Compute the routing decision for a dispatch model against the task table.
  * Returns { blocked, allowed, constrainedBy, reason }.
  */
-export function checkDispatch(routing, tasks, inProgress, dispatchModel) {
+export function checkDispatch(routing, tasks, inProgress, dispatchModel, consentTokens = new Set()) {
+  const consentDenial = frontierConsentBlock(routing, tasks, inProgress, dispatchModel, consentTokens);
+  if (consentDenial) return consentDenial;
+
   const allowed = [];
   const constrainedBy = []; // { id, subject, tier } of in-progress tasks that constrain
   let anyRequirement = false;
@@ -158,7 +233,14 @@ export function checkDispatch(routing, tasks, inProgress, dispatchModel) {
     const resolved = routing[tier];
     // Unknown tier -> drop this member (typos must not brick dispatches).
     if (typeof resolved !== 'string' || !resolved) continue;
+    if (resolved === 'off') continue;
     if (resolved === 'inherit') return { blocked: false, allowed: null, constrainedBy: null, reason: null };
+    // The frontier model is admitted only by the consent path above, never by
+    // the general allowed-set union. Keyed on the TIER NAME, not the resolved
+    // model: a config mapping advanced and frontier to the same model must not
+    // starve advanced tasks of an allowed entry. (Such configs are rejected at
+    // load, but this function also takes literal objects in tests.)
+    if (tier === 'frontier') continue;
     if (!allowed.includes(resolved)) allowed.push(resolved);
     constrainedBy.push({ id: taskId, subject: task.subject, tier });
   }
@@ -241,8 +323,8 @@ async function main() {
       return;
     }
 
-    const { tasks, inProgress } = await scanTranscript(transcript_path);
-    const result = checkDispatch(routing, tasks, inProgress, tool_input?.model);
+    const { tasks, inProgress, consentTokens } = await scanTranscript(transcript_path);
+    const result = checkDispatch(routing, tasks, inProgress, tool_input?.model, consentTokens);
 
     if (result.blocked) {
       log({ level: 'BLOCKED', model: tool_input?.model, allowed: result.allowed, inProgress, session_id, cwd });

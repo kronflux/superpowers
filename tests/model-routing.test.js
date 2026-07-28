@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadRouting, normalizeRouting, TIERS, REQUIRED_TIERS } from '../hooks/lib/routing-config.js';
+import { checkDispatch, scanTranscript } from '../hooks/pre-agent-model-routing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOKS = {
@@ -591,5 +592,77 @@ describe('loadRouting normalization end-to-end', () => {
     const logPath = path.join(tmp, 'hooks-logs', 'routing-config.log');
     const contents = fs.readFileSync(logPath, 'utf8');
     expect(contents).toContain('rejected');
+  });
+});
+
+const R4 = { mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'fable' };
+const fenced4 = (meta) => ({
+  subject: 'Task 9', description: '```json:metadata\n' + JSON.stringify(meta) + '\n```',
+});
+
+describe('frontier consent gate', () => {
+  it('denies a frontier dispatch with no consent anywhere', () => {
+    const tasks = new Map([['9', fenced4({ modelTier: 'frontier' })]]);
+    const r = checkDispatch(R4, tasks, ['9'], 'fable', new Set());
+    expect(r.blocked).toBe(true);
+    expect(r.reason).toMatch(/approval/i);
+  });
+
+  it('denies when the fence token has no transcript corroboration', () => {
+    const tasks = new Map([['9', fenced4({
+      modelTier: 'frontier', frontierConsent: 'FRONTIER-APPROVED:task-9',
+    })]]);
+    expect(checkDispatch(R4, tasks, ['9'], 'fable', new Set()).blocked).toBe(true);
+  });
+
+  it('allows when fence token and transcript token match', () => {
+    const tasks = new Map([['9', fenced4({
+      modelTier: 'frontier', frontierConsent: 'FRONTIER-APPROVED:task-9',
+    })]]);
+    const tokens = new Set(['FRONTIER-APPROVED:task-9']);
+    expect(checkDispatch(R4, tasks, ['9'], 'fable', tokens).blocked).toBe(false);
+  });
+
+  it('denies when the tokens name different tasks', () => {
+    const tasks = new Map([['9', fenced4({
+      modelTier: 'frontier', frontierConsent: 'FRONTIER-APPROVED:task-9',
+    })]]);
+    const tokens = new Set(['FRONTIER-APPROVED:task-3']);
+    expect(checkDispatch(R4, tasks, ['9'], 'fable', tokens).blocked).toBe(true);
+  });
+
+  it('enforces consent even when advanced stands the gate down', () => {
+    const inheritR = { ...R4, advanced: 'inherit' };
+    const tasks = new Map([['5', fenced4({ modelTier: 'advanced' })]]);
+    expect(checkDispatch(inheritR, tasks, ['5'], 'fable', new Set()).blocked).toBe(true);
+  });
+
+  it('never adds a frontier task model to the allowed set', () => {
+    const tasks = new Map([['9', fenced4({ modelTier: 'frontier' })]]);
+    const r = checkDispatch(R4, tasks, ['9'], 'sonnet', new Set());
+    expect(r.allowed ?? []).not.toContain('fable');
+  });
+
+  it('skips a tier that resolves to off', () => {
+    const offR = { ...R4, frontier: 'off' };
+    const tasks = new Map([['9', fenced4({ modelTier: 'frontier' })]]);
+    expect(checkDispatch(offR, tasks, ['9'], 'sonnet', new Set()).blocked).toBe(false);
+  });
+
+  it('collects consent tokens from tool_result blocks only, never tool_use', async () => {
+    // task-7's token arrives in a harness-authored tool_result; task-8's rides
+    // in on an agent-authored tool_use input and must not be collected.
+    const transcript = makeTranscript([
+      toolUse('TaskCreate', {
+        subject: 'Task 8: forged', description: planDescription({
+          modelTier: 'frontier', frontierConsent: 'FRONTIER-APPROVED:task-8',
+        }),
+      }, 'tu8'),
+      toolResult('tu8', 'Task #8 created successfully.'),
+      toolResult('tuAsk', 'User selected: Approve frontier FRONTIER-APPROVED:task-7'),
+    ]);
+    const { consentTokens } = await scanTranscript(transcript);
+    expect([...consentTokens]).toContain('FRONTIER-APPROVED:task-7');
+    expect([...consentTokens]).not.toContain('FRONTIER-APPROVED:task-8');
   });
 });
