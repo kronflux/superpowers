@@ -26,7 +26,7 @@ AskUserQuestion:
   header: "Routing"
   options:
     - label: "Guided tiers (recommended)"
-      description: "mechanical->haiku, standard->sonnet, frontier->session model. Cheap models for routine implementation, mid-tier for integration and reviews, full power only where judgment lives."
+      description: "mechanical->haiku, standard->sonnet, advanced->opus, frontier off. Cheap models for routine implementation, mid-tier for integration and reviews, full power where judgment lives."
     - label: "One fixed model"
       description: "Every subagent uses one model you pick next - flat cost cap, no per-task gradation."
     - label: "Skip"
@@ -36,12 +36,25 @@ AskUserQuestion:
 - **Guided tiers** → show the user the exact mapping you are about to write and offer to change any tier before writing:
 
   ```json
-  {"mechanical": "haiku", "standard": "sonnet", "frontier": "inherit"}
+  {"schema": 2, "mechanical": "haiku", "standard": "sonnet", "advanced": "opus", "frontier": "off"}
   ```
 
-  If the user wants a different value for any tier, substitute it before writing. Write the result to `docs/superpowers/model-routing.json` (create `docs/superpowers/` if missing — that is intentional).
+  Then ask whether to enable the frontier tier:
 
-- **One fixed model** → ask the follow-up below first, then write the same three-tier structure with every tier set to the chosen value:
+  ```yaml
+  AskUserQuestion:
+    question: "Enable the frontier tier (Fable) for exceptional tasks?"
+    header: "Frontier"
+    options:
+      - label: "Off (recommended)"
+        description: "advanced/Opus is the ceiling. Handles design judgment, architecture, and broad codebase understanding. No frontier prompts ever."
+      - label: "Enable, prompt per task"
+        description: "Fable becomes available at 2x the advanced tier. Never automatic - every frontier task asks you first, with the reason and the cost."
+  ```
+
+  On **Enable**, set `"frontier": "fable"`. If the user wants a different value for any tier, substitute it before writing — but never set `frontier` to the same model as `advanced` (the config would be rejected as invalid). Write the result to `docs/superpowers/model-routing.json` (create `docs/superpowers/` if missing — that is intentional).
+
+- **One fixed model** → ask the follow-up below first, then write `{"schema": 2, ...}` with `mechanical`, `standard`, and `advanced` all set to the chosen value and `"frontier": "off"`. Frontier must stay off here: a flat cap has no second tier to gate, and a config where `advanced` and `frontier` name the same model is rejected as invalid.
 
   ```yaml
   AskUserQuestion:
@@ -54,13 +67,11 @@ AskUserQuestion:
         description: "Mid-tier reasoning at mid-tier price. The balanced cap."
       - label: "opus"
         description: "Frontier reasoning. Caps cost only on sessions running an even higher-tier model."
-      - label: "fable"
-        description: "Highest capability and price. Only useful as a cap if your session model is above it."
   ```
 
 - **Skip** → write nothing.
 
-After writing the file, tell the user: the routing gates (`hooks/pre-taskcreate-model-tier.js`, `hooks/pre-agent-model-routing.js`) check for this file on every relevant tool call and activate immediately — no restart needed. From the next session on, `hooks/session-start` injects a `<model-routing-active>` notice with the tier mapping and rules. Kill switch at runtime: `SUPERPOWERS_ROUTING_GUARD=0`. Off-switch: delete `docs/superpowers/model-routing.json` — routing goes fully dormant, byte-identical to never having opted in.
+After writing the file, tell the user: the routing gates (`hooks/pre-taskcreate-model-tier.js`, `hooks/pre-agent-model-routing.js`) check for this file on every relevant tool call and activate immediately — no restart needed. From the next session on, `hooks/session-start` injects a `<model-routing-active>` notice with the tier mapping and rules. Kill switch at runtime: `SUPERPOWERS_ROUTING_GUARD=0`. Off-switch: delete `docs/superpowers/model-routing.json` — routing goes fully dormant, byte-identical to never having opted in. If you enabled the frontier tier, nothing dispatches to it silently: each qualifying task asks first, states why frontier suits it, and offers advanced as the default. Set `"frontier": "off"` to stop those prompts entirely.
 
 ## Feature 2: User-Gate Enforcement Hooks
 
