@@ -4,11 +4,14 @@
  *
  * When the project opts in to model routing (docs/superpowers/model-routing.json
  * exists), every plan-shaped task MUST carry a valid "modelTier" in its
- * ```json:metadata fence. Ad-hoc tasks are unaffected. A concrete "model" pin
- * in the fence overrides tier enforcement.
+ * ```json:metadata fence, one of the four tiers: mechanical, standard,
+ * advanced, frontier. Ad-hoc tasks are unaffected. A concrete "model" pin
+ * in the fence overrides tier enforcement. A "frontier" tier request is
+ * rejected outright when the routing config has the frontier tier off.
  *
  * Fail-open by design: missing config, malformed fence JSON, or any internal
- * error -> allow. Kill switch: SUPERPOWERS_ROUTING_GUARD=0.
+ * error -> allow. A determinate "frontier is off" rejection is not a fault.
+ * Kill switch: SUPERPOWERS_ROUTING_GUARD=0.
  *
  * Logs decisions to: ~/.claude/hooks-logs/YYYY-MM-DD.jsonl
  */
@@ -36,11 +39,27 @@ const TIER_TABLE = [
   'Pick ONE modelTier:',
   '  "mechanical" - touches 1-2 files, complete spec with code in the steps, no design judgment.',
   '  "standard"   - multi-file coordination, integration concerns, pattern matching, debugging.',
-  '  "frontier"   - design judgment, architecture decisions, broad codebase understanding.',
+  '  "advanced"   - design judgment, architecture decisions, broad codebase understanding.',
+  '                 This is the DEFAULT CEILING for hard work.',
+  '  "frontier"   - gated, 2x cost. Requires user approval per task, and only qualifies when',
+  '                 the task shows a documented frontier-model edge:',
+  '                   1. long-horizon autonomous execution (hours unattended, no checkpoint)',
+  '                   2. first-shot build of a fully-specified large system',
+  '                   3. genuine ambiguity - the model must choose the frame',
+  '                   4. whole-repo review/debugging including history',
+  '                   5. wide parallel sub-agent coordination',
+  '                   6. dense or degraded visual input',
+  '                 INVERSE TEST: if the advanced tier has plausibly handled this CLASS of',
+  '                 task before, it is not frontier. Difficulty alone never qualifies.',
+  '                 NEVER frontier: security-focused analysis (classifier refusals),',
+  '                 zero-data-retention orgs, prefill, latency-sensitive work.',
   '',
   'Tie-break: spec completeness wins - a task whose steps contain the complete code',
   'is "mechanical" regardless of file count. When the user pinned a specific model,',
   'set "model" instead (it overrides the tier).',
+  '',
+  'Escalation goes up only and STOPS AT "advanced". Reaching "frontier" always requires',
+  'the user approval flow in skills/writing-plans - never automatic escalation.',
   '',
   'Options:',
   '  1. Re-issue TaskCreate with a "modelTier" in the ```json:metadata fence.',
@@ -55,7 +74,7 @@ const TIER_TABLE = [
  * Decide for a TaskCreate input. Returns { blocked, reason }.
  * routing is the parsed model-routing config (non-null when routing is active).
  */
-export function checkTaskCreate(toolInput) {
+export function checkTaskCreate(toolInput, routing) {
   const description = typeof toolInput?.description === 'string' ? toolInput.description : '';
   const subject = typeof toolInput?.subject === 'string' ? toolInput.subject : '';
 
@@ -88,7 +107,29 @@ export function checkTaskCreate(toolInput) {
     return { blocked: false, reason: null };
   }
 
-  if (TIERS.includes(meta.modelTier)) return { blocked: false, reason: null };
+  if (TIERS.includes(meta.modelTier)) {
+    if (meta.modelTier === 'frontier' && routing && routing.frontier === 'off') {
+      return {
+        blocked: true,
+        reason: [
+          'FRONTIER TIER IS NOT ENABLED',
+          '',
+          `The TaskCreate for '${subject}' requests modelTier "frontier", but this project's`,
+          'routing config has the frontier tier off. Frontier is opt-in because it costs 2x',
+          'the advanced tier.',
+          '',
+          'Options:',
+          '  1. Use "advanced" instead - it is the default ceiling and handles design judgment,',
+          '     architecture decisions, and broad codebase understanding.',
+          '  2. To enable frontier, add "schema": 2 and a "frontier" model to the routing config,',
+          '     then re-run the user approval flow in skills/writing-plans.',
+          '',
+          TIER_TABLE,
+        ].join('\n'),
+      };
+    }
+    return { blocked: false, reason: null };
+  }
 
   const problem = meta.modelTier === undefined || meta.modelTier === ''
     ? 'has none'
@@ -126,7 +167,7 @@ async function main() {
       return;
     }
 
-    const result = checkTaskCreate(tool_input);
+    const result = checkTaskCreate(tool_input, routing);
     if (result.blocked) {
       log({ level: 'BLOCKED', subject: tool_input?.subject, session_id, cwd });
       process.stdout.write(JSON.stringify({

@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { loadRouting, normalizeRouting, TIERS, REQUIRED_TIERS } from '../hooks/lib/routing-config.js';
 import { checkDispatch, scanTranscript } from '../hooks/pre-agent-model-routing.js';
+import { checkTaskCreate } from '../hooks/pre-taskcreate-model-tier.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOKS = {
@@ -664,5 +665,32 @@ describe('frontier consent gate', () => {
     const { consentTokens } = await scanTranscript(transcript);
     expect([...consentTokens]).toContain('FRONTIER-APPROVED:task-7');
     expect([...consentTokens]).not.toContain('FRONTIER-APPROVED:task-8');
+  });
+});
+
+const planTask = (tier) => ({
+  subject: 'Task 1: Something',
+  description: '**Goal:** x\n\n```json:metadata\n' + JSON.stringify({ modelTier: tier }) + '\n```',
+});
+const FRONTIER_OFF = { mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off' };
+const FRONTIER_ON = { ...FRONTIER_OFF, frontier: 'fable' };
+
+describe('checkTaskCreate four-tier', () => {
+  it('allows the advanced tier', () => {
+    expect(checkTaskCreate(planTask('advanced'), FRONTIER_OFF).blocked).toBe(false);
+  });
+
+  it('denies frontier when the tier is off', () => {
+    const r = checkTaskCreate(planTask('frontier'), FRONTIER_OFF);
+    expect(r.blocked).toBe(true);
+    expect(r.reason).toMatch(/frontier/i);
+  });
+
+  it('allows frontier when the tier is mapped', () => {
+    expect(checkTaskCreate(planTask('frontier'), FRONTIER_ON).blocked).toBe(false);
+  });
+
+  it('still allows mechanical', () => {
+    expect(checkTaskCreate(planTask('mechanical'), FRONTIER_OFF).blocked).toBe(false);
   });
 });
