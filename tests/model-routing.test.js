@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { loadRouting, normalizeRouting, TIERS, REQUIRED_TIERS } from '../hooks/lib/routing-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOKS = {
@@ -21,6 +22,10 @@ afterAll(() => {
 });
 
 const ROUTING = { mechanical: 'haiku', standard: 'sonnet', frontier: 'inherit' };
+// ROUTING is the legacy three-key shape; loadRouting normalizes it (the old
+// "frontier" becomes "advanced", the new "frontier" tier disables to "off")
+// before returning it, so behavior assertions compare against this shape.
+const NORMALIZED_ROUTING = { mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off' };
 
 function makeProject(config) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-proj-'));
@@ -223,7 +228,7 @@ describe('loadRouting profile-scoped candidate', () => {
     const cwd = makeProject(undefined);
     const profileDir = makeProfile(ROUTING);
     const result = loadRoutingProbe(cwd, { CLAUDE_CONFIG_DIR: profileDir });
-    expect(result.routing).toEqual(ROUTING);
+    expect(result.routing).toEqual(NORMALIZED_ROUTING);
     expect(result.source).toBe(path.join(profileDir, 'superpowers', 'model-routing.json'));
   });
 
@@ -232,7 +237,9 @@ describe('loadRouting profile-scoped candidate', () => {
     const cwd = makeProject(projectRouting);
     const profileDir = makeProfile(ROUTING);
     const result = loadRoutingProbe(cwd, { CLAUDE_CONFIG_DIR: profileDir });
-    expect(result.routing).toEqual(projectRouting);
+    expect(result.routing).toEqual({
+      mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off',
+    });
     expect(result.source).toBe(path.join(cwd, 'docs', 'superpowers', 'model-routing.json'));
   });
 
@@ -242,7 +249,7 @@ describe('loadRouting profile-scoped candidate', () => {
     fs.mkdirSync(legacyDir, { recursive: true });
     fs.writeFileSync(path.join(legacyDir, 'model-routing.json'), JSON.stringify(ROUTING));
     const result = loadRoutingProbe(cwd);
-    expect(result.routing).toEqual(ROUTING);
+    expect(result.routing).toEqual(NORMALIZED_ROUTING);
     expect(result.source).toBe(path.join(tmpHome, '.claude', 'superpowers', 'model-routing.json'));
   });
 
@@ -269,7 +276,7 @@ describe('loadRouting profile-scoped candidate', () => {
       USERPROFILE: emptyHome,
       CLAUDE_CONFIG_DIR: emptyProfile,
     });
-    expect(hit.routing).toEqual(ROUTING);
+    expect(hit.routing).toEqual(NORMALIZED_ROUTING);
     expect(hit.source).toBe(path.join(hitCwd, 'docs', 'superpowers', 'model-routing.json'));
     expect(miss.routing).toBeNull();
     expect(miss.source).toBeNull();
@@ -366,8 +373,11 @@ describe('pre-agent-model-routing', () => {
   });
 
   it('allows any model when the in-progress tier resolves to "inherit"', () => {
+    // Under ROUTING (legacy shape), the old "frontier" value now normalizes
+    // into "advanced" (see normalizeRouting); "advanced" is the tier that
+    // resolves to "inherit" here, not "frontier" (which normalizes to "off").
     const transcript = makeTranscript([
-      toolUse('TaskCreate', { subject: 'Task 1: hard design', description: planDescription({ modelTier: 'frontier' }) }, 'tu1'),
+      toolUse('TaskCreate', { subject: 'Task 1: hard design', description: planDescription({ modelTier: 'advanced' }) }, 'tu1'),
       toolResult('tu1', 'Task #1 created successfully.'),
       toolUse('TaskUpdate', { taskId: '1', status: 'in_progress' }, 'tu2'),
     ]);
@@ -493,5 +503,93 @@ describe('pre-askuser-handoff-guard', () => {
       toolUse('TaskCreate', { subject: 'Task 1: x', description: planDescription({ modelTier: 'mechanical' }) }, 'tu1'),
     ]);
     expect(decision(run('askuser', denyingAskUser(cwd, transcript)))).toBe('allow');
+  });
+});
+
+describe('normalizeRouting', () => {
+  it('exposes four tiers and three required', () => {
+    expect(TIERS).toEqual(['mechanical', 'standard', 'advanced', 'frontier']);
+    expect(REQUIRED_TIERS).toEqual(['mechanical', 'standard', 'advanced']);
+  });
+
+  it('normalizes the legacy three-key shape, disabling frontier', () => {
+    const { routing, reason } = normalizeRouting({
+      mechanical: 'haiku', standard: 'sonnet', frontier: 'inherit',
+    });
+    expect(reason).toBeNull();
+    expect(routing).toEqual({
+      mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off',
+    });
+  });
+
+  it('passes through an explicit schema-2 config', () => {
+    const raw = {
+      schema: 2, mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'fable',
+    };
+    const { routing } = normalizeRouting(raw);
+    expect(routing.advanced).toBe('opus');
+    expect(routing.frontier).toBe('fable');
+  });
+
+  it('treats a config with advanced but no schema key as new-schema', () => {
+    const { routing } = normalizeRouting({
+      mechanical: 'haiku', standard: 'sonnet', advanced: 'opus',
+    });
+    expect(routing.advanced).toBe('opus');
+    expect(routing.frontier).toBe('off');
+  });
+
+  it('rejects a legacy config that maps frontier to a fable model', () => {
+    const { routing, reason } = normalizeRouting({
+      mechanical: 'haiku', standard: 'sonnet', frontier: 'claude-fable-5',
+    });
+    expect(routing).toBeNull();
+    expect(reason).toMatch(/fable/i);
+  });
+
+  it('rejects a config missing a required tier', () => {
+    const { routing } = normalizeRouting({ mechanical: 'haiku', standard: 'sonnet' });
+    expect(routing).toBeNull();
+  });
+
+  it('rejects an enabled frontier that duplicates the advanced model', () => {
+    const { routing, reason } = normalizeRouting({
+      schema: 2, mechanical: 'haiku', standard: 'sonnet', advanced: 'fable', frontier: 'fable',
+    });
+    expect(routing).toBeNull();
+    expect(reason).toMatch(/distinct|same/i);
+  });
+});
+
+describe('loadRouting normalization end-to-end', () => {
+  it('normalizes a legacy on-disk config to the four-key shape (criterion 1)', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-normalize-'));
+    tmpDirs.push(tmp);
+    const cfgDir = path.join(tmp, 'docs', 'superpowers');
+    fs.mkdirSync(cfgDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(cfgDir, 'model-routing.json'),
+      JSON.stringify({ mechanical: 'haiku', standard: 'sonnet', frontier: 'inherit' })
+    );
+    const routing = loadRouting(tmp, { CLAUDE_CONFIG_DIR: tmp, HOME: tmp });
+    expect(routing).toEqual({
+      mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off',
+    });
+  });
+
+  it('rejects a legacy fable-mapped config on disk and logs the rejection (criterion 4)', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-normalize-reject-'));
+    tmpDirs.push(tmp);
+    const cfgDir = path.join(tmp, 'docs', 'superpowers');
+    fs.mkdirSync(cfgDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(cfgDir, 'model-routing.json'),
+      JSON.stringify({ mechanical: 'haiku', standard: 'sonnet', frontier: 'claude-fable-5' })
+    );
+    const routing = loadRouting(tmp, { CLAUDE_CONFIG_DIR: tmp, HOME: tmp });
+    expect(routing).toBeNull();
+    const logPath = path.join(tmp, 'hooks-logs', 'routing-config.log');
+    const contents = fs.readFileSync(logPath, 'utf8');
+    expect(contents).toContain('rejected');
   });
 });
