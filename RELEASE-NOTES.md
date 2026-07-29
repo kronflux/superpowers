@@ -1,5 +1,51 @@
 # Superpowers Release Notes
 
+## 7.3.0 — four-tier model routing with gated frontier
+
+Model-tier routing expands from three tiers to four: `mechanical` / `standard` / `advanced` /
+`frontier`. `advanced` (Opus-class) is the new default ceiling, carrying the old top-tier
+semantics unchanged. `frontier` (Fable-class, 2x cost) is a new, optional tier — off by default,
+and gated per task when enabled.
+
+### Four-tier config schema
+
+- `hooks/lib/routing-config.js` returns one normalized four-key object regardless of input
+  schema, so no downstream consumer branches on schema version. `routing.frontier` is a model
+  name, `'inherit'`, or `'off'`.
+- Legacy three-key configs (`mechanical`/`standard`/`frontier`) keep working unchanged: the old
+  `frontier` key is normalized to `advanced`, and the new `frontier` key defaults to `off`.
+  Proven by direct execution of the loader against a legacy config — see the release proof in
+  `.superpowers/sdd/task-7-report.md`.
+- A legacy config that maps its `frontier` key to a Fable model is rejected as ambiguous rather
+  than silently promoted to the new frontier tier; when frontier is enabled it must name a model
+  different from `advanced`.
+
+### Consent-gated frontier dispatch
+
+- The plan gate (`hooks/pre-taskcreate-model-tier.js`) rejects `modelTier: "frontier"` when the
+  tier is off.
+- `writing-plans` carries a frontier offer contract: why this task, the 2x cost, the `advanced`
+  counter-case, and `advanced` as the default. `hooks/pre-agent-model-routing.js` enforces it at
+  dispatch with a two-signal check — a fence token plus an `AskUserQuestion` answer, both present
+  in the transcript.
+- Honest limit, stated in `docs/model-routing-flow.md`: the gate guards the careless path, not a
+  deliberately adversarial agent with Bash access.
+
+### Session notice and onboarding
+
+- `hooks/session-start` now honors `CLAUDE_CONFIG_DIR`, fixing a mismatch where the notice could
+  read a different config file than the one hooks enforce under a profile environment.
+- `/onboard` writes the new `schema: 2` config, offers `frontier` as an explicit opt-in (default
+  off), and no longer offers a Fable flat cap.
+
+### Docs
+
+- ADR: `docs/adr/2026-07-28-four-tier-model-routing.md`.
+
+### Breaking changes
+
+- None. Legacy three-key configs are normalized at load with identical routing behavior.
+
 ## 7.2.0 — config-dir isolation
 
 Superpowers works out of the box in any Claude Code environment. Custom config roots

@@ -10,7 +10,7 @@ native tools otherwise.
 
 Ships via the Claude Code marketplace **`superpowers-dev`** as plugin **`superpowers`**
 (`/plugin marketplace add kronflux/superpowers`, `/plugin install superpowers@superpowers-dev`).
-Version is authoritative in `package.json` (currently 7.1.0) and mirrored into six other
+Version is authoritative in `package.json` (currently 7.3.0) and mirrored into six other
 manifests by the bump script.
 
 ## Working in this repo
