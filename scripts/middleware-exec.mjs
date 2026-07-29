@@ -12,6 +12,19 @@ const EXIT = { OK: 0, USAGE: 1, UNCONFIGURED: 2, ENDPOINT: 3 };
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
 const stripAnsi = (s) => s.replace(ANSI_RE, '');
 
+// Flags verified 2026-07-29 against each binary's --help; input_mode verified by
+// invocation (see .superpowers/sdd/task-4-cli-evidence.md). `argvArgs` carries the
+// prompt inline; `stdinArgs` is the same invocation without the placeholder, so an
+// explicit input_mode override cannot produce a command that fails its own validation.
+// codex/gemini are deliberately absent: not installed, so not verifiable.
+export const PRESETS = {
+  // stdin NOT usable: `agy -p` with no value fails flag parsing before any model call.
+  agy:      { base: ['agy'],      modelFlag: '--model', argvArgs: ['-p', '{{prompt}}'],  stdinArgs: ['-p'],  input_mode: 'argv' },
+  // stdin verified working: prompt piped, no positional argument, exit 0.
+  opencode: { base: ['opencode'], modelFlag: '-m',      argvArgs: ['run', '{{prompt}}'], stdinArgs: ['run'], input_mode: 'stdin' },
+  claude:   { base: ['claude'],   modelFlag: '--model', argvArgs: ['-p', '{{prompt}}'],  stdinArgs: ['-p'],  input_mode: 'stdin' },
+};
+
 const TEMPLATES = {
   'extract-log-error':
     'Extract the root-cause error from this log. Output at most 5 lines: error message, file:line, first relevant stack frame, probable cause.\n\n{{input}}',
@@ -40,8 +53,14 @@ export function cliDescriptor(ep, model, env = process.env) {
   let command;
   let presetMode;
   if (ep.preset) {
-    // Task 5 replaces this with the real PRESETS lookup.
-    throw bad(`unknown preset "${ep.preset}". Known: (none yet)`);
+    const pre = PRESETS[ep.preset];
+    if (!pre) throw bad(`unknown preset "${ep.preset}". Known: ${Object.keys(PRESETS).join(', ')}`);
+    presetMode = pre.input_mode;
+    // The EFFECTIVE mode decides which arg form to expand, so an explicit
+    // override never yields a command that fails the placeholder validation.
+    const mode = ep.input_mode || presetMode;
+    const tail = mode === 'stdin' ? pre.stdinArgs : pre.argvArgs;
+    command = [...pre.base, ...(model ? [pre.modelFlag, model] : []), ...tail];
   } else if (Array.isArray(ep.command) && ep.command.length > 0) {
     command = ep.command;
   } else {

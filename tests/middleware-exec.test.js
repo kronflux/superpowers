@@ -5,7 +5,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { resolveConfig, endpointFor, renderTemplate, runHttp, cliDescriptor, runCli } from '../scripts/middleware-exec.mjs';
+import { resolveConfig, endpointFor, renderTemplate, runHttp, cliDescriptor, runCli, PRESETS } from '../scripts/middleware-exec.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -506,5 +506,64 @@ describe('cli config validation', () => {
   });
   it('rejects argv mode without a {{prompt}} placeholder', () => {
     expect(boom({ command: ['x'], input_mode: 'argv' })?.exit).toBe(2);
+  });
+});
+
+describe('cli presets', () => {
+  const p = (ep, cfgExtra = {}) => endpointFor({ active_provider: 'c', ...cfgExtra, endpoints: { c: { transport: 'cli', ...ep } } }, {});
+
+  it('ships exactly the three verified presets', () => {
+    expect(Object.keys(PRESETS).sort()).toEqual(['agy', 'claude', 'opencode']);
+  });
+
+  it('expands the agy preset with a prompt placeholder', () => {
+    const d = p({ preset: 'agy' });
+    expect(d.command[0]).toBe('agy');
+    expect(d.command).toContain('{{prompt}}');
+  });
+
+  it('inserts the model flag before the prompt argument', () => {
+    const d = p({ preset: 'agy', model: 'gemini-3-pro' });
+    const i = d.command.indexOf('gemini-3-pro');
+    expect(i).toBeGreaterThan(0);
+    expect(d.command[i - 1]).toBe(PRESETS.agy.modelFlag);
+    expect(i).toBeLessThan(d.command.indexOf('{{prompt}}'));
+  });
+
+  it('emits no model flag when no model is given', () => {
+    expect(p({ preset: 'agy' }).command).not.toContain(PRESETS.agy.modelFlag);
+  });
+
+  it('lets active_model override the endpoint model', () => {
+    const d = p({ preset: 'agy', model: 'a' }, { active_model: 'b' });
+    expect(d.command).toContain('b');
+    expect(d.command).not.toContain('a');
+  });
+
+  it('defaults input_mode from Task 4 evidence', () => {
+    expect(p({ preset: 'agy' }).inputMode).toBe('argv');
+    expect(p({ preset: 'opencode' }).inputMode).toBe('stdin');
+    expect(p({ preset: 'claude' }).inputMode).toBe('stdin');
+  });
+
+  it('uses the stdin arg form when the mode is stdin (no placeholder)', () => {
+    const d = p({ preset: 'claude' });
+    expect(d.command).not.toContain('{{prompt}}');
+    expect(d.command).toEqual([...PRESETS.claude.base, ...PRESETS.claude.stdinArgs]);
+  });
+
+  it('lets an explicit input_mode override the preset default, swapping the arg form', () => {
+    const argv = p({ preset: 'claude', input_mode: 'argv' });
+    expect(argv.inputMode).toBe('argv');
+    expect(argv.command).toContain('{{prompt}}');
+
+    const stdin = p({ preset: 'agy', input_mode: 'stdin' });
+    expect(stdin.inputMode).toBe('stdin');
+    expect(stdin.command).not.toContain('{{prompt}}');
+  });
+
+  it('rejects an unknown preset with exit 2 listing known names', () => {
+    try { p({ preset: 'nope' }); throw new Error('should have thrown'); }
+    catch (e) { expect(e.exit).toBe(2); expect(e.message).toMatch(/agy/); }
   });
 });
