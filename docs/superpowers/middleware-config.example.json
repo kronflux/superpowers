@@ -21,6 +21,19 @@
       "model": "gpt-4o-mini",
       "base_url": "http://localhost:4000/v1",
       "api_key_env": "LITELLM_API_KEY"
+    },
+    "agy-cli": {
+      "transport": "cli",
+      "preset": "agy",
+      "model": "gemini-3-pro"
+    },
+    "custom-cli": {
+      "transport": "cli",
+      "command": ["my-cli", "--prompt", "{{prompt}}"],
+      "input_mode": "argv",
+      "timeout_ms": 120000,
+      "max_argv_bytes": 30000,
+      "env": { "SOME_VAR": "value" }
     }
   },
   "templates": {
