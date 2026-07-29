@@ -1,5 +1,52 @@
 # Superpowers Release Notes
 
+## 7.4.0 — middleware CLI transport
+
+`middleware-exec` gains a second transport: local CLI agents (`agy`, `opencode`, `claude`) are
+now usable as middleware providers alongside the existing HTTP path. Proven end to end by
+executing the real entry point against a fake CLI endpoint — see the release proof in
+`.superpowers/sdd/task-7-report.md`.
+
+### Two transports
+
+`transport` defaults to `"http"`, so every existing config keeps working with no edit. A CLI
+endpoint declares either a verified `preset` or a free-form `command` argv array.
+
+### Presets, from recorded invocations
+
+- `agy` — argv delivery, `--model`. `agy` cannot take stdin: its `-p` flag fails argument
+  parsing without a value, so argv is the only viable delivery mode.
+- `opencode` — stdin delivery, `-m`, with the model flag placed under its documented `run`
+  subcommand.
+- `claude` — stdin delivery, `--model`.
+
+Defaults were set from recorded invocations of each real binary, not assumption.
+`codex` and `gemini` get no presets — neither is installed on the development machine, so
+their invocations could not be verified and guessing flags was not acceptable. Both are served
+by the free-form `command` shape. The 7.3.1 Google/Gemini HTTP endpoint remains the way to
+reach Gemini over HTTP.
+
+### Delivery and limits
+
+`input_mode` is `argv` (prompt substituted into an `{{prompt}}` placeholder) or `stdin`.
+`max_argv_bytes` (default 30000) returns exit 3 with a suggestion to switch to stdin, rather
+than truncating the prompt silently. `timeout_ms` (default 120000) kills the child.
+
+### Security posture
+
+Commands spawn with `shell: false` as an argument array, so nothing in a prompt can start a
+subprocess or chain a command. In argv mode, though, the prompt still reaches the target CLI's
+own argument parser — a leading dash may be read as a flag. Presets minimize this; hand-authored
+`command` configs should avoid bare positionals. Naming a binary in config is a code-execution
+surface, but it introduces no new trust tier: `.claude/settings.json` already runs arbitrary
+hook commands.
+
+### Agentic-tool isolation
+
+CLI providers carry their own file and shell tools, so every run spawns in a fresh temporary
+working directory that is removed afterward, keeping any writes the CLI makes out of the
+project.
+
 ## 7.3.1 — onboarding correctness fixes
 
 Three fixes, all found by running `/onboard` end-to-end against a real profile environment
