@@ -108,7 +108,7 @@ export function checkTaskCreate(toolInput, routing) {
   }
 
   if (TIERS.includes(meta.modelTier)) {
-    if (meta.modelTier === 'frontier' && routing && routing.frontier === 'off') {
+    if (meta.modelTier === 'frontier' && routing && routing.frontier === 'off' && routing.schema !== 1) {
       return {
         blocked: true,
         reason: [

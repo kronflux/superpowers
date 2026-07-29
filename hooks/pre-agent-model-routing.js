@@ -230,7 +230,10 @@ export function checkDispatch(routing, tasks, inProgress, dispatchModel, consent
     const tier = meta.modelTier;
     if (typeof tier !== 'string' || !tier) continue;
     anyRequirement = true;
-    const resolved = routing[tier];
+    // Legacy-normalized configs (schema 1): a fence tagged with the pre-7.3
+    // tier name "frontier" keeps its old meaning - the top tier, now
+    // "advanced". Only schema-2 configs treat "frontier" as the gated tier.
+    const resolved = (tier === 'frontier' && routing.schema === 1) ? routing.advanced : routing[tier];
     // Unknown tier -> drop this member (typos must not brick dispatches).
     if (typeof resolved !== 'string' || !resolved) continue;
     if (resolved === 'off') continue;
@@ -240,7 +243,7 @@ export function checkDispatch(routing, tasks, inProgress, dispatchModel, consent
     // model: a config mapping advanced and frontier to the same model must not
     // starve advanced tasks of an allowed entry. (Such configs are rejected at
     // load, but this function also takes literal objects in tests.)
-    if (tier === 'frontier') continue;
+    if (tier === 'frontier' && routing.schema !== 1) continue;
     if (!allowed.includes(resolved)) allowed.push(resolved);
     constrainedBy.push({ id: taskId, subject: task.subject, tier });
   }

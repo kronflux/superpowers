@@ -43,6 +43,7 @@ export function normalizeRouting(raw) {
 
   if (isNew) {
     cfg = { ...raw };
+    if (cfg.schema !== 2) cfg.schema = 2;
   } else {
     // Legacy three-key shape: the old "frontier" was the ungated ceiling and
     // becomes "advanced". Never let that ceiling be a Fable model, which
@@ -57,7 +58,7 @@ export function normalizeRouting(raw) {
           + 'add an explicit "advanced" tier and "schema": 2 to enable gated frontier routing',
       };
     }
-    cfg = { ...raw, advanced: raw.frontier, frontier: 'off' };
+    cfg = { ...raw, advanced: raw.frontier, frontier: 'off', schema: 1 };
   }
 
   for (const k of REQUIRED_TIERS) {

@@ -27,7 +27,7 @@ const ROUTING = { mechanical: 'haiku', standard: 'sonnet', frontier: 'inherit' }
 // ROUTING is the legacy three-key shape; loadRouting normalizes it (the old
 // "frontier" becomes "advanced", the new "frontier" tier disables to "off")
 // before returning it, so behavior assertions compare against this shape.
-const NORMALIZED_ROUTING = { mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off' };
+const NORMALIZED_ROUTING = { mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off', schema: 1 };
 
 function makeProject(config) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-proj-'));
@@ -240,7 +240,7 @@ describe('loadRouting profile-scoped candidate', () => {
     const profileDir = makeProfile(ROUTING);
     const result = loadRoutingProbe(cwd, { CLAUDE_CONFIG_DIR: profileDir });
     expect(result.routing).toEqual({
-      mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off',
+      mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off', schema: 1,
     });
     expect(result.source).toBe(path.join(cwd, 'docs', 'superpowers', 'model-routing.json'));
   });
@@ -520,7 +520,7 @@ describe('normalizeRouting', () => {
     });
     expect(reason).toBeNull();
     expect(routing).toEqual({
-      mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off',
+      mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off', schema: 1,
     });
   });
 
@@ -575,7 +575,7 @@ describe('loadRouting normalization end-to-end', () => {
     );
     const routing = loadRouting(tmp, { CLAUDE_CONFIG_DIR: tmp, HOME: tmp });
     expect(routing).toEqual({
-      mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off',
+      mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off', schema: 1,
     });
   });
 
@@ -692,5 +692,60 @@ describe('checkTaskCreate four-tier', () => {
 
   it('still allows mechanical', () => {
     expect(checkTaskCreate(planTask('mechanical'), FRONTIER_OFF).blocked).toBe(false);
+  });
+});
+
+describe('legacy fence-value aliasing', () => {
+  const LEGACY_RAW = { mechanical: 'haiku', standard: 'sonnet', frontier: 'inherit' };
+
+  it('marks legacy-normalized configs schema 1 and new configs schema 2', () => {
+    expect(normalizeRouting(LEGACY_RAW).routing.schema).toBe(1);
+    expect(normalizeRouting({ mechanical: 'haiku', standard: 'sonnet', advanced: 'opus' }).routing.schema).toBe(2);
+  });
+
+  it('allows a frontier-tagged fence at TaskCreate under a legacy config', () => {
+    const legacy = normalizeRouting(LEGACY_RAW).routing;
+    const task = {
+      subject: 'Task 1: Something',
+      description: '**Goal:** x\n\n```json:metadata\n{"modelTier":"frontier"}\n```',
+    };
+    expect(checkTaskCreate(task, legacy).blocked).toBe(false);
+  });
+
+  it('still rejects a frontier fence under an explicit schema-2 config with frontier off', () => {
+    const explicit = { schema: 2, mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off' };
+    const task = {
+      subject: 'Task 1: Something',
+      description: '**Goal:** x\n\n```json:metadata\n{"modelTier":"frontier"}\n```',
+    };
+    expect(checkTaskCreate(task, explicit).blocked).toBe(true);
+  });
+
+  it('dispatch: legacy frontier fence resolves as advanced (inherit stands the gate down)', () => {
+    const legacy = normalizeRouting(LEGACY_RAW).routing; // advanced: 'inherit'
+    const tasks = new Map([['9', {
+      subject: 'Task 9', description: '```json:metadata\n{"modelTier":"frontier"}\n```',
+    }]]);
+    expect(checkDispatch(legacy, tasks, ['9'], 'anything', new Set()).blocked).toBe(false);
+  });
+
+  it('dispatch: legacy frontier fence with a concrete advanced model joins the allowed set', () => {
+    const legacy = normalizeRouting({ mechanical: 'haiku', standard: 'sonnet', frontier: 'opus' }).routing; // advanced: 'opus'
+    const tasks = new Map([['9', {
+      subject: 'Task 9', description: '```json:metadata\n{"modelTier":"frontier"}\n```',
+    }]]);
+    const ok = checkDispatch(legacy, tasks, ['9'], 'opus', new Set());
+    expect(ok.blocked).toBe(false);
+    const blocked = checkDispatch(legacy, tasks, ['9'], 'haiku', new Set());
+    expect(blocked.blocked).toBe(true); // pre-7.3 behavior: constrained to opus (plus standard sonnet)
+  });
+
+  it('dispatch: schema-2 config still never admits the frontier tier to the allowed set', () => {
+    const explicit = { schema: 2, mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'fable' };
+    const tasks = new Map([['9', {
+      subject: 'Task 9', description: '```json:metadata\n{"modelTier":"frontier"}\n```',
+    }]]);
+    const r = checkDispatch(explicit, tasks, ['9'], 'sonnet', new Set());
+    expect((r.allowed ?? [])).not.toContain('fable');
   });
 });

@@ -44,7 +44,9 @@ and gated per task when enabled.
 
 ### Breaking changes
 
-- None. Legacy three-key configs are normalized at load with identical routing behavior.
+- None. Legacy three-key configs are normalized at load with identical routing behavior. This
+  includes the `modelTier: "frontier"` fence value in pre-7.3 plan tasks: under a legacy config
+  it is aliased to the old top tier (now `advanced`), not treated as the new gated tier.
 
 ## 7.2.0 — config-dir isolation
 
