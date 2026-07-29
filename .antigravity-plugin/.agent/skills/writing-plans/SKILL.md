@@ -255,7 +255,7 @@ the task.md task list:
   activeForm: "Implementing [Component Name]"
 ```
 
-**`modelTier`** — capability tier for routing: `"mechanical"` | `"standard"` | `"frontier"`. Resolved at dispatch via `docs/superpowers/model-routing.json` (absent → inert metadata); a concrete `model` pin overrides it. Tier definitions: `skills/shared/task-format-reference.md`.
+**`modelTier`** — `"mechanical"` | `"standard"` | `"advanced"` | `"frontier"`; `"advanced"` is the default ceiling, escalation **stops at `advanced`**. `"frontier"` is gated, 2x cost, needs per-task approval before `the task.md task list`. Full definitions and the offer contract: `skills/shared/task-format-reference.md`, `references/plan-authoring.md` → "Frontier offers".
 
 ### Native task mechanics
 

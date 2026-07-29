@@ -23,6 +23,12 @@ Before defining tasks, map out which files will be created or modified and what 
 
 This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
 
+## Frontier offers
+
+**`"frontier"` is gated and costs 2x `advanced`.** Assign it only when the task shows a documented frontier edge — long-horizon autonomous execution, first-shot build of a fully-specified large system, genuine ambiguity where the model must choose the frame, whole-repo review/debugging including history, wide parallel sub-agent coordination, or dense/degraded visual input. **Inverse test:** if `advanced` has plausibly handled this class of task before, it is not frontier. **Never frontier:** security-focused analysis (the model's classifiers refuse it), zero-data-retention orgs, prefill, latency-sensitive work.
+
+Before creating any frontier task you MUST get user approval, in one `ask_question` covering every qualifying task, with per-task rationale and per-task approval. Each offer states, in order: (1) the task, named; (2) why frontier is better here, citing the specific qualifying signal against this task's concrete properties — a generic "this is hard" is a contract violation; (3) the cost, plainly, as 2x; (4) the counter-case — what `advanced` would very likely handle adequately and precisely what is at risk if it falls short; (5) two options, `advanced` as the default. The approval option's **label** must contain `FRONTIER-APPROVED:task-<N>` verbatim; the question text and the declining option must NOT contain it, or the token leaks into the transcript without an approval. Put the same token in the task's `frontierConsent` field. Ask before `the task.md task list` so the handoff guard never sees it; a mid-run escalation uses the same contract and must carry the `CLARIFICATION` token.
+
 ## Self-Review
 
 After writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.
