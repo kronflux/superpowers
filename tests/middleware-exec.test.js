@@ -5,7 +5,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { resolveConfig, endpointFor, renderTemplate } from '../scripts/middleware-exec.mjs';
+import { resolveConfig, endpointFor, renderTemplate, runHttp } from '../scripts/middleware-exec.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -334,5 +334,25 @@ describe('middleware-exec CLI end-to-end', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe('transport dispatch', () => {
+  it('defaults to http when transport is absent', () => {
+    const cfg = { active_provider: 'p', endpoints: { p: { model: 'm', base_url: 'http://localhost:1/v1' } } };
+    expect(endpointFor(cfg, {}).transport).toBe('http');
+  });
+
+  it('accepts an explicit http transport identically', () => {
+    const cfg = { active_provider: 'p', endpoints: { p: { transport: 'http', model: 'm', base_url: 'http://localhost:1/v1' } } };
+    const r = endpointFor(cfg, {});
+    expect(r.transport).toBe('http');
+    expect(r.baseUrl).toBe('http://localhost:1/v1');
+  });
+
+  it('throws exit-2 for an unknown transport', () => {
+    const cfg = { active_provider: 'p', endpoints: { p: { transport: 'carrier-pigeon', model: 'm' } } };
+    try { endpointFor(cfg, {}); throw new Error('should have thrown'); }
+    catch (e) { expect(e.exit).toBe(2); expect(e.message).toMatch(/carrier-pigeon/); }
   });
 });

@@ -31,11 +31,18 @@ export function resolveConfig(cwd = process.cwd(), home = os.homedir(), env = pr
 export function endpointFor(cfg, env = process.env) {
   const ep = cfg.endpoints?.[cfg.active_provider];
   if (!ep) throw Object.assign(new Error(`active_provider "${cfg.active_provider}" not defined in endpoints`), { exit: EXIT.UNCONFIGURED });
+  const transport = ep.transport || 'http';
+  const model = cfg.active_model || ep.model;
+  if (transport !== 'http') {
+    throw Object.assign(new Error(`unknown transport "${transport}" (expected "http" or "cli")`), { exit: EXIT.UNCONFIGURED });
+  }
+  // HTTP-only validation: a CLI endpoint has neither base_url nor api_key_env,
+  // so this check must never run for one.
   const key = ep.api_key_env ? env[ep.api_key_env] : undefined;
   let local = false;
   try { const h = new URL(ep.base_url).hostname; local = h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]'; } catch { /* invalid URL treated as remote */ }
   if (!key && !local) throw Object.assign(new Error(`env var ${ep.api_key_env} not set for remote endpoint`), { exit: EXIT.UNCONFIGURED });
-  return { baseUrl: ep.base_url.replace(/\/+$/, ''), model: cfg.active_model || ep.model, key };
+  return { transport: 'http', baseUrl: ep.base_url.replace(/\/+$/, ''), model, key };
 }
 
 export function renderTemplate(task, input, cfg = {}) {
@@ -54,6 +61,16 @@ function parseArgs(argv) {
   return a;
 }
 
+export async function runHttp(desc, prompt) {
+  const res = await fetch(`${desc.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(desc.key ? { authorization: `Bearer ${desc.key}` } : {}) },
+    body: JSON.stringify({ model: desc.model, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!res.ok) throw Object.assign(new Error(`endpoint ${res.status}: ${(await res.text()).slice(0, 300)}`), { exit: EXIT.ENDPOINT });
+  return (await res.json()).choices?.[0]?.message?.content ?? '';
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const die = (msg, code) => { console.error(`middleware-exec: ${msg}`); process.exit(code); };
@@ -62,15 +79,9 @@ async function main() {
   if (!resolved) die('no middleware-config.json in ./.claude/, $CLAUDE_CONFIG_DIR/, or ~/.claude/ — see docs/superpowers/middleware-config.example.json', EXIT.UNCONFIGURED);
   const input = args['input-file'] ? fs.readFileSync(args['input-file'], 'utf8') : fs.readFileSync(0, 'utf8');
   try {
-    const { baseUrl, model, key } = endpointFor(resolved.cfg);
+    const desc = endpointFor(resolved.cfg);
     const prompt = renderTemplate(args.task, input, resolved.cfg);
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
-    });
-    if (!res.ok) die(`endpoint ${res.status}: ${(await res.text()).slice(0, 300)}`, EXIT.ENDPOINT);
-    const out = (await res.json()).choices?.[0]?.message?.content ?? '';
+    const out = await runHttp(desc, prompt);
     if (args.out && typeof args.out === 'string') fs.writeFileSync(args.out, out); else process.stdout.write(out);
   } catch (e) { die(e.message, e.exit ?? EXIT.ENDPOINT); }
 }
