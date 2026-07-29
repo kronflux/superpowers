@@ -212,6 +212,20 @@ AskUserQuestion:
 
 Pitch: symbol-precise navigation and edits (`find_symbol`, `find_referencing_symbols`, `replace_symbol_body`, etc.) that survive formatting drift, in place of string-match Edit during TDD/refactoring/debugging.
 
+**Memory-tool exclusion runs UNCONDITIONALLY — do this step first, before the offer below, and do it whether Serena's status is `absent`, `configured`, or `verified`.** The exclusion is a safety contract, not a feature: Serena's own memory tools must never run alongside the four-layer superpowers memory (`skills/shared/conductor/serena.md`, "STRICT PROHIBITION"). Gating it behind the install offer means anyone who installed Serena *before* onboarding — the most common case — silently never gets it. Skip this step only when Serena is `absent` AND `.superpowers-no-serena` exists (nothing to protect against). Merge into `.serena/project.yml` (create `.serena/` and the file if absent; Ground rules diff-and-confirm applies if it exists with a different `excluded_tools` list):
+
+```yaml
+excluded_tools:
+  - write_memory
+  - read_memory
+  - list_memories
+  - delete_memory
+  - rename_memory
+  - edit_memory
+```
+
+A global alternative exists (`excluded_tools` in `serena_config.yml`) but its on-disk location isn't verified here — write the per-project file only. If Serena's status is already `configured` or `verified`, do NOT present the offer below; the exclusion step above is the whole of this section.
+
 ```yaml
 AskUserQuestion:
   question: "Set up Serena (symbol-precise edits, adapter: skills/shared/conductor/serena.md)?"
@@ -247,18 +261,8 @@ AskUserQuestion:
      claude mcp add --scope user serena -- uvx -p 3.13 --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project-from-cwd
      ```
      If Serena is slow to start and Claude Code gives up on the connection, raise the MCP startup timeout: `export MCP_TIMEOUT=60000` in the shell profile.
-  2. Write the memory-tool exclusion regardless of which route above was used (plugin or non-plugin) and regardless of whether step 1 has even been run yet, so it is already in place once Serena activates this project. This exclusion applies the same way under the plugin route — it is still `.serena/project.yml` in the project root, unaffected by how the MCP server itself was installed. Merge into `.serena/project.yml` (create `.serena/` and the file if absent; if the file exists with a different `excluded_tools` list, follow the Ground rules diff-and-confirm):
-     ```yaml
-     excluded_tools:
-       - write_memory
-       - read_memory
-       - list_memories
-       - delete_memory
-       - rename_memory
-       - edit_memory
-     ```
-     This blocks Serena's own memory tools so the four-layer superpowers memory stays the only memory system (`skills/shared/conductor/serena.md`, "STRICT PROHIBITION"). A global alternative exists (`excluded_tools` in `serena_config.yml`) but its on-disk location isn't verified here — this offer writes the per-project file only.
-- **No** → write `.superpowers-no-serena` (empty file) in the project root.
+  2. The memory-tool exclusion is NOT repeated here — it was already written unconditionally at the top of this section, before the offer, and applies identically under the plugin and non-plugin routes.
+- **No** → write `.superpowers-no-serena` (empty file) in the project root. The exclusion written above stays in place; it costs nothing when Serena is absent and protects the moment Serena ever appears.
 
 ### Context7
 

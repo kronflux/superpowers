@@ -1,5 +1,38 @@
 # Superpowers Release Notes
 
+## 7.3.1 — onboarding correctness fixes
+
+Three fixes, all found by running `/onboard` end-to-end against a real profile environment
+rather than by inspection.
+
+### Middleware detection under a custom config root
+
+`hooks/lib/capability-registry.js` probed for `middleware-config.json` in only two locations
+(project `.claude/` and `~/.claude/`), while `scripts/middleware-exec.mjs` resolves three —
+project, `$CLAUDE_CONFIG_DIR`, then legacy home. Under a custom config root, `/onboard` wrote a
+valid config to the profile root that the probe could never see: middleware reported `absent`
+forever, the conductor treated it as unavailable, and every subsequent `/onboard` re-offered it.
+The probe now uses the same candidate chain as the executor. Regression test pins both `HOME`
+and `CLAUDE_CONFIG_DIR` to scratch dirs and fails against the old code.
+
+### Serena memory exclusion is now unconditional
+
+The `.serena/project.yml` memory-tool exclusion was written only inside the "yes" branch of an
+install offer that fires only when Serena is `absent`. Anyone who installed Serena *before*
+onboarding — the common case — silently never got it, leaving Serena's own memory tools live
+alongside the four-layer superpowers memory that `skills/shared/conductor/serena.md` marks as a
+STRICT PROHIBITION. The exclusion is now an unconditional step that runs ahead of the offer,
+whatever Serena's detected status, and the offer no longer duplicates it.
+
+### Google/Gemini provider example
+
+`docs/superpowers/middleware-config.example.json` gains a `google` endpoint —
+`https://generativelanguage.googleapis.com/v1beta/openai/`, model `gemini-3.6-flash`, key env
+`GEMINI_API_KEY`. Verified against Google's own OpenAI-compatibility documentation; it needs no
+code change because it authenticates with `Authorization: Bearer`, which `middleware-exec`
+already sends. The unconfigured-error message also now names all three search paths instead of
+two.
+
 ## 7.3.0 — four-tier model routing with gated frontier
 
 Model-tier routing expands from three tiers to four: `mechanical` / `standard` / `advanced` /

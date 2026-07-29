@@ -103,7 +103,12 @@ function probe(cwd = process.cwd(), opts = {}) {
       declined: exists(path.join(cwd, '.superpowers-no-obsidian-cli')),
     },
     middleware: {
+      // Same candidate chain as scripts/middleware-exec.mjs resolveConfig():
+      // project -> active config root -> legacy home. Omitting the config-root
+      // candidate makes the probe blind to configs written under a custom
+      // CLAUDE_CONFIG_DIR, which is exactly where /onboard writes them.
       status: st([path.join(cwd, '.claude', 'middleware-config.json'),
+                  path.join(configDir(env), 'middleware-config.json'),
                   path.join(home, '.claude', 'middleware-config.json')].some(exists)),
       declined: exists(path.join(cwd, '.superpowers-no-middleware')),
     },

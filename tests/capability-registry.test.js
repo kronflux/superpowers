@@ -48,6 +48,17 @@ describe('capability-registry', () => {
     expect(probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).middleware.status).toBe(STATUS.CONFIGURED);
   });
 
+  it('detects middleware config in the profile config root (CLAUDE_CONFIG_DIR)', () => {
+    const prof = path.join(tmp, 'profile');
+    fs.mkdirSync(prof, { recursive: true });
+    fs.writeFileSync(path.join(prof, 'middleware-config.json'), '{}');
+    // home has no config: only the profile root carries it. middleware-exec
+    // resolves this path, so the probe must agree or onboarding writes a
+    // config the registry can never see.
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.middleware.status).toBe(STATUS.CONFIGURED);
+  });
+
   it('survives corrupt config json', () => {
     fs.writeFileSync(path.join(tmp, '.mcp.json'), '{not json');
     expect(() => probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } })).not.toThrow();
