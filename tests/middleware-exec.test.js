@@ -497,10 +497,16 @@ describe('runCli guards', () => {
     const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('sp-mw-'));
     const e = await runCli(d, '').then(() => null, (err) => err);
     expect(e?.exit).toBe(3);
-    // Give the OS a moment to release the handle and the close event to fire.
-    await new Promise((r) => setTimeout(r, 500));
-    const after = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('sp-mw-'));
-    expect(after.length).toBeLessThanOrEqual(before.length);
+    // Cleanup lands on the child's close event, which fires shortly AFTER the
+    // promise settles — measured at ~16ms. Poll rather than sleeping a fixed
+    // amount: this exits as soon as the directory is gone, so it costs nothing
+    // in the common case while removing the tail risk on a slow machine.
+    const countNow = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('sp-mw-')).length;
+    const deadline = Date.now() + 5000;
+    while (countNow() > before.length && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(countNow()).toBeLessThanOrEqual(before.length);
   }, 10000);
 });
 
