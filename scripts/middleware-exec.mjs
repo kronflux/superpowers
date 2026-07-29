@@ -3,9 +3,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { configDir } from '../hooks/lib/config-dir.js';
 
 const EXIT = { OK: 0, USAGE: 1, UNCONFIGURED: 2, ENDPOINT: 3 };
+
+// CSI sequences cover the colouring these CLIs emit; exotic escapes are out of scope.
+const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
+const stripAnsi = (s) => s.replace(ANSI_RE, '');
 
 const TEMPLATES = {
   'extract-log-error':
@@ -28,11 +33,46 @@ export function resolveConfig(cwd = process.cwd(), home = os.homedir(), env = pr
   return null;
 }
 
+export function cliDescriptor(ep, model, env = process.env) {
+  const bad = (msg) => Object.assign(new Error(msg), { exit: EXIT.UNCONFIGURED });
+  if (ep.preset && ep.command) throw bad('cli endpoint sets both "preset" and "command"; they are mutually exclusive');
+
+  let command;
+  let presetMode;
+  if (ep.preset) {
+    // Task 5 replaces this with the real PRESETS lookup.
+    throw bad(`unknown preset "${ep.preset}". Known: (none yet)`);
+  } else if (Array.isArray(ep.command) && ep.command.length > 0) {
+    command = ep.command;
+  } else {
+    throw bad('cli endpoint needs either "preset" or a non-empty "command" array');
+  }
+
+  const inputMode = ep.input_mode || presetMode || 'argv';
+  if (inputMode !== 'argv' && inputMode !== 'stdin') throw bad(`input_mode must be "argv" or "stdin", got "${inputMode}"`);
+
+  const hasPlaceholder = command.some((a) => typeof a === 'string' && a.includes('{{prompt}}'));
+  if (inputMode === 'stdin' && hasPlaceholder) throw bad('input_mode "stdin" but command contains a {{prompt}} placeholder — the prompt would be delivered twice');
+  if (inputMode === 'argv' && !hasPlaceholder) throw bad('input_mode "argv" but command has no {{prompt}} placeholder — the prompt would never reach the command');
+
+  return {
+    transport: 'cli',
+    command,
+    inputMode,
+    model,
+    timeoutMs: ep.timeout_ms ?? 120000,
+    maxArgvBytes: ep.max_argv_bytes ?? 30000,
+    cwd: ep.cwd ?? null,
+    env: { ...env, ...(ep.env || {}) },
+  };
+}
+
 export function endpointFor(cfg, env = process.env) {
   const ep = cfg.endpoints?.[cfg.active_provider];
   if (!ep) throw Object.assign(new Error(`active_provider "${cfg.active_provider}" not defined in endpoints`), { exit: EXIT.UNCONFIGURED });
   const transport = ep.transport || 'http';
   const model = cfg.active_model || ep.model;
+  if (transport === 'cli') return cliDescriptor(ep, model, env);
   if (transport !== 'http') {
     throw Object.assign(new Error(`unknown transport "${transport}" (expected "http" or "cli")`), { exit: EXIT.UNCONFIGURED });
   }
@@ -71,6 +111,38 @@ export async function runHttp(desc, prompt) {
   return (await res.json()).choices?.[0]?.message?.content ?? '';
 }
 
+export function runCli(desc, prompt) {
+  return new Promise((resolve, reject) => {
+    const [cmd, ...rest] = desc.command;
+    let args = rest;
+    if (desc.inputMode === 'argv') {
+      // Function replacer: a string replacement would let JavaScript interpret
+      // $&, $`, $', $1 inside the PROMPT and corrupt the command.
+      args = rest.map((a) => (typeof a === 'string' ? a.replace('{{prompt}}', () => prompt) : a));
+    }
+    const cwd = desc.cwd || fs.mkdtempSync(path.join(os.tmpdir(), 'sp-mw-'));
+    let timer;
+    let done = false;
+    const finish = (fn, v) => { if (!done) { done = true; clearTimeout(timer); fn(v); } };
+
+    const child = spawn(cmd, args, { shell: false, cwd, env: desc.env, stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('error', (e) => finish(reject, Object.assign(new Error(e.message), { exit: EXIT.ENDPOINT })));
+    child.on('close', (code) => {
+      if (code === 0) finish(resolve, stripAnsi(out).trim());
+      else finish(reject, Object.assign(new Error(`cli exited ${code}: ${err.trim().slice(-300)}`), { exit: EXIT.ENDPOINT }));
+    });
+
+    if (desc.inputMode === 'stdin') {
+      child.stdin.on('error', () => { /* EPIPE: child already closed stdin */ });
+      child.stdin.end(prompt);
+    }
+  });
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const die = (msg, code) => { console.error(`middleware-exec: ${msg}`); process.exit(code); };
@@ -81,7 +153,7 @@ async function main() {
   try {
     const desc = endpointFor(resolved.cfg);
     const prompt = renderTemplate(args.task, input, resolved.cfg);
-    const out = await runHttp(desc, prompt);
+    const out = desc.transport === 'cli' ? await runCli(desc, prompt) : await runHttp(desc, prompt);
     if (args.out && typeof args.out === 'string') fs.writeFileSync(args.out, out); else process.stdout.write(out);
   } catch (e) { die(e.message, e.exit ?? EXIT.ENDPOINT); }
 }

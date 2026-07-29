@@ -5,7 +5,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { resolveConfig, endpointFor, renderTemplate, runHttp } from '../scripts/middleware-exec.mjs';
+import { resolveConfig, endpointFor, renderTemplate, runHttp, cliDescriptor, runCli } from '../scripts/middleware-exec.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -354,5 +354,80 @@ describe('transport dispatch', () => {
     const cfg = { active_provider: 'p', endpoints: { p: { transport: 'carrier-pigeon', model: 'm' } } };
     try { endpointFor(cfg, {}); throw new Error('should have thrown'); }
     catch (e) { expect(e.exit).toBe(2); expect(e.message).toMatch(/carrier-pigeon/); }
+  });
+});
+
+// Fake CLIs built from the running Node binary: real spawn behavior, no
+// network, no model cost.
+const NODE = process.execPath;
+const echoStdin = ['-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(s))'];
+const echoArgv  = ['-e', 'process.stdout.write(process.argv[1]||"")'];
+
+const cliCfg = (ep) => ({ active_provider: 'c', endpoints: { c: { transport: 'cli', ...ep } } });
+
+// Spawning tests MUST pass a real environment. A child spawned with env {} has
+// no SystemRoot on Windows and can fail for reasons unrelated to the assertion.
+// Validation-only tests (which never spawn) may pass {}.
+const desc = (ep, env = process.env) => endpointFor(cliCfg(ep), env);
+
+describe('runCli delivery', () => {
+  it('returns child stdout for stdin delivery', async () => {
+    const d = desc({ command: [NODE, ...echoStdin], input_mode: 'stdin' });
+    expect(await runCli(d, 'hello middleware')).toBe('hello middleware');
+  });
+
+  it('substitutes {{prompt}} as a single argv element', async () => {
+    const d = desc({ command: [NODE, ...echoArgv, '{{prompt}}'], input_mode: 'argv' });
+    expect(await runCli(d, 'two words "quoted"')).toBe('two words "quoted"');
+  });
+
+  it('does not interpret $& or $` in the prompt (function replacer)', async () => {
+    const d = desc({ command: [NODE, ...echoArgv, '{{prompt}}'], input_mode: 'argv' });
+    const nasty = 'cost $& and $` and $1 and $\'';
+    expect(await runCli(d, nasty)).toBe(nasty);
+  });
+
+  it('strips ANSI escapes from stdout', async () => {
+    const ansi = ['-e', 'process.stdout.write("\\u001B[31mred\\u001B[0m")'];
+    const d = desc({ command: [NODE, ...ansi], input_mode: 'stdin' });
+    expect(await runCli(d, '')).toBe('red');
+  });
+
+  it('runs in a temp cwd, not the project', async () => {
+    const probe = ['-e', 'process.stdout.write(process.cwd())'];
+    const d = desc({ command: [NODE, ...probe], input_mode: 'stdin' });
+    const out = await runCli(d, '');
+    expect(fs.realpathSync(out)).not.toBe(fs.realpathSync(process.cwd()));
+    expect(fs.existsSync(out)).toBe(true);
+  });
+
+  it('honors an explicit cwd override', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-cwd-'));
+    const probe = ['-e', 'process.stdout.write(process.cwd())'];
+    const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', cwd: dir });
+    expect(fs.realpathSync(await runCli(d, ''))).toBe(fs.realpathSync(dir));
+  });
+
+  it('merges env over the parent instead of replacing it', async () => {
+    const probe = ['-e', 'process.stdout.write((process.env.MW_TEST||"")+"|"+(process.env.PATH?"has-path":"no-path"))'];
+    const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', env: { MW_TEST: 'v' } });
+    expect(await runCli(d, '')).toBe('v|has-path');
+  });
+});
+
+describe('cli config validation', () => {
+  const boom = (ep) => { try { endpointFor(cliCfg(ep), {}); return null; } catch (e) { return e; } };
+
+  it('rejects preset and command together', () => {
+    expect(boom({ preset: 'agy', command: ['x', '{{prompt}}'] })?.exit).toBe(2);
+  });
+  it('rejects neither preset nor command', () => {
+    expect(boom({})?.exit).toBe(2);
+  });
+  it('rejects stdin mode with a {{prompt}} placeholder', () => {
+    expect(boom({ command: ['x', '{{prompt}}'], input_mode: 'stdin' })?.exit).toBe(2);
+  });
+  it('rejects argv mode without a {{prompt}} placeholder', () => {
+    expect(boom({ command: ['x'], input_mode: 'argv' })?.exit).toBe(2);
   });
 });
