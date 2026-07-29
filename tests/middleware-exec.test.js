@@ -566,4 +566,10 @@ describe('cli presets', () => {
     try { p({ preset: 'nope' }); throw new Error('should have thrown'); }
     catch (e) { expect(e.exit).toBe(2); expect(e.message).toMatch(/agy/); }
   });
+
+  it('places the opencode model flag after the run subcommand', () => {
+    const d = p({ preset: 'opencode', model: 'X' });
+    expect(d.command.indexOf('run')).toBeLessThan(d.command.indexOf('-m'));
+    expect(d.command).toEqual(['opencode', 'run', '-m', 'X']);
+  });
 });

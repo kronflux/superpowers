@@ -21,7 +21,9 @@ export const PRESETS = {
   // stdin NOT usable: `agy -p` with no value fails flag parsing before any model call.
   agy:      { base: ['agy'],      modelFlag: '--model', argvArgs: ['-p', '{{prompt}}'],  stdinArgs: ['-p'],  input_mode: 'argv' },
   // stdin verified working: prompt piped, no positional argument, exit 0.
-  opencode: { base: ['opencode'], modelFlag: '-m',      argvArgs: ['run', '{{prompt}}'], stdinArgs: ['run'], input_mode: 'stdin' },
+  // -m/--model is an option of the `run` subcommand, not global, so `run` moves
+  // into base to keep the flag positioned after it.
+  opencode: { base: ['opencode', 'run'], modelFlag: '-m', argvArgs: ['{{prompt}}'], stdinArgs: [], input_mode: 'stdin' },
   claude:   { base: ['claude'],   modelFlag: '--model', argvArgs: ['-p', '{{prompt}}'],  stdinArgs: ['-p'],  input_mode: 'stdin' },
 };
 
