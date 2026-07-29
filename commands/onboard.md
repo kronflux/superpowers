@@ -18,7 +18,7 @@ All config-file paths below are relative to the current project root. Hook regis
 
 ## Feature 1: Subagent Model Routing
 
-One-line intro for the user before asking: plan execution dispatches an implementer plus reviewers per task, and by default they all inherit the session model — on a frontier-priced session that multiplies the most expensive model across tasks that are, by design, often mechanical. Full semantics: `docs/model-routing-flow.md`.
+One-line intro for the user before asking: plan execution dispatches an implementer plus reviewers per task, and by default they all inherit the session model — on a top-priced session that multiplies the most expensive model across tasks that are, by design, often mechanical. Full semantics: `docs/model-routing-flow.md`.
 
 ```yaml
 AskUserQuestion:
