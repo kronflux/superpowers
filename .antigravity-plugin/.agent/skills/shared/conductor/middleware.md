@@ -37,10 +37,78 @@ internals either way. context-mode inactive: pipe the source file directly into 
 | Symbol-precise refactors | primary agent + [serena.md](serena.md) adapter |
 | Spec / quality-gate review | primary agent — NEVER middleware |
 
+## Transports
+
+`transport` defaults to `"http"` (existing OpenAI-compatible request), so every existing
+config is unaffected. `transport: "cli"` spawns a local CLI binary instead:
+
+```json
+{
+  "transport": "cli",
+  "preset": "agy",              // XOR with "command"
+  "command": ["my-cli", "--prompt", "{{prompt}}"],
+  "model": "gemini-3-pro",       // optional; cfg.active_model wins
+  "input_mode": "argv",          // or "stdin"; overrides preset default
+  "timeout_ms": 120000,          // default 120000
+  "max_argv_bytes": 30000,       // default 30000, argv only
+  "cwd": "C:/some/dir",          // default: temp dir, removed after run
+  "env": { "VAR": "value" }      // merged OVER parent environment
+}
+```
+
+`preset` xor `command`. Verified presets:
+
+| preset | no model | with model `X` | default `input_mode` |
+|---|---|---|---|
+| `agy` | `["agy","-p","{{prompt}}"]` | `["agy","--model","X","-p","{{prompt}}"]` | `argv` |
+| `opencode` | `["opencode","run"]` | `["opencode","run","-m","X"]` | `stdin` |
+| `claude` | `["claude","-p"]` | `["claude","--model","X","-p"]` | `stdin` |
+
+`input_mode` overrides the preset default: `argv` needs `{{prompt}}` in `command`; `stdin`
+must not contain it.
+
+**CLI providers are agentic.** `agy`, `opencode`, and `claude` are not text filters — they carry
+file-edit and shell tools. A middleware call that means "summarize this log" invokes an agent
+that may decide to act. Every CLI run therefore spawns in a fresh temporary directory, which is
+removed when the run ends, so anything it writes lands in a throwaway location rather than your
+project. Override `cwd` only when you understand that consequence.
+
+**`claude` as its own middleware.** Configuring the `claude` preset means a Claude session
+spawning Claude sessions. It works, and a second profile via `env.CLAUDE_CONFIG_DIR` keeps the
+two separate — but the cost is Claude-tier per call, which is the opposite of what offloading
+mechanical work is for. Prefer a cheaper provider unless you specifically want it.
+
+**The prompt is not shielded from the target CLI's argument parser.** In `argv` mode the
+rendered prompt is inserted as a plain argument, so a prompt beginning with `-` may be read as a
+flag by the CLI you are calling. This is not shell injection — commands are spawned with no
+shell, as an argument array, so nothing in a prompt can start a subprocess or chain a command.
+But if you hand-author a `command` that places `{{prompt}}` as a bare positional, that CLI's own
+parser decides what a leading dash means. The shipped presets avoid the worst of this: only
+`agy` uses `argv`, and there the prompt is the value of `-p` rather than a bare positional.
+
+**`agy` has a hard size ceiling.** Argv-only (stdin fails parsing), so oversized prompts return
+exit 3. `opencode`/`claude` use stdin — no ceiling.
+
+**`env` can override `PATH`.** Merge is `{...parentEnv, ...endpoint.env}`, so it can replace
+`PATH` — deliberate (enables a second Claude Code profile via `CLAUDE_CONFIG_DIR`), and adds no
+capability: editing `middleware-config.json` can already name any binary in `command`.
+
 ## Exit codes
 
 `0` ok — result on stdout or written to `--out`. `1` usage error — missing/unknown `--task`.
-`2` unconfigured — no config file found, `active_provider` undefined, or a remote endpoint's
-API key env var is unset (localhost/127.0.0.1/::1 endpoints may omit the key). `3` endpoint
-failure — non-2xx HTTP response. `2` and `3` both fall through to the next link in the
-Fallback policy chain; never surfaced as a hard error to the user.
+
+`http`: `2` unconfigured — no config found, `active_provider` undefined, or API key env var
+unset (localhost/127.0.0.1/::1 may omit it). `3` endpoint failure — non-2xx response.
+
+`cli`:
+
+| condition | exit |
+|---|---|
+| unknown preset; `preset`+`command` both/neither set; non-string `command` element; bad `input_mode`; `{{prompt}}` present under stdin/missing under argv | 2 |
+| spawn ENOENT (binary not found) | 2 |
+| rendered prompt over `max_argv_bytes` in argv mode | 3 |
+| timeout | 3 |
+| non-zero child exit (message carries the stderr tail) | 3 |
+
+`2` and `3` both fall through to the next link in the Fallback policy chain; never surfaced as
+a hard error to the user.
