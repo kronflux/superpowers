@@ -47,7 +47,7 @@ config is unaffected. `transport: "cli"` spawns a local CLI binary instead:
   "transport": "cli",
   "preset": "agy",              // XOR with "command"
   "command": ["my-cli", "--prompt", "{{prompt}}"],
-  "model": "gemini-3-pro",       // optional; cfg.active_model wins
+  "model": "gemini-3-pro",       // preset only, ignored on "command"; cfg.active_model wins
   "input_mode": "argv",          // or "stdin"; overrides preset default
   "timeout_ms": 120000,          // default 120000
   "max_argv_bytes": 30000,       // default 30000, argv only
