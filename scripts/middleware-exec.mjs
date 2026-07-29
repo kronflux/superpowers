@@ -51,6 +51,10 @@ export function cliDescriptor(ep, model, env = process.env) {
   const inputMode = ep.input_mode || presetMode || 'argv';
   if (inputMode !== 'argv' && inputMode !== 'stdin') throw bad(`input_mode must be "argv" or "stdin", got "${inputMode}"`);
 
+  if (command.some((a) => typeof a !== 'string')) {
+    throw bad('every "command" element must be a string — a non-string first element throws, and a later one is silently dropped from the child\'s arguments');
+  }
+
   const hasPlaceholder = command.some((a) => typeof a === 'string' && a.includes('{{prompt}}'));
   if (inputMode === 'stdin' && hasPlaceholder) throw bad('input_mode "stdin" but command contains a {{prompt}} placeholder — the prompt would be delivered twice');
   if (inputMode === 'argv' && !hasPlaceholder) throw bad('input_mode "argv" but command has no {{prompt}} placeholder — the prompt would never reach the command');
@@ -116,21 +120,42 @@ export function runCli(desc, prompt) {
     const [cmd, ...rest] = desc.command;
     let args = rest;
     if (desc.inputMode === 'argv') {
+      const bytes = Buffer.byteLength(prompt, 'utf8');
+      if (bytes > desc.maxArgvBytes) {
+        return reject(Object.assign(new Error(
+          `rendered prompt is ${bytes} bytes, over the ${desc.maxArgvBytes}-byte argv limit for this endpoint. `
+          + 'Set "input_mode": "stdin" on this endpoint, or raise "max_argv_bytes".'), { exit: EXIT.ENDPOINT }));
+      }
       // Function replacer: a string replacement would let JavaScript interpret
       // $&, $`, $', $1 inside the PROMPT and corrupt the command.
       args = rest.map((a) => (typeof a === 'string' ? a.replace('{{prompt}}', () => prompt) : a));
     }
-    const cwd = desc.cwd || fs.mkdtempSync(path.join(os.tmpdir(), 'sp-mw-'));
+    const ownedTemp = desc.cwd ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'sp-mw-'));
+    const cwd = desc.cwd || ownedTemp;
     let timer;
     let done = false;
-    const finish = (fn, v) => { if (!done) { done = true; clearTimeout(timer); fn(v); } };
+    const finish = (fn, v) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (ownedTemp) { try { fs.rmSync(ownedTemp, { recursive: true, force: true }); } catch { /* best effort */ } }
+      fn(v);
+    };
 
     const child = spawn(cmd, args, { shell: false, cwd, env: desc.env, stdio: ['pipe', 'pipe', 'pipe'] });
+    timer = setTimeout(() => {
+      child.kill();
+      finish(reject, Object.assign(new Error(`cli endpoint timed out after ${desc.timeoutMs}ms`), { exit: EXIT.ENDPOINT }));
+    }, desc.timeoutMs);
     let out = '';
     let err = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
-    child.on('error', (e) => finish(reject, Object.assign(new Error(e.message), { exit: EXIT.ENDPOINT })));
+    child.on('error', (e) => finish(reject, Object.assign(
+      new Error(e.code === 'ENOENT'
+        ? `cli command "${cmd}" not found. On Windows a .cmd/.bat shim cannot be spawned without a shell — put its absolute path in "command".`
+        : e.message),
+      { exit: e.code === 'ENOENT' ? EXIT.UNCONFIGURED : EXIT.ENDPOINT })));
     child.on('close', (code) => {
       if (code === 0) finish(resolve, stripAnsi(out).trim());
       else finish(reject, Object.assign(new Error(`cli exited ${code}: ${err.trim().slice(-300)}`), { exit: EXIT.ENDPOINT }));

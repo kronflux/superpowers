@@ -397,8 +397,7 @@ describe('runCli delivery', () => {
     const probe = ['-e', 'process.stdout.write(process.cwd())'];
     const d = desc({ command: [NODE, ...probe], input_mode: 'stdin' });
     const out = await runCli(d, '');
-    expect(fs.realpathSync(out)).not.toBe(fs.realpathSync(process.cwd()));
-    expect(fs.existsSync(out)).toBe(true);
+    expect(path.resolve(out)).not.toBe(path.resolve(process.cwd()));
   });
 
   it('honors an explicit cwd override', async () => {
@@ -412,6 +411,84 @@ describe('runCli delivery', () => {
     const probe = ['-e', 'process.stdout.write((process.env.MW_TEST||"")+"|"+(process.env.PATH?"has-path":"no-path"))'];
     const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', env: { MW_TEST: 'v' } });
     expect(await runCli(d, '')).toBe('v|has-path');
+  });
+});
+
+describe('runCli guards', () => {
+  it('rejects oversized argv with exit 3 and a stdin suggestion', async () => {
+    const d = desc({
+      command: [NODE, '-e', 'process.stdout.write("x")', '{{prompt}}'],
+      input_mode: 'argv', max_argv_bytes: 100,
+    });
+    const e = await runCli(d, 'y'.repeat(101)).then(() => null, (err) => err);
+    expect(e).toBeTruthy();
+    expect(e.exit).toBe(3);
+    expect(e.message).toMatch(/101/);
+    expect(e.message).toMatch(/stdin/);
+  });
+
+  it('does not size-check stdin mode', async () => {
+    const d = desc({
+      command: [NODE, '-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(s.length)))'],
+      input_mode: 'stdin', max_argv_bytes: 10,
+    });
+    expect(await runCli(d, 'z'.repeat(5000))).toBe('5000');
+  });
+
+  it('kills a child that outlives timeout_ms (exit 3)', async () => {
+    const d = desc({
+      command: [NODE, '-e', 'setTimeout(()=>{},60000)'],
+      input_mode: 'stdin', timeout_ms: 300,
+    });
+    const e = await runCli(d, '').then(() => null, (err) => err);
+    expect(e?.exit).toBe(3);
+    expect(e.message).toMatch(/timed out/);
+  }, 10000);
+
+  it('times out even when the child never reads stdin', async () => {
+    // 200KB overflows the ~64KB pipe buffer. If the timer were armed after the
+    // stdin write, this would hang forever instead of rejecting.
+    const d = desc({
+      command: [NODE, '-e', 'process.stdin.pause();setTimeout(()=>{},60000)'],
+      input_mode: 'stdin', timeout_ms: 300,
+    });
+    const e = await runCli(d, 'q'.repeat(200000)).then(() => null, (err) => err);
+    expect(e?.exit).toBe(3);
+  }, 10000);
+
+  it('maps ENOENT to exit 2 with the Windows shim hint', async () => {
+    const d = desc({ command: ['definitely-not-a-real-binary-xyz'], input_mode: 'stdin' });
+    const e = await runCli(d, '').then(() => null, (err) => err);
+    expect(e?.exit).toBe(2);
+    expect(e.message).toMatch(/\.cmd/);
+  });
+
+  it('maps a non-zero child exit to exit 3 with stderr tail', async () => {
+    const d = desc({
+      command: [NODE, '-e', 'process.stderr.write("boom detail");process.exit(4)'],
+      input_mode: 'stdin',
+    });
+    const e = await runCli(d, '').then(() => null, (err) => err);
+    expect(e?.exit).toBe(3);
+    expect(e.message).toMatch(/boom detail/);
+  });
+
+  it('rejects a command containing a non-string element with exit 2', () => {
+    const boom = (ep) => { try { endpointFor(cliCfg(ep), {}); return null; } catch (e) { return e; } };
+    expect(boom({ command: [123, '{{prompt}}'], input_mode: 'argv' })?.exit).toBe(2);
+    expect(boom({ command: ['ok', 42, '{{prompt}}'], input_mode: 'argv' })?.exit).toBe(2);
+  });
+
+  it('removes a temp cwd it created, but never a configured one', async () => {
+    const probe = ['-e', 'process.stdout.write(process.cwd())'];
+    const auto = desc({ command: [NODE, ...probe], input_mode: 'stdin' });
+    const tempUsed = await runCli(auto, '');
+    expect(fs.existsSync(tempUsed)).toBe(false);
+
+    const mine = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-keep-'));
+    const explicit = desc({ command: [NODE, ...probe], input_mode: 'stdin', cwd: mine });
+    await runCli(explicit, '');
+    expect(fs.existsSync(mine)).toBe(true);
   });
 });
 
