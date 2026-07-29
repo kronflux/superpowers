@@ -490,6 +490,18 @@ describe('runCli guards', () => {
     await runCli(explicit, '');
     expect(fs.existsSync(mine)).toBe(true);
   });
+
+  it('removes the temp cwd even when the run times out', async () => {
+    const probe = ['-e', 'process.stdout.write(process.cwd());setTimeout(()=>{},60000)'];
+    const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', timeout_ms: 300 });
+    const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('sp-mw-'));
+    const e = await runCli(d, '').then(() => null, (err) => err);
+    expect(e?.exit).toBe(3);
+    // Give the OS a moment to release the handle and the close event to fire.
+    await new Promise((r) => setTimeout(r, 500));
+    const after = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('sp-mw-'));
+    expect(after.length).toBeLessThanOrEqual(before.length);
+  }, 10000);
 });
 
 describe('cli config validation', () => {
@@ -506,6 +518,26 @@ describe('cli config validation', () => {
   });
   it('rejects argv mode without a {{prompt}} placeholder', () => {
     expect(boom({ command: ['x'], input_mode: 'argv' })?.exit).toBe(2);
+  });
+
+  it('rejects a non-numeric max_argv_bytes', () => {
+    expect(boom({ command: ['x', '{{prompt}}'], input_mode: 'argv', max_argv_bytes: 'lots' })?.exit).toBe(2);
+  });
+  it('rejects a zero or negative timeout_ms', () => {
+    expect(boom({ command: ['x'], input_mode: 'stdin', timeout_ms: 0 })?.exit).toBe(2);
+    expect(boom({ command: ['x'], input_mode: 'stdin', timeout_ms: -5 })?.exit).toBe(2);
+  });
+  it('defaults timeout_ms and max_argv_bytes when omitted', () => {
+    const d = endpointFor(cliCfg({ command: ['x'], input_mode: 'stdin' }), {});
+    expect(d.timeoutMs).toBe(120000);
+    expect(d.maxArgvBytes).toBe(30000);
+  });
+
+  it('rejects a non-string cwd', () => {
+    expect(boom({ command: ['x'], input_mode: 'stdin', cwd: 5 })?.exit).toBe(2);
+  });
+  it('rejects an empty-string cwd', () => {
+    expect(boom({ command: ['x'], input_mode: 'stdin', cwd: '' })?.exit).toBe(2);
   });
 });
 

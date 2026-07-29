@@ -80,13 +80,25 @@ export function cliDescriptor(ep, model, env = process.env) {
   if (inputMode === 'stdin' && hasPlaceholder) throw bad('input_mode "stdin" but command contains a {{prompt}} placeholder — the prompt would be delivered twice');
   if (inputMode === 'argv' && !hasPlaceholder) throw bad('input_mode "argv" but command has no {{prompt}} placeholder — the prompt would never reach the command');
 
+  const num = (v, dflt, name) => {
+    if (v === undefined || v === null) return dflt;
+    if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) {
+      throw bad(`"${name}" must be a positive number, got ${JSON.stringify(v)}`);
+    }
+    return v;
+  };
+
+  if (ep.cwd !== undefined && ep.cwd !== null && (typeof ep.cwd !== 'string' || ep.cwd === '')) {
+    throw bad('"cwd" must be a non-empty string when set');
+  }
+
   return {
     transport: 'cli',
     command,
     inputMode,
     model,
-    timeoutMs: ep.timeout_ms ?? 120000,
-    maxArgvBytes: ep.max_argv_bytes ?? 30000,
+    timeoutMs: num(ep.timeout_ms, 120000, 'timeout_ms'),
+    maxArgvBytes: num(ep.max_argv_bytes, 30000, 'max_argv_bytes'),
     cwd: ep.cwd ?? null,
     env: { ...env, ...(ep.env || {}) },
   };
@@ -155,11 +167,14 @@ export function runCli(desc, prompt) {
     const cwd = desc.cwd || ownedTemp;
     let timer;
     let done = false;
+    const cleanupTemp = () => {
+      if (!ownedTemp) return;
+      try { fs.rmSync(ownedTemp, { recursive: true, force: true }); } catch { /* retried on close */ }
+    };
     const finish = (fn, v) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
-      if (ownedTemp) { try { fs.rmSync(ownedTemp, { recursive: true, force: true }); } catch { /* best effort */ } }
       fn(v);
     };
 
@@ -172,19 +187,26 @@ export function runCli(desc, prompt) {
     let err = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
-    child.on('error', (e) => finish(reject, Object.assign(
-      new Error(e.code === 'ENOENT'
-        ? `cli command "${cmd}" not found. On Windows a .cmd/.bat shim cannot be spawned without a shell — put its absolute path in "command".`
-        : e.message),
-      { exit: e.code === 'ENOENT' ? EXIT.UNCONFIGURED : EXIT.ENDPOINT })));
+    child.on('error', (e) => {
+      finish(reject, Object.assign(
+        new Error(e.code === 'ENOENT'
+          ? `cli command "${cmd}" not found, or its "cwd" does not exist. On Windows a .cmd/.bat shim cannot be spawned without a shell — put its absolute path in "command".`
+          : e.message),
+        { exit: e.code === 'ENOENT' ? EXIT.UNCONFIGURED : EXIT.ENDPOINT }));
+      cleanupTemp();
+    });
     child.on('close', (code) => {
       if (code === 0) finish(resolve, stripAnsi(out).trim());
       else finish(reject, Object.assign(new Error(`cli exited ${code}: ${err.trim().slice(-300)}`), { exit: EXIT.ENDPOINT }));
+      cleanupTemp();
     });
 
     if (desc.inputMode === 'stdin') {
       child.stdin.on('error', () => { /* EPIPE: child already closed stdin */ });
       child.stdin.end(prompt);
+    } else {
+      child.stdin.on('error', () => { /* EPIPE: child already closed stdin */ });
+      child.stdin.end();
     }
   });
 }
