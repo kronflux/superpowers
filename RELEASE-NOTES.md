@@ -1,5 +1,25 @@
 # Superpowers Release Notes
 
+## 7.5.0 — routing reliability, path consolidation, visibility, and token usage
+
+Four improvements across dispatch routing, project paths, conductor visibility, and usage tracking.
+
+### Chronological dispatch-gate scanner
+
+A task's description now resolves to the latest transcript event, fixing frontier-consent fences shadowed by stale TaskUpdate descriptions on reused task ids. New consent-fence mechanics section in `docs/model-routing-flow.md`.
+
+### .superpowers is the canonical project config dir
+
+`model-routing.json` and `workflow.json` resolve `.superpowers/` first; legacy `docs/superpowers/` stays readable with a logged notice and a session-start migration offer. User-level paths unchanged. `/onboard` writes canonical paths and checks `.superpowers/` is gitignored first.
+
+### Conductor visibility
+
+`[middleware]` start/done stderr banners with duration and usage; `[conductor]` delegation announcements mandated in the conductor contract; every routed dispatch decision recorded in `hooks-logs/routing-dispatch.log`.
+
+### Token usage reporting
+
+Middleware HTTP requests log exact prompt/completion tokens (CLI transports log byte sizes) to `hooks-logs/middleware-usage.jsonl`; a new Stop hook aggregates the session's own transcript usage into `session-stats.json` and `hooks-logs/claude-usage.jsonl`; `/superpowers:usage` renders the report.
+
 ## 7.4.0 — middleware CLI transport
 
 `middleware-exec` gains a second transport: local CLI agents (`agy`, `opencode`, `claude`) are
