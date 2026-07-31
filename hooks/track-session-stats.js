@@ -48,6 +48,7 @@ function createFreshStats() {
     hookBlocks: 0,
     filesEdited: 0,
     verificationsRun: 0,
+    tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
   };
 }
 

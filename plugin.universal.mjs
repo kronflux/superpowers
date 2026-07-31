@@ -91,6 +91,11 @@ export default {
       platforms: ['claude-code', 'codex'],
     },
     {
+      event: 'Stop',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/usage-aggregator.js"',
+      platforms: ['claude-code'],
+    },
+    {
       event: 'SubagentStop',
       command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-guard.js"',
       platforms: ['claude-code'],
