@@ -1,5 +1,5 @@
 ---
-description: "Show this session's token usage: cumulative Claude-side totals (transcript-derived estimate) plus recent middleware per-request usage. Reads hooks-logs; writes nothing."
+description: "Show token usage for this config root (cumulative across sessions sharing it): Claude-side totals (transcript-derived estimate) plus recent middleware per-request usage. Reads hooks-logs; writes nothing."
 ---
 
 # Token Usage Report
@@ -9,9 +9,12 @@ sources live under it; each may be absent — report "no data yet" for a missing
 continue with the rest. Read them in a single script or `ctx_execute` run rather than dumping
 raw file contents into context.
 
-1. **Session totals** — `hooks-logs/session-stats.json`, key `tokens`
+1. **Config-root totals** — `hooks-logs/session-stats.json`, key `tokens`
    (`{input, output, cacheRead, cacheCreation}`). Cumulative for the current stats window,
-   which resets when the stats file ages out.
+   which resets when the stats file ages out. This file lives under the config root, not per
+   session: concurrent sessions or projects sharing the same config root fold their deltas into
+   the same totals. For a genuinely session-scoped number, filter
+   `hooks-logs/claude-usage.jsonl` by `sessionId` instead and sum its records.
 2. **Per-turn Claude usage** — `hooks-logs/claude-usage.jsonl`, last 10 records.
 3. **Middleware per-request usage** — `hooks-logs/middleware-usage.jsonl`, last 10 records.
    `promptTokens`/`completionTokens` are exact for `http` endpoints; `cli` endpoints report
