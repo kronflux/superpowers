@@ -6,6 +6,7 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolveConfig, endpointFor, renderTemplate, runHttp, cliDescriptor, runCli, PRESETS } from '../scripts/middleware-exec.mjs';
+import { configDir } from '../hooks/lib/config-dir.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -284,8 +285,11 @@ describe('middleware-exec CLI end-to-end', () => {
   });
 
   it('exits 2 when no config exists in project or home', async () => {
-    const homeConfigPath = path.join(os.homedir(), '.claude', 'middleware-config.json');
-    if (fs.existsSync(homeConfigPath)) {
+    const candidates = [
+      path.join(configDir(process.env), 'middleware-config.json'),
+      path.join(os.homedir(), '.claude', 'middleware-config.json'),
+    ];
+    if (candidates.some((p) => fs.existsSync(p))) {
       // Not hermetic on this machine — skip rather than assert against a config we don't control.
       return;
     }
