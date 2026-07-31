@@ -1,8 +1,10 @@
 /**
  * Shared loader for the opt-in model-routing config.
  *
- * Routing activates only when docs/superpowers/model-routing.json exists in
- * the project, or a superpowers/model-routing.json exists under the active
+ * Routing activates when a config exists at, in order: the canonical
+ * .superpowers/model-routing.json (project), the legacy
+ * docs/superpowers/model-routing.json (project, read-supported with a
+ * migration notice), or a superpowers/model-routing.json under the active
  * config dir (CLAUDE_CONFIG_DIR, or ~/.claude as legacy fallback). Absent
  * config, kill switch, or malformed/invalid JSON all return null — callers
  * treat null as "routing dormant, allow everything".
@@ -91,11 +93,13 @@ export function routingSource() {
   return lastSource;
 }
 
-function logSource(p, env, note) {
+function logSource(p, env, note, notice) {
   try {
     const logDir = path.join(configDir(env), 'hooks-logs');
     fs.mkdirSync(logDir, { recursive: true });
-    const line = note ? `routing-config: rejected ${p} - ${note}\n` : `routing-config: using ${p}\n`;
+    const line = notice ? `routing-config: ${notice}\n`
+      : note ? `routing-config: rejected ${p} - ${note}\n`
+      : `routing-config: using ${p}\n`;
     fs.appendFileSync(path.join(logDir, 'routing-config.log'), line);
   } catch {
     // Logging is best-effort; never let it break routing resolution.
@@ -105,8 +109,12 @@ function logSource(p, env, note) {
 export function loadRouting(cwd, env = process.env) {
   lastSource = null;
   if (env.SUPERPOWERS_ROUTING_GUARD === '0') return null;
+  const projectRoot = cwd || process.cwd();
+  const canonical = path.join(projectRoot, '.superpowers', 'model-routing.json');
+  const legacyProject = path.join(projectRoot, 'docs', 'superpowers', 'model-routing.json');
   const candidates = [
-    path.join(cwd || process.cwd(), 'docs', 'superpowers', 'model-routing.json'),
+    canonical,
+    legacyProject, // legacy project location: read-supported, migration offered
     ...userCandidates(['superpowers', 'model-routing.json'], env),
   ];
   for (const p of candidates) {
@@ -116,6 +124,11 @@ export function loadRouting(cwd, env = process.env) {
       if (routing) {
         lastSource = p;
         logSource(p, env);
+        if (p === legacyProject) {
+          logSource(p, env, null, 'legacy project path in use - migrate docs/superpowers/model-routing.json to .superpowers/model-routing.json');
+        } else if (p === canonical && fs.existsSync(legacyProject)) {
+          logSource(p, env, null, 'both .superpowers/ and docs/superpowers/ configs exist; canonical .superpowers/ wins - migrate or delete the legacy file');
+        }
         return routing;
       }
       logSource(p, env, reason);

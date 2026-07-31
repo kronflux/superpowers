@@ -29,11 +29,11 @@ const ROUTING = { mechanical: 'haiku', standard: 'sonnet', frontier: 'inherit' }
 // before returning it, so behavior assertions compare against this shape.
 const NORMALIZED_ROUTING = { mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off', schema: 1 };
 
-function makeProject(config) {
+function makeProject(config, { legacy = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-proj-'));
   tmpDirs.push(dir);
   if (config !== undefined) {
-    const cfgDir = path.join(dir, 'docs', 'superpowers');
+    const cfgDir = legacy ? path.join(dir, 'docs', 'superpowers') : path.join(dir, '.superpowers');
     fs.mkdirSync(cfgDir, { recursive: true });
     const body = typeof config === 'string' ? config : JSON.stringify(config);
     fs.writeFileSync(path.join(cfgDir, 'model-routing.json'), body);
@@ -242,7 +242,7 @@ describe('loadRouting profile-scoped candidate', () => {
     expect(result.routing).toEqual({
       mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off', schema: 1,
     });
-    expect(result.source).toBe(path.join(cwd, 'docs', 'superpowers', 'model-routing.json'));
+    expect(result.source).toBe(path.join(cwd, '.superpowers', 'model-routing.json'));
   });
 
   it('unset CLAUDE_CONFIG_DIR: legacy home fallback behaves as in v7.1.0', () => {
@@ -279,9 +279,32 @@ describe('loadRouting profile-scoped candidate', () => {
       CLAUDE_CONFIG_DIR: emptyProfile,
     });
     expect(hit.routing).toEqual(NORMALIZED_ROUTING);
-    expect(hit.source).toBe(path.join(hitCwd, 'docs', 'superpowers', 'model-routing.json'));
+    expect(hit.source).toBe(path.join(hitCwd, '.superpowers', 'model-routing.json'));
     expect(miss.routing).toBeNull();
     expect(miss.source).toBeNull();
+  });
+});
+
+describe('project candidate chain (.superpowers canonical, docs/superpowers legacy)', () => {
+  it('canonical .superpowers/ wins over legacy docs/superpowers/', () => {
+    const dir = makeProject({ ...ROUTING, mechanical: 'canonical-model' });
+    fs.mkdirSync(path.join(dir, 'docs', 'superpowers'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'docs', 'superpowers', 'model-routing.json'),
+      JSON.stringify({ ...ROUTING, mechanical: 'legacy-model' }));
+    const { routing, source } = loadRoutingProbe(dir);
+    expect(routing.mechanical).toBe('canonical-model');
+    expect(source).toBe(path.join(dir, '.superpowers', 'model-routing.json'));
+    const log = fs.readFileSync(path.join(tmpHome, '.claude', 'hooks-logs', 'routing-config.log'), 'utf8');
+    expect(log).toMatch(/both .* exist/);
+  });
+
+  it('legacy docs/superpowers/ alone still activates, with a migration log line', () => {
+    const dir = makeProject(ROUTING, { legacy: true });
+    const { routing, source } = loadRoutingProbe(dir);
+    expect(routing).toEqual(NORMALIZED_ROUTING);
+    expect(source).toBe(path.join(dir, 'docs', 'superpowers', 'model-routing.json'));
+    const log = fs.readFileSync(path.join(tmpHome, '.claude', 'hooks-logs', 'routing-config.log'), 'utf8');
+    expect(log).toMatch(/legacy project path in use/);
   });
 });
 
