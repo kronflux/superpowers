@@ -20,7 +20,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadRouting, fenceMeta, TIERS } from './lib/routing-config.js';
+import { loadRouting, fenceMeta, TIERS, routingSource } from './lib/routing-config.js';
 import { configDir } from './lib/config-dir.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
@@ -136,12 +136,13 @@ export function checkTaskCreate(toolInput, routing) {
   const problem = meta.modelTier === undefined || meta.modelTier === ''
     ? 'has none'
     : `has invalid value '${meta.modelTier}'`;
+  const configPath = routingSource() || '.superpowers/model-routing.json';
   return {
     blocked: true,
     reason: [
       'PLAN TASK MISSING MODEL TIER',
       '',
-      'This project has opted in to subagent model routing (.superpowers/model-routing.json),',
+      `This project has opted in to subagent model routing (${configPath}),`,
       `so every plan task's json:metadata fence MUST carry a "modelTier". The TaskCreate for`,
       `'${subject}' ${problem}.`,
       '',

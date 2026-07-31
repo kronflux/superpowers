@@ -44,7 +44,7 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 import { fileURLToPath } from 'url';
-import { loadRouting, fenceMeta } from './lib/routing-config.js';
+import { loadRouting, fenceMeta, routingSource } from './lib/routing-config.js';
 import { configDir } from './lib/config-dir.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
@@ -280,6 +280,7 @@ export function checkDispatch(routing, tasks, inProgress, dispatchModel, consent
   }
 
   const taskLines = constrainedBy.map((t) => `  - Task #${t.id} ('${t.subject}') -> ${t.tier}`);
+  const configPath = routingSource() || '.superpowers/model-routing.json';
   return {
     blocked: true,
     allowed,
@@ -288,7 +289,7 @@ export function checkDispatch(routing, tasks, inProgress, dispatchModel, consent
       'AGENT DISPATCH DOES NOT MATCH TASK MODEL TIER',
       '',
       `Your Agent call passed model='${dispatchModel}', but the in-progress task(s) constrain`,
-      `dispatches to: ${allowed.join(', ')} (per .superpowers/model-routing.json).`,
+      `dispatches to: ${allowed.join(', ')} (per ${configPath}).`,
       '',
       'Constraining in-progress task(s):',
       ...taskLines,
