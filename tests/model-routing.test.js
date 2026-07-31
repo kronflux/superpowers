@@ -829,12 +829,38 @@ describe('routing-dispatch.log', () => {
     run('agent', denyingAgent(dir, transcript));
 
     const added = readLog().slice(before.length);
-    expect(added).toMatch(/ALLOW model=haiku/);
-    expect(added).toMatch(/BLOCK model=opus/);
+    expect(added).toMatch(/ALLOW model=haiku allowed=haiku,sonnet tasks=1/);
+    expect(added).toMatch(/BLOCK model=opus allowed=haiku,sonnet tasks=1/);
+  });
+
+  it('logs allowed=- and tasks=- when dispatch is routed but no tasks are in-progress', () => {
+    const dir = makeProject(ROUTING);
+    // Transcript with TaskCreate whose result binds a native id, but no TaskUpdate to set in_progress
+    const transcript = makeTranscript([
+      toolUse('TaskCreate', { subject: 'Task 1: something', description: 'plain task' }, 'tu1'),
+      toolResult('tu1', 'Task #1 created successfully.'),
+    ]);
+    const before = readLog();
+
+    run('agent', {
+      tool_name: 'Agent',
+      cwd: dir,
+      transcript_path: transcript,
+      tool_input: { description: 'impl', prompt: 'do it', model: 'haiku' },
+    });
+
+    const added = readLog().slice(before.length);
+    expect(added).toMatch(/ALLOW model=haiku allowed=- tasks=-/);
   });
 
   it('writes nothing when routing is dormant', () => {
-    // Clean up any legacy config from previous tests to ensure routing is truly dormant
+    // CRITICAL: tmpHome is shared across the entire test suite. The earlier describe
+    // block "loadRouting profile-scoped candidate" writes a legacy routing config to
+    // tmpHome/.claude/superpowers/model-routing.json. This test must delete it to
+    // ensure the "dormant" scenario is actually dormant (no config found anywhere).
+    // This test must run AFTER the describe blocks that populate tmpHome, or the
+    // cleanup will have no effect. If a new describe block is added AFTER this one,
+    // it will silently reactivate routing unless it also cleans up first.
     const legacyDir = path.join(tmpHome, '.claude', 'superpowers');
     if (fs.existsSync(legacyDir)) {
       fs.rmSync(legacyDir, { recursive: true, force: true });
