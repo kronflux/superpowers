@@ -24,6 +24,10 @@
  * Tasks are keyed strictly by their NATIVE id, extracted from the TaskCreate
  * tool_result text ("Task #N created successfully") — never by creation
  * order, which mis-keys tiers when result ids do not match create sequence.
+ * A task's description resolves chronologically: the latest description-
+ * bearing event (TaskCreate or TaskUpdate) for that native id wins, so a
+ * stale TaskUpdate from earlier in the session (e.g. a reused native id
+ * after a task-list clear) can never clobber a later TaskCreate's fence.
  *
  * Custom subagent_types (anything other than absent/empty/"general-purpose")
  * are exempt: only implementer/reviewer-grade dispatches are routed.
@@ -76,10 +80,11 @@ function resultText(content) {
  * consentTokens: Set<string> }.
  */
 export async function scanTranscript(transcriptPath) {
-  const creates = [];        // [toolUseId, {subject, description}] in stream order
+  let seq = 0;               // monotonic event counter: stream position IS chronology
+  const creates = [];        // [toolUseId, {subject, description, seq}] in stream order
   const realId = new Map();  // toolUseId -> native id from the create result
   const inProgress = [];     // native ids, most recent last
-  const updDesc = new Map(); // native id -> description carried on a TaskUpdate
+  const updDesc = new Map(); // native id -> {description, seq} of the LATEST update
   const consentTokens = new Set(); // harness-authored frontier approval tokens
 
   const rl = readline.createInterface({
@@ -112,12 +117,13 @@ export async function scanTranscript(transcriptPath) {
         creates.push([block.id, {
           subject: typeof input.subject === 'string' ? input.subject : '',
           description: typeof input.description === 'string' ? input.description : '',
+          seq: seq++,
         }]);
       } else if (block.type === 'tool_use' && block.name === 'TaskUpdate') {
         const taskId = String(input.taskId ?? '');
         if (!taskId) continue;
         if (typeof input.description === 'string' && input.description) {
-          updDesc.set(taskId, input.description);
+          updDesc.set(taskId, { description: input.description, seq: seq++ });
         }
         const status = input.status;
         if (status === 'in_progress') {
@@ -144,10 +150,16 @@ export async function scanTranscript(transcriptPath) {
     const nativeId = realId.get(toolUseId);
     if (nativeId !== undefined) tasks.set(nativeId, meta);
   }
-  for (const [taskId, description] of updDesc) {
-    const existing = tasks.get(taskId) || { subject: '', description: '' };
-    existing.description = description;
-    tasks.set(taskId, existing);
+  // Latest description-bearing event wins, by stream position. A stale
+  // TaskUpdate from earlier in the session (e.g. a reused native id after a
+  // task-list clear) must never clobber a later TaskCreate's fence.
+  for (const [taskId, upd] of updDesc) {
+    const existing = tasks.get(taskId);
+    if (!existing) {
+      tasks.set(taskId, { subject: '', description: upd.description, seq: upd.seq });
+    } else if (upd.seq > existing.seq) {
+      existing.description = upd.description;
+    }
   }
 
   return { tasks, inProgress, consentTokens };

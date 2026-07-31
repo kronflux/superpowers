@@ -749,3 +749,41 @@ describe('legacy fence-value aliasing', () => {
     expect((r.allowed ?? [])).not.toContain('fable');
   });
 });
+
+describe('scanTranscript chronology', () => {
+  function writeTranscript(lines) {
+    const p = path.join(tmpHome, `transcript-${Math.random().toString(36).slice(2)}.jsonl`);
+    fs.writeFileSync(p, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    return p;
+  }
+  const use = (name, id, input) => ({ message: { content: [{ type: 'tool_use', id, name, input }] } });
+  const result = (toolUseId, text) => ({ message: { content: [{ type: 'tool_result', tool_use_id: toolUseId, content: text }] } });
+
+  it('a later TaskCreate description beats an earlier TaskUpdate description (reused id)', async () => {
+    const p = writeTranscript([
+      use('TaskUpdate', 'u1', { taskId: '1', description: 'STALE from a prior task list' }),
+      use('TaskCreate', 'c1', { subject: 'fresh', description: 'FRESH with fence' }),
+      result('c1', 'Task #1 created successfully'),
+    ]);
+    const { tasks } = await scanTranscript(p);
+    expect(tasks.get('1').description).toBe('FRESH with fence');
+  });
+
+  it('a later TaskUpdate description still beats the create description', async () => {
+    const p = writeTranscript([
+      use('TaskCreate', 'c1', { subject: 's', description: 'original' }),
+      result('c1', 'Task #1 created successfully'),
+      use('TaskUpdate', 'u1', { taskId: '1', description: 'updated' }),
+    ]);
+    const { tasks } = await scanTranscript(p);
+    expect(tasks.get('1').description).toBe('updated');
+  });
+
+  it('an update without any bound create still yields a table entry', async () => {
+    const p = writeTranscript([
+      use('TaskUpdate', 'u1', { taskId: '9', description: 'orphan update' }),
+    ]);
+    const { tasks } = await scanTranscript(p);
+    expect(tasks.get('9').description).toBe('orphan update');
+  });
+});
