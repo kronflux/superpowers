@@ -14,10 +14,10 @@ The plugin is driven by lifecycle hooks. Each fires on a harness event and is re
 - `hooks/session-start` (via `hooks/run-hook.cmd`) injects the `using-superpowers` SKILL.md
   **body** into session context. `awk` strips the YAML frontmatter so only the payload body is
   sent (`hookSpecificOutput.additionalContext`, ~5.2 KB — see Context economy).
-- If `docs/superpowers/model-routing.json` → `$CLAUDE_CONFIG_DIR/superpowers/model-routing.json`
-  → `~/.claude/superpowers/model-routing.json` resolves (first match wins), a
-  `<model-routing-active>` block carrying the project's tier mapping is appended.
-  Absent config → byte-identical output with no block.
+- If `.superpowers/model-routing.json` (canonical) → legacy `docs/superpowers/model-routing.json`
+  → `$CLAUDE_CONFIG_DIR/superpowers/model-routing.json` → `~/.claude/superpowers/model-routing.json`
+  resolves (first match wins), a `<model-routing-active>` block carrying the project's tier
+  mapping is appended. Absent config → byte-identical output with no block.
 - `hooks/context-engine.js` runs on SessionStart (claude-code and codex) for context-mode
   detection and session bookkeeping.
 - `hooks/lib/config-dir.js` (`CLAUDE_CONFIG_DIR` → `~/.claude`) is the shared config-root

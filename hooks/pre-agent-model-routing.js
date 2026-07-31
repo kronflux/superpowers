@@ -2,8 +2,9 @@
 /**
  * Model-Tier Dispatch Gate — PreToolUse Hook for Agent
  *
- * Dormant unless the project opts in via docs/superpowers/model-routing.json
- * (or ~/.claude/superpowers/model-routing.json). When active, an Agent
+ * Dormant unless the project opts in via .superpowers/model-routing.json
+ * (or the legacy docs/superpowers/model-routing.json, or
+ * ~/.claude/superpowers/model-routing.json). When active, an Agent
  * dispatch's model must agree with the tier of an in-progress task, resolved
  * through the routing config. Reviewers always run at "standard", so the
  * allowed set is the UNION of every in-progress task's resolved tier plus
@@ -287,7 +288,7 @@ export function checkDispatch(routing, tasks, inProgress, dispatchModel, consent
       'AGENT DISPATCH DOES NOT MATCH TASK MODEL TIER',
       '',
       `Your Agent call passed model='${dispatchModel}', but the in-progress task(s) constrain`,
-      `dispatches to: ${allowed.join(', ')} (per docs/superpowers/model-routing.json).`,
+      `dispatches to: ${allowed.join(', ')} (per .superpowers/model-routing.json).`,
       '',
       'Constraining in-progress task(s):',
       ...taskLines,

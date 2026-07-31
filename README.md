@@ -115,8 +115,9 @@ Capabilities this fork adds on top of the upstream skills library:
 - **Opt-in verification gates** — seven task-gate hooks under `hooks/examples/` enforce
   blockedBy ordering, dispatch matching, and evidence re-validation. All off by default; enable
   by registering them ([hooks/examples/README.md](hooks/examples/README.md)).
-- **Model-tier routing** — `docs/superpowers/model-routing.json` (opt-in) maps plan tiers to
-  models, enforced by three PreToolUse gates plus a session notice. Run `/onboard` to set it up.
+- **Model-tier routing** — `.superpowers/model-routing.json` (opt-in; legacy `docs/superpowers/`
+  still read) maps plan tiers to models, enforced by three PreToolUse gates plus a session
+  notice. Run `/onboard` to set it up.
 - **Four-layer memory architecture** — auto-capture → `state.md` → durable git-committed
   artifacts → harness memory, with promotion/indexing/resume protocols. See
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

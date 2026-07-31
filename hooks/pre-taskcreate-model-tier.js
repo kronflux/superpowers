@@ -2,8 +2,9 @@
 /**
  * Model-Tier Plan Gate — PreToolUse Hook for TaskCreate
  *
- * When the project opts in to model routing (docs/superpowers/model-routing.json
- * exists), every plan-shaped task MUST carry a valid "modelTier" in its
+ * When the project opts in to model routing (.superpowers/model-routing.json,
+ * or the legacy docs/superpowers/model-routing.json), every plan-shaped task
+ * MUST carry a valid "modelTier" in its
  * ```json:metadata fence, one of the four tiers: mechanical, standard,
  * advanced, frontier. Ad-hoc tasks are unaffected. A concrete "model" pin
  * in the fence overrides tier enforcement. A "frontier" tier request is
@@ -65,7 +66,8 @@ const TIER_TABLE = [
   '  1. Re-issue TaskCreate with a "modelTier" in the ```json:metadata fence.',
   '  2. If this is genuinely an ad-hoc task (not part of a plan), rephrase the subject',
   '     without the numbered-plan prefix and without template headers, then retry.',
-  '  3. If routing should not apply here, delete docs/superpowers/model-routing.json.',
+  '  3. If routing should not apply here, delete .superpowers/model-routing.json and',
+  '     docs/superpowers/model-routing.json (a legacy file left in place still activates it).',
   '',
   'Rationale: docs/model-routing-flow.md. Runtime disable: SUPERPOWERS_ROUTING_GUARD=0.',
 ].join('\n');
@@ -139,7 +141,7 @@ export function checkTaskCreate(toolInput, routing) {
     reason: [
       'PLAN TASK MISSING MODEL TIER',
       '',
-      'This project has opted in to subagent model routing (docs/superpowers/model-routing.json),',
+      'This project has opted in to subagent model routing (.superpowers/model-routing.json),',
       `so every plan task's json:metadata fence MUST carry a "modelTier". The TaskCreate for`,
       `'${subject}' ${problem}.`,
       '',

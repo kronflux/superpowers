@@ -4,7 +4,7 @@ Plan execution fans out: one task dispatches an implementer plus reviewers, revi
 
 ## The opt-in switch
 
-One file controls everything: `docs/superpowers/model-routing.json` in the project, with `~/.claude/superpowers/model-routing.json` as a user-level fallback (first file found wins entirely; no merging). File present → routing active. File absent → every routing component is fully dormant and behavior is byte-identical to vanilla. `/onboard` generates the file (lands in a later commit); deleting it switches everything off instantly.
+One file controls everything, resolved in this order (first file found wins entirely; no merging): `.superpowers/model-routing.json` in the project (canonical), then the legacy project location `docs/superpowers/model-routing.json` (still read, logged, and offered for migration at session start), then `$CLAUDE_CONFIG_DIR/superpowers/model-routing.json`, then `~/.claude/superpowers/model-routing.json` as the final user-level fallback. When both project files exist, the canonical `.superpowers/` one wins and the legacy one is ignored (with a log line naming both). File present → routing active. File absent → every routing component is fully dormant and behavior is byte-identical to vanilla. `/onboard` generates the canonical file; deleting all resolving files switches everything off instantly.
 
 Config schema — map each tier to a model string:
 
@@ -34,6 +34,19 @@ Plan tasks carry `"modelTier"` in their `json:metadata` fence (see `skills/share
 **Frontier consent.** A dispatch on the frontier model requires two independent signals: `"frontierConsent": "FRONTIER-APPROVED:task-<N>"` in the constraining task's fence, AND the same token in a harness-authored tool_result (the user actually selecting the approval option in an AskUserQuestion). The fence alone is agent-writable and proves nothing by itself; the transcript token is what ties the gate to a real user action. The check runs before the `inherit` stand-down — standing down relaxes tier matching, never consent. The frontier model is never admitted to the general allowed set; only the consent path admits it.
 
 **Consent semantics and honest limits.** Consent is per task, not per dispatch: while an approved frontier task is in progress, its dispatches (including re-dispatches after review) need no fresh approval. The gate is a guardrail against the careless path — no correctly-behaving agent ever emits the token without running the offer. It is NOT tamper-proof against a deliberately adversarial agent: any tool output the agent controls (e.g. a Bash `echo`) lands in a tool_result and can forge the transcript signal, and a token approved for one task, copied into another frontier task's fence, would authorize that task too. A future hardening must match the token against the text of the *selected option* of a real AskUserQuestion result specifically (result provenance alone is insufficient — the harness echoes question text into results); it is deliberately deferred until then. Do not describe this gate anywhere as agent-tamper-proof.
+
+### Consent-fence mechanics
+
+The consent fence is part of the task's **description** — the `json:metadata` code fence at
+its end — not the native `metadata` parameter (which TaskGet does not return). Either write
+path works: a `TaskCreate` whose description already carries
+`"frontierConsent": "FRONTIER-APPROVED:task-<N>"`, or a later `TaskUpdate` that rewrites the
+description with the token added. The dispatch-gate scanner resolves descriptions
+chronologically (latest event in the transcript wins, since 7.5.0), so neither path can be
+shadowed by stale history. If a frontier dispatch is denied despite an approval: check
+`hooks-logs/routing-config.log` for which config file resolved, and
+`hooks-logs/routing-dispatch.log` for the decision record; the usual cause before 7.5.0 was a
+reused task id whose old description shadowed the fence.
 
 ## The five enforcement layers
 

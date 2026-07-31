@@ -2,8 +2,9 @@
 /**
  * Execution Handoff Guard — PreToolUse Hook for AskUserQuestion
  *
- * Dormant unless the project opts in via docs/superpowers/model-routing.json
- * (or ~/.claude/superpowers/model-routing.json). When active, and after
+ * Dormant unless the project opts in via .superpowers/model-routing.json
+ * (or the legacy docs/superpowers/model-routing.json, or
+ * ~/.claude/superpowers/model-routing.json). When active, and after
  * writing-plans has been invoked and tasks created, the only permitted
  * AskUserQuestion at the handoff point is the mandated two-option Execution
  * Handoff ("Subagent-Driven (this session)" / "Parallel Session (separate)").
