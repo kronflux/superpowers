@@ -29,3 +29,16 @@ memory + ADR layer is the sole memory system. A second store is split-brain memo
 Hooks detect `configured` only. A capability becomes trustworthy (`verified`) after its
 first successful tool call this session; any failure demotes it — fall through the chain
 silently.
+
+## Delegation announcements
+
+Whenever work leaves the primary session — an Agent dispatch under a routed tier, or any
+`middleware-exec` run — announce it in the response text, one line, before the results:
+
+    [conductor] <task or job> -> <model or tier> (external|subagent)
+
+Examples: `[conductor] task 3 implementer -> haiku (subagent)`,
+`[conductor] extract-log-error -> openrouter/qwen-72b (external)`.
+One line per delegation; no announcement for work done in the primary context. Logs remain
+the ground truth (`hooks-logs/routing-dispatch.log`, `hooks-logs/middleware-usage.jsonl`);
+the announcement exists so the human can see delegation without opening tool output.
