@@ -55,9 +55,9 @@ export function aggregate(transcriptPath, offset) {
 }
 
 async function main() {
-  let input = '';
-  for await (const chunk of process.stdin) input += chunk;
   try {
+    let input = '';
+    for await (const chunk of process.stdin) input += chunk;
     const { session_id, transcript_path } = JSON.parse(input);
     if (typeof transcript_path !== 'string' || !transcript_path || !fs.existsSync(transcript_path)) {
       process.stdout.write('{}');
@@ -75,7 +75,7 @@ async function main() {
         cacheRead: t.cacheRead + delta.cacheRead, cacheCreation: t.cacheCreation + delta.cacheCreation,
       };
       saveStats(stats);
-      if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+      fs.mkdirSync(LOG_DIR, { recursive: true });
       fs.appendFileSync(path.join(LOG_DIR, 'claude-usage.jsonl'),
         JSON.stringify({ ts: new Date().toISOString(), sessionId, ...delta }) + '\n');
     }
@@ -84,4 +84,4 @@ async function main() {
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-if (isMain) main();
+if (isMain) main().catch(() => { process.stdout.write('{}'); });

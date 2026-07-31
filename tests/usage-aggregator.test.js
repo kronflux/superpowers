@@ -46,13 +46,13 @@ const readStats = () => JSON.parse(fs.readFileSync(statsPath(), 'utf8'));
 describe('usage-aggregator', () => {
   it('sums usage on the first run, then adds only the delta on the next', () => {
     const t = path.join(home, 't.jsonl');
-    fs.writeFileSync(t, asst(100, 20) + asst(50, 10, { cache_read_input_tokens: 500 }));
+    fs.writeFileSync(t, asst(100, 20, { cache_creation_input_tokens: 200 }) + asst(50, 10, { cache_read_input_tokens: 500 }));
     run('s1', t);
-    expect(readStats().tokens).toEqual({ input: 150, output: 30, cacheRead: 500, cacheCreation: 0 });
+    expect(readStats().tokens).toEqual({ input: 150, output: 30, cacheRead: 500, cacheCreation: 200 });
 
     fs.appendFileSync(t, asst(5, 5));
     run('s1', t);
-    expect(readStats().tokens).toEqual({ input: 155, output: 35, cacheRead: 500, cacheCreation: 0 });
+    expect(readStats().tokens).toEqual({ input: 155, output: 35, cacheRead: 500, cacheCreation: 200 });
     expect(fs.readFileSync(usageLog(), 'utf8').trim().split('\n')).toHaveLength(2);
   });
 
