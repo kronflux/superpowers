@@ -32,6 +32,36 @@ const SANDBOX_PATH = [dirOf('bash'), dirOf('node')]
   .filter((d, i, arr) => arr.indexOf(d) === i)
   .join(path.delimiter);
 
+function runHook(cwd) {
+  const raw = execSync(`bash "${HOOK}"`, {
+    cwd,
+    env: {
+      ...process.env,
+      CLAUDE_PLUGIN_ROOT: ROOT,
+      HOME: cwd,
+      CLAUDE_CONFIG_DIR: cwd,
+      PATH: SANDBOX_PATH,
+      COPILOT_CLI: '',
+      CURSOR_PLUGIN_ROOT: '',
+    },
+  }).toString();
+  const parsed = JSON.parse(raw);
+  return parsed?.hookSpecificOutput?.additionalContext ?? raw;
+}
+
+function withScratch(fn) {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-payload-'));
+  try { return fn(scratch); } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+}
+
+const ROUTING_JSON = JSON.stringify({ schema: 2, mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off' });
+
+function writeRouting(scratch, relDir) {
+  const dir = path.join(scratch, ...relDir);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'model-routing.json'), ROUTING_JSON);
+}
+
 describe('session-start context economy', () => {
   it('assembled payload <= 5232 bytes', () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-payload-'));
@@ -63,5 +93,37 @@ describe('session-start context economy', () => {
     // (+20 B headroom for minor capability-list variance across machines).
     expect(ctx).toMatch(/^\[conductor\] /m);
     expect(Buffer.byteLength(ctx)).toBeLessThanOrEqual(5232);
+  });
+});
+
+describe('session-start routing candidate chain', () => {
+  it('legacy project routing config adds the migration-offer line', () => {
+    withScratch((scratch) => {
+      writeRouting(scratch, ['docs', 'superpowers']);
+      const ctx = runHook(scratch);
+      expect(ctx).toContain('<model-routing-active>');
+      expect(ctx).toContain('LEGACY CONFIG PATH');
+      expect(ctx).toContain('.superpowers/model-routing.json');
+    });
+  });
+
+  it('canonical project routing config carries no legacy line', () => {
+    withScratch((scratch) => {
+      writeRouting(scratch, ['.superpowers']);
+      const ctx = runHook(scratch);
+      expect(ctx).toContain('<model-routing-active>');
+      expect(ctx).not.toContain('LEGACY CONFIG PATH');
+    });
+  });
+
+  it('canonical wins over legacy when both exist, with no legacy line', () => {
+    withScratch((scratch) => {
+      writeRouting(scratch, ['docs', 'superpowers']);
+      writeRouting(scratch, ['.superpowers']);
+      const ctx = runHook(scratch);
+      expect(ctx).toContain('.superpowers/model-routing.json');
+      expect(ctx).not.toContain('docs/superpowers');
+      expect(ctx).not.toContain('LEGACY CONFIG PATH');
+    });
   });
 });
