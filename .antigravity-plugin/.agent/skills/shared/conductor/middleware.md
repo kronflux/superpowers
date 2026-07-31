@@ -68,21 +68,23 @@ config is unaffected. `transport: "cli"` spawns a local CLI binary instead:
 must not contain it.
 
 **CLI providers are agentic.** `agy`, `opencode`, and `claude` are not text filters — they carry
-file-edit and shell tools. A call that means "summarize this log" invokes an agent that may
-decide to act. Every CLI run therefore spawns in a fresh temp directory, removed when the run
-ends, so writes land in a throwaway location rather than your project. Override `cwd` only when
-you understand that consequence.
+file-edit and shell tools. A middleware call that means "summarize this log" invokes an agent
+that may decide to act. Every CLI run therefore spawns in a fresh temporary directory, which is
+removed when the run ends, so anything it writes lands in a throwaway location rather than your
+project. Override `cwd` only when you understand that consequence.
 
 **`claude` as its own middleware.** Configuring the `claude` preset means a Claude session
 spawning Claude sessions. It works, and a second profile via `env.CLAUDE_CONFIG_DIR` keeps the
 two separate — but the cost is Claude-tier per call, which is the opposite of what offloading
 mechanical work is for. Prefer a cheaper provider unless you specifically want it.
 
-**The prompt is not shielded from the target CLI's argument parser.** In `argv` mode a prompt
-beginning with `-` may be read as a flag (not shell injection — no shell is used, so nothing in
-the prompt can start a subprocess). A hand-authored `command` placing `{{prompt}}` as a bare
-positional is exposed to this; the shipped presets avoid it — only `agy` uses `argv`, and there
-the prompt is the value of `-p`, not a bare positional.
+**The prompt is not shielded from the target CLI's argument parser.** In `argv` mode the
+rendered prompt is inserted as a plain argument, so a prompt beginning with `-` may be read as a
+flag by the CLI you are calling. This is not shell injection — commands are spawned with no
+shell, as an argument array, so nothing in a prompt can start a subprocess or chain a command.
+But if you hand-author a `command` that places `{{prompt}}` as a bare positional, that CLI's own
+parser decides what a leading dash means. The shipped presets avoid the worst of this: only
+`agy` uses `argv`, and there the prompt is the value of `-p` rather than a bare positional.
 
 **`agy` has a hard size ceiling.** Argv-only (stdin fails parsing), so oversized prompts return
 exit 3. `opencode`/`claude` use stdin — no ceiling.
@@ -91,16 +93,9 @@ exit 3. `opencode`/`claude` use stdin — no ceiling.
 `PATH` — deliberate (enables a second Claude Code profile via `CLAUDE_CONFIG_DIR`), and adds no
 capability: editing `middleware-config.json` can already name any binary in `command`.
 
-## Banner and usage log
-
-Every run logs `[middleware] start …`/`done …` to stderr (duration + usage); stdout stays the
-bare result. Each run also appends a JSONL record to
-`<configRoot>/hooks-logs/middleware-usage.jsonl`: exact tokens for `http`, bytes for `cli` (no
-token counts available there).
-
 ## Exit codes
 
-`0` ok — result on stdout or written to `--out`. `1` usage error — missing/unknown `--task`.
+`0` ok — result on stdout (banners and usage go to stderr) or written to `--out`. `1` usage error — missing/unknown `--task`.
 
 `http`: `2` unconfigured — no config found, `active_provider` undefined, or API key env var
 unset (localhost/127.0.0.1/::1 may omit it). `3` endpoint failure — non-2xx response.
