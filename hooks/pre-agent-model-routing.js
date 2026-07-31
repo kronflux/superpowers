@@ -347,7 +347,7 @@ async function main() {
     // prose, so this log is the ground truth for what actually dispatched.
     try {
       const line = `${new Date().toISOString()} ${result.blocked ? 'BLOCK' : 'ALLOW'} `
-        + `model=${tool_input?.model || 'inherit'} `
+        + `model=${String(tool_input?.model || 'inherit').replace(/[\r\n]/g, ' ')} `
         + `allowed=${result.allowed ? result.allowed.join(',') : '-'} `
         + `tasks=${inProgress.length ? inProgress.join(',') : '-'}\n`;
       if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
