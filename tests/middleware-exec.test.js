@@ -361,6 +361,82 @@ describe('transport dispatch', () => {
   });
 });
 
+describe('usage capture', () => {
+  it('runHttp returns content plus the usage object', async () => {
+    const server = http.createServer((req, res) => {
+      req.on('data', () => {});
+      req.on('end', () => {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 11, completion_tokens: 7 } }));
+      });
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const desc = { transport: 'http', baseUrl: `http://127.0.0.1:${server.address().port}`, model: 'm', key: null };
+    try {
+      const out = await runHttp(desc, 'p');
+      expect(out).toEqual({ content: 'hi', usage: { prompt_tokens: 11, completion_tokens: 7 } });
+    } finally {
+      server.close();
+    }
+  });
+
+  it('runHttp tolerates a response without usage', async () => {
+    const server = http.createServer((req, res) => {
+      req.on('data', () => {});
+      req.on('end', () => {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ choices: [{ message: { content: 'hi' } }] }));
+      });
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const desc = { transport: 'http', baseUrl: `http://127.0.0.1:${server.address().port}`, model: 'm', key: null };
+    try {
+      const out = await runHttp(desc, 'p');
+      expect(out).toEqual({ content: 'hi', usage: null });
+    } finally {
+      server.close();
+    }
+  });
+
+  it('main prints start/done banners to stderr, leaving stdout as the bare result', async () => {
+    const canned = 'error: NullPointerException at foo.js:42';
+    const server = http.createServer((req, res) => {
+      req.on('data', () => {});
+      req.on('end', () => {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ choices: [{ message: { content: canned } }], usage: { prompt_tokens: 3, completion_tokens: 9 } }));
+      });
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = server.address().port;
+
+    const projectDir = path.join(tmp, 'project-banner');
+    fs.mkdirSync(path.join(projectDir, '.claude'), { recursive: true });
+    const config = {
+      active_provider: 'teststub',
+      active_model: 'test-model',
+      endpoints: { teststub: { model: 'test-model', base_url: `http://127.0.0.1:${port}`, api_key_env: 'MW_TEST_KEY' } },
+    };
+    fs.writeFileSync(path.join(projectDir, '.claude', 'middleware-config.json'), JSON.stringify(config));
+    const tmpLog = path.join(tmp, 'input-banner.log');
+    fs.writeFileSync(tmpLog, 'some log content\nwith an error\n');
+    const cliPath = path.join(process.cwd(), 'scripts', 'middleware-exec.mjs');
+
+    try {
+      const { stdout, stderr } = await execFileAsync(
+        process.execPath,
+        [cliPath, '--task', 'extract-log-error', '--input-file', tmpLog],
+        { cwd: projectDir, env: { ...process.env, MW_TEST_KEY: 'test' } },
+      );
+      expect(stdout).toBe(canned);
+      expect(stderr).toContain('[middleware] start');
+      expect(stderr).toContain('[middleware] done');
+    } finally {
+      server.close();
+    }
+  });
+});
+
 // Fake CLIs built from the running Node binary: real spawn behavior, no
 // network, no model cost.
 const NODE = process.execPath;
@@ -377,44 +453,44 @@ const desc = (ep, env = process.env) => endpointFor(cliCfg(ep), env);
 describe('runCli delivery', () => {
   it('returns child stdout for stdin delivery', async () => {
     const d = desc({ command: [NODE, ...echoStdin], input_mode: 'stdin' });
-    expect(await runCli(d, 'hello middleware')).toBe('hello middleware');
+    expect((await runCli(d, 'hello middleware')).content).toBe('hello middleware');
   });
 
   it('substitutes {{prompt}} as a single argv element', async () => {
     const d = desc({ command: [NODE, ...echoArgv, '{{prompt}}'], input_mode: 'argv' });
-    expect(await runCli(d, 'two words "quoted"')).toBe('two words "quoted"');
+    expect((await runCli(d, 'two words "quoted"')).content).toBe('two words "quoted"');
   });
 
   it('does not interpret $& or $` in the prompt (function replacer)', async () => {
     const d = desc({ command: [NODE, ...echoArgv, '{{prompt}}'], input_mode: 'argv' });
     const nasty = 'cost $& and $` and $1 and $\'';
-    expect(await runCli(d, nasty)).toBe(nasty);
+    expect((await runCli(d, nasty)).content).toBe(nasty);
   });
 
   it('strips ANSI escapes from stdout', async () => {
     const ansi = ['-e', 'process.stdout.write("\\u001B[31mred\\u001B[0m")'];
     const d = desc({ command: [NODE, ...ansi], input_mode: 'stdin' });
-    expect(await runCli(d, '')).toBe('red');
+    expect((await runCli(d, '')).content).toBe('red');
   });
 
   it('runs in a temp cwd, not the project', async () => {
     const probe = ['-e', 'process.stdout.write(process.cwd())'];
     const d = desc({ command: [NODE, ...probe], input_mode: 'stdin' });
     const out = await runCli(d, '');
-    expect(path.resolve(out)).not.toBe(path.resolve(process.cwd()));
+    expect(path.resolve(out.content)).not.toBe(path.resolve(process.cwd()));
   });
 
   it('honors an explicit cwd override', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-cwd-'));
     const probe = ['-e', 'process.stdout.write(process.cwd())'];
     const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', cwd: dir });
-    expect(fs.realpathSync(await runCli(d, ''))).toBe(fs.realpathSync(dir));
+    expect(fs.realpathSync((await runCli(d, '')).content)).toBe(fs.realpathSync(dir));
   });
 
   it('merges env over the parent instead of replacing it', async () => {
     const probe = ['-e', 'process.stdout.write((process.env.MW_TEST||"")+"|"+(process.env.PATH?"has-path":"no-path"))'];
     const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', env: { MW_TEST: 'v' } });
-    expect(await runCli(d, '')).toBe('v|has-path');
+    expect((await runCli(d, '')).content).toBe('v|has-path');
   });
 });
 
@@ -436,7 +512,7 @@ describe('runCli guards', () => {
       command: [NODE, '-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(s.length)))'],
       input_mode: 'stdin', max_argv_bytes: 10,
     });
-    expect(await runCli(d, 'z'.repeat(5000))).toBe('5000');
+    expect((await runCli(d, 'z'.repeat(5000))).content).toBe('5000');
   });
 
   it('kills a child that outlives timeout_ms (exit 3)', async () => {
@@ -486,7 +562,7 @@ describe('runCli guards', () => {
   it('removes a temp cwd it created, but never a configured one', async () => {
     const probe = ['-e', 'process.stdout.write(process.cwd())'];
     const auto = desc({ command: [NODE, ...probe], input_mode: 'stdin' });
-    const tempUsed = await runCli(auto, '');
+    const tempUsed = (await runCli(auto, '')).content;
     expect(fs.existsSync(tempUsed)).toBe(false);
 
     const mine = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-keep-'));

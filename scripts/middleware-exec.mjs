@@ -145,7 +145,14 @@ export async function runHttp(desc, prompt) {
     body: JSON.stringify({ model: desc.model, messages: [{ role: 'user', content: prompt }] }),
   });
   if (!res.ok) throw Object.assign(new Error(`endpoint ${res.status}: ${(await res.text()).slice(0, 300)}`), { exit: EXIT.ENDPOINT });
-  return (await res.json()).choices?.[0]?.message?.content ?? '';
+  const body = await res.json();
+  const u = body.usage;
+  return {
+    content: body.choices?.[0]?.message?.content ?? '',
+    usage: u && typeof u === 'object'
+      ? { prompt_tokens: u.prompt_tokens ?? null, completion_tokens: u.completion_tokens ?? null }
+      : null,
+  };
 }
 
 export function runCli(desc, prompt) {
@@ -196,7 +203,7 @@ export function runCli(desc, prompt) {
       cleanupTemp();
     });
     child.on('close', (code) => {
-      if (code === 0) finish(resolve, stripAnsi(out).trim());
+      if (code === 0) finish(resolve, { content: stripAnsi(out).trim(), usage: null });
       else finish(reject, Object.assign(new Error(`cli exited ${code}: ${err.trim().slice(-300)}`), { exit: EXIT.ENDPOINT }));
       cleanupTemp();
     });
@@ -221,8 +228,27 @@ async function main() {
   try {
     const desc = endpointFor(resolved.cfg);
     const prompt = renderTemplate(args.task, input, resolved.cfg);
-    const out = desc.transport === 'cli' ? await runCli(desc, prompt) : await runHttp(desc, prompt);
-    if (args.out && typeof args.out === 'string') fs.writeFileSync(args.out, out); else process.stdout.write(out);
+    const provider = resolved.cfg.active_provider;
+    console.error(`[middleware] start task=${args.task} ${provider}/${desc.model ?? 'default'} transport=${desc.transport}`);
+    const started = Date.now();
+    const { content, usage } = desc.transport === 'cli' ? await runCli(desc, prompt) : await runHttp(desc, prompt);
+    const durationMs = Date.now() - started;
+    const promptBytes = Buffer.byteLength(prompt, 'utf8');
+    const outputBytes = Buffer.byteLength(content, 'utf8');
+    const spent = usage
+      ? `tokens=${usage.prompt_tokens ?? '?'}/${usage.completion_tokens ?? '?'}`
+      : `bytes=${promptBytes}/${outputBytes}${desc.transport === 'cli' ? ' (cli - token counts unavailable)' : ''}`;
+    console.error(`[middleware] done task=${args.task} in ${(durationMs / 1000).toFixed(1)}s ${spent}`);
+    try {
+      const logDir = path.join(configDir(process.env), 'hooks-logs');
+      fs.mkdirSync(logDir, { recursive: true });
+      fs.appendFileSync(path.join(logDir, 'middleware-usage.jsonl'), JSON.stringify({
+        ts: new Date().toISOString(), task: args.task, provider, model: desc.model ?? null,
+        transport: desc.transport, promptTokens: usage?.prompt_tokens ?? null,
+        completionTokens: usage?.completion_tokens ?? null, promptBytes, outputBytes, durationMs,
+      }) + '\n');
+    } catch { /* usage logging is best-effort */ }
+    if (args.out && typeof args.out === 'string') fs.writeFileSync(args.out, content); else process.stdout.write(content);
   } catch (e) { die(e.message, e.exit ?? EXIT.ENDPOINT); }
 }
 
