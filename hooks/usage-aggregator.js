@@ -29,17 +29,30 @@ function writeOffset(sessionId, offset) {
 }
 
 export function aggregate(transcriptPath, offset) {
-  const buf = fs.readFileSync(transcriptPath);
-  if (offset >= buf.length) return { delta: null, nextOffset: offset };
+  const size = fs.statSync(transcriptPath).size;
+  if (offset > size) offset = 0; // file shrank: rotated or regenerated, re-scan
+  if (offset >= size) return { delta: null, nextOffset: offset };
+
+  // Positional read: only the bytes since offset, not the whole transcript.
+  const buf = Buffer.alloc(size - offset);
+  const fd = fs.openSync(transcriptPath, 'r');
+  try {
+    fs.readSync(fd, buf, 0, buf.length, offset);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  // end is relative to buf (which starts at `offset`); nextOffset below
+  // converts back to an absolute file offset.
   let end = buf.length;
   // Only consume complete lines: an unterminated tail is re-read next run.
   if (buf[end - 1] !== 0x0a) {
     end = buf.lastIndexOf(0x0a, end - 1) + 1;
-    if (end <= offset) return { delta: null, nextOffset: offset };
+    if (end <= 0) return { delta: null, nextOffset: offset };
   }
   const delta = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
   let saw = false;
-  for (const line of buf.toString('utf8', offset, end).split('\n')) {
+  for (const line of buf.toString('utf8', 0, end).split('\n')) {
     if (!line.includes('"usage"')) continue;
     let event;
     try { event = JSON.parse(line); } catch { continue; }
@@ -51,7 +64,7 @@ export function aggregate(transcriptPath, offset) {
     delta.cacheRead += u.cache_read_input_tokens || 0;
     delta.cacheCreation += u.cache_creation_input_tokens || 0;
   }
-  return { delta: saw ? delta : null, nextOffset: end };
+  return { delta: saw ? delta : null, nextOffset: offset + end };
 }
 
 async function main() {

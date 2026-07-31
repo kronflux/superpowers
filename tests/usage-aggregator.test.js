@@ -14,7 +14,7 @@ const HOOK = path.join(__dirname, '..', 'hooks', 'usage-aggregator.js');
 // run of this suite (same literal session ids) would corrupt the next run's "first
 // run sums everything" assumption. Clear known offset files before each case so
 // every test starts from a true first run, regardless of prior invocations.
-const SESSION_IDS = ['s1', 's2', 's3', 's4', 's5'];
+const SESSION_IDS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 function clearOffsets() {
   for (const id of SESSION_IDS) {
     fs.rmSync(path.join(os.tmpdir(), `sp-usage-${id}`), { force: true });
@@ -84,6 +84,20 @@ describe('usage-aggregator', () => {
     fs.writeFileSync(t, JSON.stringify({ message: { role: 'user', content: 'hi' } }) + '\n');
     run('s4', t);
     expect(fs.existsSync(usageLog())).toBe(false);
+  });
+
+  it('re-scans from the start when the transcript shrinks (rotation/regeneration)', () => {
+    const t = path.join(home, 't.jsonl');
+    fs.writeFileSync(t, asst(100, 20) + asst(50, 10) + asst(25, 5));
+    run('s6', t);
+    expect(readStats().tokens).toEqual({ input: 175, output: 35, cacheRead: 0, cacheCreation: 0 });
+
+    // Same path, rewritten shorter: compaction, rotation, or a resumed
+    // session regenerating the transcript. The stored offset is now past
+    // EOF; this must be treated as a rescan, not "nothing new".
+    fs.writeFileSync(t, asst(7, 3));
+    run('s6', t);
+    expect(readStats().tokens).toEqual({ input: 182, output: 38, cacheRead: 0, cacheCreation: 0 });
   });
 
   it('fails open on malformed stdin and on a missing transcript', () => {
