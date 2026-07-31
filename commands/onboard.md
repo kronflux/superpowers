@@ -33,6 +33,8 @@ AskUserQuestion:
       description: "Keep the default: every subagent inherits the session model. Nothing is written."
 ```
 
+Before writing the routing file under `.superpowers/` in either branch below: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/model-routing.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes.
+
 - **Guided tiers** → show the user the exact mapping you are about to write and offer to change any tier before writing:
 
   ```json
@@ -52,9 +54,9 @@ AskUserQuestion:
         description: "Fable becomes available at 2x the advanced tier. Never automatic - every frontier task asks you first, with the reason and the cost."
   ```
 
-  On **Enable**, set `"frontier": "fable"`. If the user wants a different value for any tier, substitute it before writing — but never set `frontier` to the same model as `advanced` (the config would be rejected as invalid). Before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/model-routing.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Write the result to `.superpowers/model-routing.json` (create `.superpowers/` if missing).
+  On **Enable**, set `"frontier": "fable"`. If the user wants a different value for any tier, substitute it before writing — but never set `frontier` to the same model as `advanced` (the config would be rejected as invalid). Write the result to `.superpowers/model-routing.json` (create `.superpowers/` if missing).
 
-- **One fixed model** → ask the follow-up below first, then before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/model-routing.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Then write `{"schema": 2, ...}` with `mechanical`, `standard`, and `advanced` all set to the chosen value and `"frontier": "off"`. Frontier must stay off here: a flat cap has no second tier to gate, and a config where `advanced` and `frontier` name the same model is rejected as invalid.
+- **One fixed model** → ask the follow-up below first, then write `{"schema": 2, ...}` with `mechanical`, `standard`, and `advanced` all set to the chosen value and `"frontier": "off"`. Frontier must stay off here: a flat cap has no second tier to gate, and a config where `advanced` and `frontier` name the same model is rejected as invalid.
 
   ```yaml
   AskUserQuestion:
@@ -133,13 +135,15 @@ AskUserQuestion:
       description: "Leave nothing on disk. Behavior stays the per-task default; identical outcome to choosing it explicitly, just without a config file."
 ```
 
-- **Per-task commits** → before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/workflow.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Then write `.superpowers/workflow.json`:
+Before writing the workflow file under `.superpowers/` in either branch below: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/workflow.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes.
+
+- **Per-task commits** → write `.superpowers/workflow.json`:
 
   ```json
   {"commitStrategy": "per-task"}
   ```
 
-- **Single commit at plan end** → before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/workflow.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Then write `.superpowers/workflow.json`:
+- **Single commit at plan end** → write `.superpowers/workflow.json`:
 
   ```json
   {"commitStrategy": "at-end"}
