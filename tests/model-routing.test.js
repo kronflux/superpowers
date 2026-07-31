@@ -810,3 +810,47 @@ describe('scanTranscript chronology', () => {
     expect(tasks.get('9').description).toBe('orphan update');
   });
 });
+
+describe('routing-dispatch.log', () => {
+  const logPath = () => path.join(tmpHome, '.claude', 'hooks-logs', 'routing-dispatch.log');
+  const readLog = () => (fs.existsSync(logPath()) ? fs.readFileSync(logPath(), 'utf8') : '');
+
+  it('records ALLOW for a permitted dispatch and BLOCK for a denied one', () => {
+    const dir = makeProject(ROUTING);
+    const transcript = mechanicalInProgressTranscript();
+    const before = readLog();
+
+    run('agent', {
+      tool_name: 'Agent',
+      cwd: dir,
+      transcript_path: transcript,
+      tool_input: { description: 'impl', prompt: 'do it', model: 'haiku' },
+    });
+    run('agent', denyingAgent(dir, transcript));
+
+    const added = readLog().slice(before.length);
+    expect(added).toMatch(/ALLOW model=haiku/);
+    expect(added).toMatch(/BLOCK model=opus/);
+  });
+
+  it('writes nothing when routing is dormant', () => {
+    // Clean up any legacy config from previous tests to ensure routing is truly dormant
+    const legacyDir = path.join(tmpHome, '.claude', 'superpowers');
+    if (fs.existsSync(legacyDir)) {
+      fs.rmSync(legacyDir, { recursive: true, force: true });
+    }
+
+    const dir = makeProject();               // no config file -> routing dormant
+    const transcript = mechanicalInProgressTranscript();
+    const before = readLog();
+
+    run('agent', {
+      tool_name: 'Agent',
+      cwd: dir,
+      transcript_path: transcript,
+      tool_input: { description: 'impl', prompt: 'do it', model: 'haiku' },
+    });
+
+    expect(readLog().slice(before.length)).toBe('');
+  });
+});

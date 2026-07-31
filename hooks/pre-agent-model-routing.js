@@ -341,6 +341,17 @@ async function main() {
     const { tasks, inProgress, consentTokens } = await scanTranscript(transcript_path);
     const result = checkDispatch(routing, tasks, inProgress, tool_input?.model, consentTokens);
 
+    // Decision record for every routed dispatch: the announcement contract is
+    // prose, so this log is the ground truth for what actually dispatched.
+    try {
+      const line = `${new Date().toISOString()} ${result.blocked ? 'BLOCK' : 'ALLOW'} `
+        + `model=${tool_input?.model || 'inherit'} `
+        + `allowed=${result.allowed ? result.allowed.join(',') : '-'} `
+        + `tasks=${inProgress.length ? inProgress.join(',') : '-'}\n`;
+      if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+      fs.appendFileSync(path.join(LOG_DIR, 'routing-dispatch.log'), line);
+    } catch { /* decision logging is best-effort */ }
+
     if (result.blocked) {
       log({ level: 'BLOCKED', model: tool_input?.model, allowed: result.allowed, inProgress, session_id, cwd });
       process.stdout.write(JSON.stringify({
