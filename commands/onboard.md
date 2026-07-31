@@ -9,7 +9,7 @@ Walk the user through this fork's optional features one at a time. For each feat
 ## Ground rules
 
 - **Assume a clean slate.** Do NOT audit existing configuration beyond what each step needs to do its own job (Feature 2's dedupe check and Feature 4's already-enabled check are the only state reads this command performs — both are required by the step itself, not general auditing). Go straight to the questions.
-- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `docs/superpowers/model-routing.json`, `docs/superpowers/workflow.json`, `.serena/project.yml`, `$CLAUDE_CONFIG_DIR/middleware-config.json` (or `~/.claude/middleware-config.json` when no custom config root is active), and any settings file being merged.
+- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `.superpowers/model-routing.json`, `.superpowers/workflow.json`, `.serena/project.yml`, `$CLAUDE_CONFIG_DIR/middleware-config.json` (or `~/.claude/middleware-config.json` when no custom config root is active), and any settings file being merged.
 - Each feature is optional. Every question includes a way to decline; declining writes nothing and moves to the next feature.
 - **NEVER commit anything.** Files are written to the working tree only; committing is the user's call.
 - After the last feature, produce the Closing summary (see below) — what was written and where, what was skipped, and how to undo each.
@@ -52,9 +52,9 @@ AskUserQuestion:
         description: "Fable becomes available at 2x the advanced tier. Never automatic - every frontier task asks you first, with the reason and the cost."
   ```
 
-  On **Enable**, set `"frontier": "fable"`. If the user wants a different value for any tier, substitute it before writing — but never set `frontier` to the same model as `advanced` (the config would be rejected as invalid). Write the result to `docs/superpowers/model-routing.json` (create `docs/superpowers/` if missing — that is intentional).
+  On **Enable**, set `"frontier": "fable"`. If the user wants a different value for any tier, substitute it before writing — but never set `frontier` to the same model as `advanced` (the config would be rejected as invalid). Before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/model-routing.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Write the result to `.superpowers/model-routing.json` (create `.superpowers/` if missing).
 
-- **One fixed model** → ask the follow-up below first, then write `{"schema": 2, ...}` with `mechanical`, `standard`, and `advanced` all set to the chosen value and `"frontier": "off"`. Frontier must stay off here: a flat cap has no second tier to gate, and a config where `advanced` and `frontier` name the same model is rejected as invalid.
+- **One fixed model** → ask the follow-up below first, then before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/model-routing.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Then write `{"schema": 2, ...}` with `mechanical`, `standard`, and `advanced` all set to the chosen value and `"frontier": "off"`. Frontier must stay off here: a flat cap has no second tier to gate, and a config where `advanced` and `frontier` name the same model is rejected as invalid.
 
   ```yaml
   AskUserQuestion:
@@ -71,7 +71,7 @@ AskUserQuestion:
 
 - **Skip** → write nothing.
 
-After writing the file, tell the user: the routing gates (`hooks/pre-taskcreate-model-tier.js`, `hooks/pre-agent-model-routing.js`) check for this file on every relevant tool call and activate immediately — no restart needed. From the next session on, `hooks/session-start` injects a `<model-routing-active>` notice with the tier mapping and rules. Kill switch at runtime: `SUPERPOWERS_ROUTING_GUARD=0`. Off-switch: delete `docs/superpowers/model-routing.json` — routing goes fully dormant, byte-identical to never having opted in. If you enabled the frontier tier, nothing dispatches to it silently: each qualifying task asks first, states why frontier suits it, and offers advanced as the default. Set `"frontier": "off"` to stop those prompts entirely.
+After writing the file, tell the user: the routing gates (`hooks/pre-taskcreate-model-tier.js`, `hooks/pre-agent-model-routing.js`) check for this file on every relevant tool call and activate immediately — no restart needed. From the next session on, `hooks/session-start` injects a `<model-routing-active>` notice with the tier mapping and rules. Kill switch at runtime: `SUPERPOWERS_ROUTING_GUARD=0`. Off-switch: delete `.superpowers/model-routing.json` — routing goes fully dormant, byte-identical to never having opted in. (If you also have a legacy `docs/superpowers/model-routing.json`, delete that too; the canonical file takes precedence and deleting only the legacy one leaves routing active.) If you enabled the frontier tier, nothing dispatches to it silently: each qualifying task asks first, states why frontier suits it, and offers advanced as the default. Set `"frontier": "off"` to stop those prompts entirely.
 
 ## Feature 2: User-Gate Enforcement Hooks
 
@@ -126,20 +126,20 @@ AskUserQuestion:
   header: "Commits"
   options:
     - label: "Per-task commits (default)"
-      description: "Every task ends with its own commit - fine-grained history, per-task rollback. Writes docs/superpowers/workflow.json with commitStrategy=\"per-task\" so the choice is explicit on disk."
+      description: "Every task ends with its own commit - fine-grained history, per-task rollback. Writes .superpowers/workflow.json with commitStrategy=\"per-task\" so the choice is explicit on disk."
     - label: "Single commit at plan end"
       description: "Tasks leave changes uncommitted; one final plan task commits the full implementation as a single commit. Writes commitStrategy=\"at-end\"."
     - label: "Skip"
       description: "Leave nothing on disk. Behavior stays the per-task default; identical outcome to choosing it explicitly, just without a config file."
 ```
 
-- **Per-task commits** → write `docs/superpowers/workflow.json`:
+- **Per-task commits** → before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/workflow.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Then write `.superpowers/workflow.json`:
 
   ```json
   {"commitStrategy": "per-task"}
   ```
 
-- **Single commit at plan end** → write `docs/superpowers/workflow.json`:
+- **Single commit at plan end** → before writing under `.superpowers/`: run `git check-ignore -q .superpowers` in the project root. Not ignored → tell the user this file is machine-local by design and offer to append `.superpowers/` to `.gitignore` (decline = write anyway, noting it will show as untracked). Then, if the legacy file `docs/superpowers/workflow.json` exists: offer to move it to `.superpowers/` instead of writing a second copy — an unmigrated legacy file is shadowed by the canonical one and drifts silently. Never move it without a yes. Then write `.superpowers/workflow.json`:
 
   ```json
   {"commitStrategy": "at-end"}
@@ -373,9 +373,9 @@ AskUserQuestion:
 
 Report in one block, per feature: configured or skipped, the exact absolute path written (if any), and a one-line undo:
 
-- **Routing** — delete `docs/superpowers/model-routing.json` to fully deactivate.
+- **Routing** — delete `.superpowers/model-routing.json` to fully deactivate. (If you also have a legacy `docs/superpowers/model-routing.json`, delete that too; the canonical file takes precedence.)
 - **Gate hooks** — remove the hook entries you added from `hooks.PostToolUse` / `hooks.Stop` and the `"EnterPlanMode"` entry from `permissions.deny`, all in the project's `.claude/settings.json`.
-- **Commit strategy** — delete `docs/superpowers/workflow.json`, or remove its `commitStrategy` key.
+- **Commit strategy** — delete `.superpowers/workflow.json`, or remove its `commitStrategy` key.
 - **Auto-update** — set `extraKnownMarketplaces["superpowers-dev"].autoUpdate` back to `false` (or remove the key) in the settings file you wrote it to.
 - **CodeGraph** — nothing written by this offer besides an optional `.superpowers-no-codegraph` decline marker (delete it to be asked again); the CLI/agent-wiring/index steps are all run by the user outside this flow.
 - **Serena** — remove the `excluded_tools` key (or the six memory-tool entries within it) from `.serena/project.yml`; delete `.superpowers-no-serena` to be asked again.
