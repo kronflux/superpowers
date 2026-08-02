@@ -119,7 +119,7 @@ function summaryLine(caps) {
   const present = Object.entries(caps)
     .filter(([, v]) => v.status !== STATUS.ABSENT).map(([k]) => k);
   return present.length
-    ? `[conductor] available: ${present.join(', ')}`
+    ? `[conductor] use first: ${present.join(', ')}`
     : '[conductor] no optional integrations detected';
 }
 
