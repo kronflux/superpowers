@@ -18,7 +18,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { probe } from './lib/capability-registry.js';
 
 const CLASSES = ['codegraph', 'serena', 'middleware'];
 
@@ -36,19 +35,39 @@ function statePath(sessionId) {
   return path.join(os.tmpdir(), `sp-conductor-${String(sessionId).replace(/[^A-Za-z0-9_-]/g, '_')}`);
 }
 
-function loadState(sessionId, cwd) {
+function claimNudge(sessionId, cls) {
+  try {
+    fs.writeFileSync(`${statePath(sessionId)}-${cls}`, '1', { flag: 'wx' });
+    return true;
+  } catch {
+    return false; // already claimed (EEXIST) or unwritable - either way, stay silent
+  }
+}
+
+async function loadState(sessionId, cwd) {
   try { return JSON.parse(fs.readFileSync(statePath(sessionId), 'utf8')); } catch {}
   // First invocation this session: probe once and cache. probe() is fs/PATH
   // checks only; if it ever throws, caps stay all-false (nudges silent).
   const caps = { codegraph: false, serena: false, middleware: false };
   try {
+    const { probe } = await import('./lib/capability-registry.js');
     const p = probe(cwd);
-    caps.codegraph = p.codegraph.indexed === true && p.codegraph.declined !== true;
+    caps.codegraph = p.codegraph.status !== 'absent' && p.codegraph.indexed === true && p.codegraph.declined !== true;
     caps.serena = p.serena.status !== 'absent' && p.serena.declined !== true;
     caps.middleware = p.middleware.status !== 'absent' && p.middleware.declined !== true;
   } catch {}
   const state = { caps, spent: { codegraph: false, serena: false, middleware: false } };
-  try { fs.writeFileSync(statePath(sessionId), JSON.stringify(state)); } catch {}
+  try {
+    const tmp = statePath(sessionId) + `.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(state));
+    try {
+      fs.renameSync(tmp, statePath(sessionId));
+    } catch {
+      // Another instance won the race; prefer its state.
+      try { fs.rmSync(tmp, { force: true }); } catch {}
+      try { return JSON.parse(fs.readFileSync(statePath(sessionId), 'utf8')); } catch {}
+    }
+  } catch {}
   return state;
 }
 
@@ -68,7 +87,7 @@ async function main() {
     const { tool_name, session_id, cwd } = data;
     const isPost = data.hook_event_name === 'PostToolUse' || 'tool_response' in data;
     const sessionId = String(session_id || 'unknown');
-    const state = loadState(sessionId, cwd || process.cwd());
+    const state = await loadState(sessionId, cwd || process.cwd());
 
     if (CLASSES.every((c) => state.spent[c] || !state.caps[c])) {
       process.stdout.write('{}');
@@ -89,6 +108,7 @@ async function main() {
       process.stdout.write('{}');
       return;
     }
+    if (!claimNudge(sessionId, cls)) { process.stdout.write('{}'); return; }
 
     state.spent[cls] = true;
     try { fs.writeFileSync(statePath(sessionId), JSON.stringify(state)); } catch {}
