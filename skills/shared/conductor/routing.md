@@ -39,6 +39,11 @@ Whenever work leaves the primary session — an Agent dispatch under a routed ti
 
 Examples: `[conductor] task 3 implementer -> haiku (subagent)`,
 `[conductor] extract-log-error -> openrouter/qwen-72b (external)`.
+For external runs, the announcement after completion MUST carry the run's cost, taken from
+the `[middleware] done` banner: `[conductor] summarize-test-failure -> openrouter/qwen-72b
+(external) — 812/54 tokens, 2.1s` (http transports report exact prompt/completion tokens;
+cli transports report `promptBytes/outputBytes bytes` instead — they carry no token counts).
 One line per delegation; no announcement for work done in the primary context. Logs remain
 the ground truth (`hooks-logs/routing-dispatch.log`, `hooks-logs/middleware-usage.jsonl`);
-the announcement exists so the human can see delegation without opening tool output.
+the announcement exists so the human can see delegation and its cost without opening tool
+output.
