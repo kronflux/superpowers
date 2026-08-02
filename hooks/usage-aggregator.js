@@ -8,6 +8,11 @@
  * hooks-logs/claude-usage.jsonl. Transcript-derived ESTIMATE: it reflects what
  * the harness recorded, not billing. Fail-open: any error -> {} and exit 0.
  * Offset state: os.tmpdir()/sp-usage-<session_id>.
+ *
+ * Reads are chunked: a single invocation never materializes more than
+ * MAX_CHUNK bytes as a string, so a huge transcript cannot stall the hook.
+ * First sight of a transcript larger than BACKFILL_CAP starts near EOF
+ * instead of counting the whole history.
  */
 
 import fs from 'fs';
@@ -19,6 +24,12 @@ import { loadStats, saveStats } from './track-session-stats.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
+// Bounded work per invocation. buf.toString() over the whole unread region is
+// what killed this hook in the field: V8 refuses strings past ~512 MB, the
+// throw landed before writeOffset, and every later Stop retried from 0 forever.
+const MAX_CHUNK = 32 * 1024 * 1024;
+const BACKFILL_CAP = 64 * 1024 * 1024;
+
 function readOffset(sessionId) {
   try { return parseInt(fs.readFileSync(path.join(os.tmpdir(), `sp-usage-${sessionId}`), 'utf8'), 10) || 0; }
   catch { return 0; }
@@ -28,43 +39,71 @@ function writeOffset(sessionId, offset) {
   try { fs.writeFileSync(path.join(os.tmpdir(), `sp-usage-${sessionId}`), String(offset)); } catch {}
 }
 
-export function aggregate(transcriptPath, offset) {
+/** Offset of the first line start at or after `from` (or `from` if none found). */
+function lineStartAtOrAfter(fd, from, size) {
+  const len = Math.min(64 * 1024, size - from);
+  if (len <= 0) return from;
+  const probe = Buffer.alloc(len);
+  fs.readSync(fd, probe, 0, len, from);
+  const nl = probe.indexOf(0x0a);
+  return nl === -1 ? from : from + nl + 1;
+}
+
+export function aggregate(transcriptPath, offset, opts = {}) {
+  const maxChunk = opts.maxChunk ?? MAX_CHUNK;
+  const backfillCap = opts.backfillCap ?? BACKFILL_CAP;
   const size = fs.statSync(transcriptPath).size;
   if (offset > size) offset = 0; // file shrank: rotated or regenerated, re-scan
-  if (offset >= size) return { delta: null, nextOffset: offset };
+  if (offset >= size) return { delta: null, nextOffset: offset, truncatedBackfill: false };
 
-  // Positional read: only the bytes since offset, not the whole transcript.
-  const buf = Buffer.alloc(size - offset);
+  let truncatedBackfill = false;
   const fd = fs.openSync(transcriptPath, 'r');
   try {
-    fs.readSync(fd, buf, 0, buf.length, offset);
+    // First sight of an already-huge transcript: counting all of it would cost
+    // many slow turns, so start near EOF and say so rather than pretend.
+    if (offset === 0 && size > backfillCap) {
+      offset = lineStartAtOrAfter(fd, size - backfillCap, size);
+      truncatedBackfill = true;
+    }
+
+    const want = Math.min(size - offset, maxChunk);
+    const buf = Buffer.alloc(want);
+    fs.readSync(fd, buf, 0, want, offset);
+
+    // `end` is relative to buf (which starts at `offset`).
+    let end = want;
+    // Only consume complete lines: an unterminated tail is re-read next run.
+    if (buf[end - 1] !== 0x0a) {
+      end = buf.lastIndexOf(0x0a, end - 1) + 1;
+      if (end <= 0) {
+        // A full chunk with no newline means one line exceeds maxChunk. Advance
+        // past it: the next chunk starts mid-line and its leading fragment
+        // fails JSON.parse harmlessly. Stalling here is the original bug.
+        // A short chunk is just an incomplete tail — wait for more bytes.
+        return want === maxChunk
+          ? { delta: null, nextOffset: offset + want, truncatedBackfill }
+          : { delta: null, nextOffset: offset, truncatedBackfill };
+      }
+    }
+
+    const delta = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
+    let saw = false;
+    for (const line of buf.toString('utf8', 0, end).split('\n')) {
+      if (!line.includes('"usage"')) continue;
+      let event;
+      try { event = JSON.parse(line); } catch { continue; }
+      const u = event?.message?.usage;
+      if (!u || typeof u !== 'object' || event?.message?.role !== 'assistant') continue;
+      saw = true;
+      delta.input += u.input_tokens || 0;
+      delta.output += u.output_tokens || 0;
+      delta.cacheRead += u.cache_read_input_tokens || 0;
+      delta.cacheCreation += u.cache_creation_input_tokens || 0;
+    }
+    return { delta: saw ? delta : null, nextOffset: offset + end, truncatedBackfill };
   } finally {
     fs.closeSync(fd);
   }
-
-  // end is relative to buf (which starts at `offset`); nextOffset below
-  // converts back to an absolute file offset.
-  let end = buf.length;
-  // Only consume complete lines: an unterminated tail is re-read next run.
-  if (buf[end - 1] !== 0x0a) {
-    end = buf.lastIndexOf(0x0a, end - 1) + 1;
-    if (end <= 0) return { delta: null, nextOffset: offset };
-  }
-  const delta = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
-  let saw = false;
-  for (const line of buf.toString('utf8', 0, end).split('\n')) {
-    if (!line.includes('"usage"')) continue;
-    let event;
-    try { event = JSON.parse(line); } catch { continue; }
-    const u = event?.message?.usage;
-    if (!u || typeof u !== 'object' || event?.message?.role !== 'assistant') continue;
-    saw = true;
-    delta.input += u.input_tokens || 0;
-    delta.output += u.output_tokens || 0;
-    delta.cacheRead += u.cache_read_input_tokens || 0;
-    delta.cacheCreation += u.cache_creation_input_tokens || 0;
-  }
-  return { delta: saw ? delta : null, nextOffset: offset + end };
 }
 
 async function main() {

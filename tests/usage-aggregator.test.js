@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { aggregate } from '../hooks/usage-aggregator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.join(__dirname, '..', 'hooks', 'usage-aggregator.js');
@@ -105,5 +106,55 @@ describe('usage-aggregator', () => {
     delete env.CLAUDE_CONFIG_DIR;
     expect(JSON.parse(execFileSync('node', [HOOK], { input: 'not json', encoding: 'utf8', env }))).toEqual({});
     run('s5', path.join(home, 'does-not-exist.jsonl'));
+  });
+});
+
+describe('aggregate chunking', () => {
+  // asst() already exists in this file; it returns one JSONL line.
+  it('aggregates a transcript larger than maxChunk across successive calls', () => {
+    const t = path.join(home, 'big.jsonl');
+    let expected = 0;
+    let body = '';
+    for (let i = 0; i < 200; i++) { body += asst(10, 5); expected += 10; }
+    fs.writeFileSync(t, body);
+    const size = fs.statSync(t).size;
+    const maxChunk = Math.ceil(size / 7); // force ~7 chunks
+
+    let offset = 0, guard = 0, input = 0;
+    while (offset < size && guard++ < 50) {
+      const r = aggregate(t, offset, { maxChunk });
+      expect(r.nextOffset).toBeGreaterThan(offset); // advance invariant
+      offset = r.nextOffset;
+      if (r.delta) input += r.delta.input;
+    }
+    expect(offset).toBe(size);
+    expect(input).toBe(expected);
+    expect(guard).toBeLessThan(50); // did not spin
+  });
+
+  it('does not stall on a single line longer than maxChunk', () => {
+    const t = path.join(home, 'longline.jsonl');
+    const huge = JSON.stringify({ message: { role: 'user', content: 'x'.repeat(5000) } }) + '\n';
+    fs.writeFileSync(t, huge + asst(7, 3));
+    const r = aggregate(t, 0, { maxChunk: 1024 });
+    expect(r.nextOffset).toBeGreaterThan(0); // advanced despite no newline in chunk 1
+  });
+
+  it('caps first-sight backfill and reports truncation', () => {
+    const t = path.join(home, 'backfill.jsonl');
+    let body = '';
+    for (let i = 0; i < 100; i++) body += asst(1, 1);
+    fs.writeFileSync(t, body);
+    const size = fs.statSync(t).size;
+    const r = aggregate(t, 0, { backfillCap: Math.floor(size / 4), maxChunk: size });
+    expect(r.truncatedBackfill).toBe(true);
+    expect(r.nextOffset).toBeGreaterThan(Math.floor(size / 2)); // started near EOF, not 0
+  });
+
+  it('leaves an unterminated trailing line for the next run', () => {
+    const t = path.join(home, 'partial.jsonl');
+    fs.writeFileSync(t, asst(4, 2) + asst(9, 9).trimEnd());
+    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
+    expect(r.delta.input).toBe(4); // second line not consumed
   });
 });
