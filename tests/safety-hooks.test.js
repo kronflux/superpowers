@@ -77,6 +77,8 @@ describe('bulk-staging ask patterns', () => {
     'git commit -a -m "x"',
     'git commit -am "x"',
     'git commit --all -m "x"',
+    'git add .\ngit status',
+    'cd foo && git add .\nnpm test',
   ];
   const allows = [
     'git add path/to/file.js',
@@ -85,6 +87,8 @@ describe('bulk-staging ask patterns', () => {
     'git commit -m "feat: x"',
     'git commit --amend --no-edit',
     'git status',
+    'git add ./src',
+    'git add ./src\nnpm test',
   ];
   for (const cmd of asks) {
     it(`asks on: ${cmd}`, () => {

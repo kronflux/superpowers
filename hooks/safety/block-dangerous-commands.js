@@ -54,7 +54,7 @@ const PATTERNS = [
 // Short-flag regexes use -(?!-) so long flags like --amend cannot match.
 const ASK_PATTERNS = [
   { id: 'git-add-all', regex: /\bgit\s+add\s+(?:\S+\s+)*(?:-(?!-)[a-zA-Z]*A[a-zA-Z]*|--all)(?:\s|$|[;&|])/, reason: 'bulk staging sweeps unrelated local changes into the commit - stage explicit paths (skills/shared/git-hygiene.md), or allow if bulk staging is intended' },
-  { id: 'git-add-dot', regex: /\bgit\s+add\s+(?:-\S+\s+)*["']?\.\/?["']?\s*(?:$|[;&|])/, reason: 'git add . stages everything under the cwd - stage explicit paths (skills/shared/git-hygiene.md), or allow if bulk staging is intended' },
+  { id: 'git-add-dot', regex: /\bgit\s+add\s+(?:-\S+\s+)*["']?\.\/?["']?[ \t]*(?:$|[\n;&|])/, reason: 'git add . stages everything under the cwd - stage explicit paths (skills/shared/git-hygiene.md), or allow if bulk staging is intended' },
   { id: 'git-commit-all', regex: /\bgit\s+commit\s+(?:\S+\s+)*(?:-(?!-)[a-zA-Z]*a[a-zA-Z]*\b|--all\b)/, reason: 'git commit -a stages every modified file - commit explicit paths (skills/shared/git-hygiene.md), or allow if intended' },
 ];
 
