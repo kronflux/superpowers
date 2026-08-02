@@ -53,6 +53,18 @@ export default {
       platforms: ['claude-code'],
     },
     {
+      event: 'PreToolUse',
+      matcher: 'Grep|Glob|Read|Edit',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/conductor-nudges.js"',
+      platforms: ['claude-code'],
+    },
+    {
+      event: 'PostToolUse',
+      matcher: 'Bash',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/conductor-nudges.js"',
+      platforms: ['claude-code'],
+    },
+    {
       // TaskCreate is a Claude Code-native tool; routing stays claude-code-only.
       event: 'PreToolUse',
       matcher: 'TaskCreate',
