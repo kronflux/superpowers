@@ -122,8 +122,52 @@ describe('health record', () => {
     expect(h.offset).toBe(h.transcriptSize);
   });
 
-  it('records the error when a hook error occurs', () => {
-    // Trigger an error by passing malformed stdin (JSON parsing fails)
+  it('records the error when aggregation throws (invalid read position)', () => {
+    // Seed the offset-state file with a negative offset to cause fs.readSync to throw EINVAL.
+    // readState() accepts negative offsets (Number.isFinite(-5) is true), both early guards
+    // fall through, and fs.readSync(fd, buf, 0, want, -5) throws — genuine aggregate() error.
+    const sessionId = 's-throw-test';
+    const statePath = path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+    fs.writeFileSync(statePath, JSON.stringify({ offset: -5, pending: {} }));
+
+    try {
+      const t = path.join(home, 'test.jsonl');
+      fs.writeFileSync(t, asst(10, 5));
+
+      const env = { ...process.env, HOME: home, USERPROFILE: home };
+      delete env.CLAUDE_CONFIG_DIR;
+      const out = execFileSync('node', [HOOK], {
+        input: JSON.stringify({ session_id: sessionId, transcript_path: t }),
+        encoding: 'utf8', env,
+      });
+      expect(JSON.parse(out)).toEqual({});
+
+      const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+      expect(h.lastError).not.toBeNull();
+      expect(String(h.lastError.message).length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(statePath, { force: true });
+    }
+  });
+
+  it('records a health file when transcript is missing', () => {
+    // Run with a transcript path that does not exist; health should record no error but note absence.
+    const missingPath = path.join(home, 'does-not-exist.jsonl');
+    const env = { ...process.env, HOME: home, USERPROFILE: home };
+    delete env.CLAUDE_CONFIG_DIR;
+    const out = execFileSync('node', [HOOK], {
+      input: JSON.stringify({ session_id: 's-missing', transcript_path: missingPath }),
+      encoding: 'utf8', env,
+    });
+    expect(JSON.parse(out)).toEqual({});
+
+    const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+    expect(h.lastError).toBeNull();
+    expect(h.note).toBe('no transcript_path');
+  });
+
+  it('records the error when a hook error occurs (malformed stdin)', () => {
+    // Trigger an error by passing malformed stdin (JSON parsing fails).
     const env = { ...process.env, HOME: home, USERPROFILE: home };
     delete env.CLAUDE_CONFIG_DIR;
     const out = execFileSync('node', [HOOK], {
