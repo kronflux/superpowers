@@ -1,5 +1,21 @@
 # Superpowers Release Notes
 
+## 7.6.0 — conductor activation, usage announcements, git hygiene
+
+Three improvements in tool-selection nudging, external model attribution, and explicit staging practices.
+
+### Conductor nudges
+
+A new fail-open hook fires one tip per capability class per session at the moment of tool choice: CodeGraph-indexed repos on Grep/Glob/Read, Serena on first Edit, middleware digests on large failing Bash output. The session-start `[conductor]` line is now directive (`use first:`). No auto-execution: middleware runs stay an explicit, announced choice.
+
+### Usage in announcements
+
+External delegation announcements must carry the run's token cost (byte counts for CLI transports) from the `[middleware] done` banner.
+
+### Git hygiene
+
+Bulk staging (`git add -A`/`.`, `git commit -a`) now raises the native permission prompt instead of passing silently; `skills/shared/git-hygiene.md` sets the explicit-path staging and history-repair contract (amend/rebase unpushed mistakes, never stacked undo-commits, never rewrite pushed history).
+
 ## 7.5.0 — routing reliability, path consolidation, visibility, and token usage
 
 Four improvements across dispatch routing, project paths, conductor visibility, and usage tracking.
