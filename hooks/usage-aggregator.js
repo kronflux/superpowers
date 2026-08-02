@@ -30,13 +30,51 @@ const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 const MAX_CHUNK = 32 * 1024 * 1024;
 const BACKFILL_CAP = 64 * 1024 * 1024;
 
-function readOffset(sessionId) {
-  try { return parseInt(fs.readFileSync(path.join(os.tmpdir(), `sp-usage-${sessionId}`), 'utf8'), 10) || 0; }
-  catch { return 0; }
+// Conductor capabilities, matched against the tool_use name. Middleware is not
+// an MCP tool - it is a Bash call to scripts/middleware-exec.mjs.
+const CAPABILITY_PATTERNS = [
+  ['codegraph', /codegraph/i],
+  ['serena',    /serena/i],
+  ['context7',  /context7/i],
+  ['obsidian',  /obsidian|basic.?memory/i],
+];
+const MAX_PENDING = 500;
+
+function capabilityOf(name, input) {
+  if (typeof name !== 'string') return null;
+  for (const [cap, re] of CAPABILITY_PATTERNS) if (re.test(name)) return cap;
+  if (name === 'Bash' && typeof input?.command === 'string'
+      && input.command.includes('middleware-exec')) return 'middleware';
+  return null;
 }
 
-function writeOffset(sessionId, offset) {
-  try { fs.writeFileSync(path.join(os.tmpdir(), `sp-usage-${sessionId}`), String(offset)); } catch {}
+function bump(conductor, cap, field, n) {
+  if (!conductor[cap]) conductor[cap] = { calls: 0, bytes: 0 };
+  conductor[cap][field] += n;
+}
+
+function statePath(sessionId) {
+  return path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+}
+
+function readState(sessionId) {
+  const empty = { offset: 0, pending: {}, truncatedBackfill: false };
+  try {
+    const raw = fs.readFileSync(statePath(sessionId), 'utf8');
+    try {
+      const s = JSON.parse(raw);
+      if (s && typeof s === 'object' && Number.isFinite(s.offset)) {
+        return { offset: s.offset, pending: s.pending || {}, truncatedBackfill: !!s.truncatedBackfill };
+      }
+    } catch { /* fall through to the legacy bare-integer format */ }
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n)) return { ...empty, offset: n };
+  } catch {}
+  return empty;
+}
+
+function writeState(sessionId, state) {
+  try { fs.writeFileSync(statePath(sessionId), JSON.stringify(state)); } catch {}
 }
 
 /** Offset of the first line start at or after `from` (or `from` if none found). */
@@ -54,7 +92,12 @@ export function aggregate(transcriptPath, offset, opts = {}) {
   const backfillCap = opts.backfillCap ?? BACKFILL_CAP;
   const size = fs.statSync(transcriptPath).size;
   if (offset > size) offset = 0; // file shrank: rotated or regenerated, re-scan
-  if (offset >= size) return { delta: null, nextOffset: offset, truncatedBackfill: false };
+  if (offset >= size) {
+    return {
+      delta: null, nextOffset: offset, truncatedBackfill: false,
+      conductor: {}, pending: { ...(opts.pending || {}) },
+    };
+  }
 
   let truncatedBackfill = false;
   const fd = fs.openSync(transcriptPath, 'r');
@@ -81,26 +124,61 @@ export function aggregate(transcriptPath, offset, opts = {}) {
         // fails JSON.parse harmlessly. Stalling here is the original bug.
         // A short chunk is just an incomplete tail — wait for more bytes.
         return want === maxChunk
-          ? { delta: null, nextOffset: offset + want, truncatedBackfill }
-          : { delta: null, nextOffset: offset, truncatedBackfill };
+          ? {
+              delta: null, nextOffset: offset + want, truncatedBackfill,
+              conductor: {}, pending: { ...(opts.pending || {}) },
+            }
+          : {
+              delta: null, nextOffset: offset, truncatedBackfill,
+              conductor: {}, pending: { ...(opts.pending || {}) },
+            };
       }
     }
 
     const delta = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
     let saw = false;
+    const conductor = {};
+    const pending = { ...(opts.pending || {}) };
     for (const line of buf.toString('utf8', 0, end).split('\n')) {
-      if (!line.includes('"usage"')) continue;
+      const hasUsage = line.includes('"usage"');
+      const hasTool = line.includes('"tool_use"') || line.includes('"tool_result"');
+      if (!hasUsage && !hasTool) continue;
       let event;
       try { event = JSON.parse(line); } catch { continue; }
+
       const u = event?.message?.usage;
-      if (!u || typeof u !== 'object' || event?.message?.role !== 'assistant') continue;
-      saw = true;
-      delta.input += u.input_tokens || 0;
-      delta.output += u.output_tokens || 0;
-      delta.cacheRead += u.cache_read_input_tokens || 0;
-      delta.cacheCreation += u.cache_creation_input_tokens || 0;
+      if (u && typeof u === 'object' && event?.message?.role === 'assistant') {
+        saw = true;
+        delta.input += u.input_tokens || 0;
+        delta.output += u.output_tokens || 0;
+        delta.cacheRead += u.cache_read_input_tokens || 0;
+        delta.cacheCreation += u.cache_creation_input_tokens || 0;
+      }
+
+      const content = event?.message?.content;
+      if (!Array.isArray(content)) continue;
+      for (const b of content) {
+        if (!b || typeof b !== 'object') continue;
+        if (b.type === 'tool_use') {
+          const cap = capabilityOf(b.name, b.input);
+          if (cap && b.id) {
+            bump(conductor, cap, 'calls', 1);
+            pending[b.id] = cap;
+          }
+        } else if (b.type === 'tool_result') {
+          const cap = pending[b.tool_use_id];
+          if (cap) {
+            bump(conductor, cap, 'bytes', Buffer.byteLength(JSON.stringify(b.content ?? '')));
+            delete pending[b.tool_use_id];
+          }
+        }
+      }
     }
-    return { delta: saw ? delta : null, nextOffset: offset + end, truncatedBackfill };
+    // Interrupted calls never get a result; keep the map bounded.
+    if (Object.keys(pending).length > MAX_PENDING) {
+      for (const k of Object.keys(pending).slice(0, Object.keys(pending).length - MAX_PENDING)) delete pending[k];
+    }
+    return { delta: saw ? delta : null, conductor, nextOffset: offset + end, pending, truncatedBackfill };
   } finally {
     fs.closeSync(fd);
   }
@@ -116,20 +194,35 @@ async function main() {
       return;
     }
     const sessionId = String(session_id || 'unknown');
-    const offset = readOffset(sessionId);
-    const { delta, nextOffset } = aggregate(transcript_path, offset);
-    writeOffset(sessionId, nextOffset);
-    if (delta) {
+    const st = readState(sessionId);
+    const { delta, conductor, nextOffset, pending, truncatedBackfill } =
+      aggregate(transcript_path, st.offset, { pending: st.pending });
+    writeState(sessionId, { offset: nextOffset, pending, truncatedBackfill: st.truncatedBackfill || truncatedBackfill });
+    const hasConductor = Object.keys(conductor).length > 0;
+    if (delta || hasConductor) {
       const stats = loadStats();
-      const t = stats.tokens || { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
-      stats.tokens = {
-        input: t.input + delta.input, output: t.output + delta.output,
-        cacheRead: t.cacheRead + delta.cacheRead, cacheCreation: t.cacheCreation + delta.cacheCreation,
-      };
+      if (delta) {
+        const t = stats.tokens || { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
+        stats.tokens = {
+          input: t.input + delta.input, output: t.output + delta.output,
+          cacheRead: t.cacheRead + delta.cacheRead, cacheCreation: t.cacheCreation + delta.cacheCreation,
+        };
+      }
+      if (hasConductor) {
+        const c = stats.conductor || {};
+        for (const [cap, v] of Object.entries(conductor)) {
+          const prev = c[cap] || { calls: 0, bytes: 0 };
+          c[cap] = { calls: prev.calls + v.calls, bytes: prev.bytes + v.bytes };
+        }
+        stats.conductor = c;
+      }
       saveStats(stats);
       fs.mkdirSync(LOG_DIR, { recursive: true });
-      fs.appendFileSync(path.join(LOG_DIR, 'claude-usage.jsonl'),
-        JSON.stringify({ ts: new Date().toISOString(), sessionId, ...delta }) + '\n');
+      fs.appendFileSync(path.join(LOG_DIR, 'claude-usage.jsonl'), JSON.stringify({
+        ts: new Date().toISOString(), sessionId,
+        ...(delta || { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }),
+        ...(hasConductor ? { conductor } : {}),
+      }) + '\n');
     }
   } catch { /* fail-open */ }
   process.stdout.write('{}');

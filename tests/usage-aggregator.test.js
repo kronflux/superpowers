@@ -15,7 +15,7 @@ const HOOK = path.join(__dirname, '..', 'hooks', 'usage-aggregator.js');
 // run of this suite (same literal session ids) would corrupt the next run's "first
 // run sums everything" assumption. Clear known offset files before each case so
 // every test starts from a true first run, regardless of prior invocations.
-const SESSION_IDS = ['s1', 's2', 's3', 's4', 's5', 's6'];
+const SESSION_IDS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7'];
 function clearOffsets() {
   for (const id of SESSION_IDS) {
     fs.rmSync(path.join(os.tmpdir(), `sp-usage-${id}`), { force: true });
@@ -156,5 +156,78 @@ describe('aggregate chunking', () => {
     fs.writeFileSync(t, asst(4, 2) + asst(9, 9).trimEnd());
     const r = aggregate(t, 0, { maxChunk: 1 << 20 });
     expect(r.delta.input).toBe(4); // second line not consumed
+  });
+
+  it('clamps the post-backfill read to maxChunk', () => {
+    const t = path.join(home, 'backfill-chunk.jsonl');
+    let body = '';
+    for (let i = 0; i < 100; i++) body += asst(1, 1);
+    fs.writeFileSync(t, body);
+    const size = fs.statSync(t).size;
+    const backfillCap = Math.floor(size / 4);
+    const maxChunk = Math.floor(backfillCap / 3); // smaller than what backfill alone would leave
+
+    // Mirror aggregate()'s own line-boundary alignment: the actual backfill
+    // start is the first line start at or after size - backfillCap, not that
+    // raw arithmetic offset (which may land mid-line).
+    const rawStart = size - backfillCap;
+    const nl = body.indexOf('\n', rawStart);
+    const backfillStart = nl === -1 ? rawStart : nl + 1;
+
+    const r = aggregate(t, 0, { backfillCap, maxChunk });
+    expect(r.truncatedBackfill).toBe(true);
+    expect(r.nextOffset).toBeLessThan(size); // maxChunk actually capped the read, not just backfill
+    expect(r.nextOffset - backfillStart).toBeLessThanOrEqual(maxChunk);
+  });
+});
+
+describe('conductor attribution', () => {
+  const sessionId = 's7';
+  const use = (id, name, input = {}) => JSON.stringify({
+    message: { role: 'assistant', content: [{ type: 'tool_use', id, name, input }] },
+  }) + '\n';
+  const res = (id, content) => JSON.stringify({
+    message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content }] },
+  }) + '\n';
+
+  it('rolls MCP tools up per capability with call counts and bytes', () => {
+    const t = path.join(home, 'cap.jsonl');
+    fs.writeFileSync(t,
+      use('a1', 'mcp__plugin_serena_serena__find_symbol') + res('a1', 'x'.repeat(100)) +
+      use('a2', 'codegraph_explore') + res('a2', 'y'.repeat(50)) +
+      use('a3', 'Read') + res('a3', 'z'.repeat(999)));
+    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
+    expect(r.conductor.serena.calls).toBe(1);
+    expect(r.conductor.serena.bytes).toBeGreaterThan(90);
+    expect(r.conductor.codegraph.calls).toBe(1);
+    expect(r.conductor.Read).toBeUndefined();
+  });
+
+  it('counts middleware-exec Bash calls as the middleware capability', () => {
+    const t = path.join(home, 'mw.jsonl');
+    fs.writeFileSync(t,
+      use('b1', 'Bash', { command: 'node scripts/middleware-exec.mjs --task summarize-test-failure' }) +
+      res('b1', 'digest'));
+    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
+    expect(r.conductor.middleware.calls).toBe(1);
+  });
+
+  it('attributes a tool_result that lands in a later chunk', () => {
+    const t = path.join(home, 'split.jsonl');
+    const a = use('c1', 'codegraph_explore');
+    const b = res('c1', 'w'.repeat(40));
+    fs.writeFileSync(t, a + b);
+    const first = aggregate(t, 0, { maxChunk: a.length }); // chunk 1: the tool_use only
+    expect(first.pending.c1).toBe('codegraph');
+    const second = aggregate(t, first.nextOffset, { maxChunk: 1 << 20, pending: first.pending });
+    expect(second.conductor.codegraph.bytes).toBeGreaterThan(35);
+  });
+
+  it('reads a legacy bare-integer offset file', () => {
+    const t = path.join(home, 'legacy.jsonl');
+    fs.writeFileSync(t, asst(5, 5));
+    fs.writeFileSync(path.join(os.tmpdir(), `sp-usage-${sessionId}`), '0');
+    run(sessionId, t);
+    expect(readStats().tokens.input).toBe(5);
   });
 });
