@@ -60,4 +60,14 @@ describe('bash-compress-hook', () => {
     const out = runHook({ tool_name: 'Read', tool_input: { file_path: 'x' }, session_id: sid });
     expect(out).toEqual({});
   });
+
+  it('stands down for a command the ask guard targets, even though a compress rule matches', () => {
+    seedCtx(sid, false);
+    const out = runHook({
+      tool_name: 'Bash',
+      tool_input: { command: 'git add -A' },
+      session_id: sid,
+    });
+    expect(out).toEqual({});
+  });
 });

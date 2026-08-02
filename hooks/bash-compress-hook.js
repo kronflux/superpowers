@@ -14,6 +14,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { RULES, NEVER_COMPRESS } from './compression-rules.js';
 import { isContextModeActive } from './lib/ctx-detect.js';
+import { checkAsk } from './safety/block-dangerous-commands.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -77,6 +78,11 @@ async function main() {
 
     const cmd = (tool_input?.command || '').trim();
     if (!cmd) { process.stdout.write('{}'); return; }
+
+    // Never compress (or 'allow') a command the ask guard wants the user to see:
+    // conflicting permissionDecisions on one event are harness-defined behavior
+    // we refuse to depend on.
+    if (checkAsk(cmd).ask) { process.stdout.write('{}'); return; }
 
     // ── context-mode yield ──
     // When context-mode is active it owns Bash routing. Yield: no updatedInput.
