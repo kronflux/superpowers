@@ -109,6 +109,35 @@ describe('usage-aggregator', () => {
   });
 });
 
+describe('health record', () => {
+  const healthPath = () => path.join(home, '.claude', 'hooks-logs', 'usage-aggregator-health.json');
+
+  it('records a successful run with no error', () => {
+    const t = path.join(home, 'h.jsonl');
+    fs.writeFileSync(t, asst(3, 3));
+    run('s1', t);
+    const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+    expect(h.lastError).toBeNull();
+    expect(h.transcriptSize).toBe(fs.statSync(t).size);
+    expect(h.offset).toBe(h.transcriptSize);
+  });
+
+  it('records the error when a hook error occurs', () => {
+    // Trigger an error by passing malformed stdin (JSON parsing fails)
+    const env = { ...process.env, HOME: home, USERPROFILE: home };
+    delete env.CLAUDE_CONFIG_DIR;
+    const out = execFileSync('node', [HOOK], {
+      input: 'not json at all',
+      encoding: 'utf8', env,
+    });
+    expect(JSON.parse(out)).toEqual({});
+
+    const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+    expect(h.lastError).not.toBeNull();
+    expect(String(h.lastError.message).length).toBeGreaterThan(0);
+  });
+});
+
 describe('aggregate chunking', () => {
   // asst() already exists in this file; it returns one JSONL line.
   it('aggregates a transcript larger than maxChunk across successive calls', () => {

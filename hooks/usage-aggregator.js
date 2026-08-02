@@ -28,6 +28,18 @@ import { configDir } from './lib/config-dir.js';
 import { loadStats, saveStats } from './track-session-stats.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
+const HEALTH_FILE = () => path.join(LOG_DIR, 'usage-aggregator-health.json');
+
+// Single overwritten file, never appended: a hook that dies every turn must
+// leave exactly one current record, not an unbounded error log.
+function writeHealth(fields) {
+  try {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+    let prev = {};
+    try { prev = JSON.parse(fs.readFileSync(HEALTH_FILE(), 'utf8')); } catch {}
+    fs.writeFileSync(HEALTH_FILE(), JSON.stringify({ ...prev, ...fields }, null, 2));
+  } catch { /* health reporting is best-effort */ }
+}
 
 // Bounded work per invocation. buf.toString() over the whole unread region is
 // what killed this hook in the field: V8 refuses strings past ~512 MB, the
@@ -196,6 +208,7 @@ async function main() {
     for await (const chunk of process.stdin) input += chunk;
     const { session_id, transcript_path } = JSON.parse(input);
     if (typeof transcript_path !== 'string' || !transcript_path || !fs.existsSync(transcript_path)) {
+      writeHealth({ lastRunAt: new Date().toISOString(), lastError: null, note: 'no transcript_path' });
       process.stdout.write('{}');
       return;
     }
@@ -230,7 +243,14 @@ async function main() {
         ...(hasConductor ? { conductor } : {}),
       }) + '\n');
     }
-  } catch { /* fail-open */ }
+    writeHealth({
+      lastRunAt: new Date().toISOString(), lastError: null,
+      offset: nextOffset, transcriptSize: fs.statSync(transcript_path).size,
+      truncatedBackfill: st.truncatedBackfill || truncatedBackfill,
+    });
+  } catch (e) {
+    writeHealth({ lastRunAt: new Date().toISOString(), lastError: { ts: new Date().toISOString(), message: String(e && e.message || e).slice(0, 300) } });
+  }
   process.stdout.write('{}');
 }
 
