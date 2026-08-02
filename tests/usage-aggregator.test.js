@@ -230,4 +230,44 @@ describe('conductor attribution', () => {
     run(sessionId, t);
     expect(readStats().tokens.input).toBe(5);
   });
+
+  it('recognizes the context7 capability', () => {
+    const t = path.join(home, 'ctx7.jsonl');
+    fs.writeFileSync(t,
+      use('d1', 'mcp__plugin_context7_context7__query-docs') + res('d1', 'docs'.repeat(10)));
+    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
+    expect(r.conductor.context7.calls).toBe(1);
+    expect(r.conductor.context7.bytes).toBeGreaterThan(0);
+  });
+
+  it('recognizes the obsidian capability', () => {
+    const t = path.join(home, 'obsidian.jsonl');
+    fs.writeFileSync(t,
+      use('e1', 'mcp__plugin_obsidian_obsidian__list_notes') + res('e1', 'notes'.repeat(10)));
+    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
+    expect(r.conductor.obsidian.calls).toBe(1);
+    expect(r.conductor.obsidian.bytes).toBeGreaterThan(0);
+  });
+
+  it('recognizes the basic-memory alternate for the obsidian capability', () => {
+    const t = path.join(home, 'basic-memory.jsonl');
+    fs.writeFileSync(t,
+      use('f1', 'mcp__plugin_basic_memory_basic-memory__write_note') + res('f1', 'note') +
+      use('f2', 'mcp__plugin_basic-memory_basic-memory__read_note') + res('f2', 'note'));
+    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
+    expect(r.conductor.obsidian.calls).toBe(2);
+  });
+
+  it('caps the pending map at opts.maxPending, evicting the oldest unmatched calls', () => {
+    const t = path.join(home, 'pending-cap.jsonl');
+    let body = '';
+    for (let i = 0; i < 10; i++) body += use(`p${i}`, 'codegraph_explore'); // no matching tool_result
+    fs.writeFileSync(t, body);
+    const r = aggregate(t, 0, { maxChunk: 1 << 20, maxPending: 3 });
+    expect(Object.keys(r.pending)).toHaveLength(3);
+    // Oldest entries evicted first; the most recent calls survive.
+    expect(r.pending.p9).toBe('codegraph');
+    expect(r.pending.p7).toBe('codegraph');
+    expect(r.pending.p0).toBeUndefined();
+  });
 });

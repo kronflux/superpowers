@@ -13,6 +13,11 @@
  * MAX_CHUNK bytes as a string, so a huge transcript cannot stall the hook.
  * First sight of a transcript larger than BACKFILL_CAP starts near EOF
  * instead of counting the whole history.
+ *
+ * The same pass also attributes conductor tool usage (codegraph, serena,
+ * context7, obsidian/basic-memory, middleware) per capability as call counts
+ * and tool_result byte sizes. `bytes` measures context consumed by tool
+ * results — it is NOT tokens billed, and is never presented as such.
  */
 
 import fs from 'fs';
@@ -90,6 +95,7 @@ function lineStartAtOrAfter(fd, from, size) {
 export function aggregate(transcriptPath, offset, opts = {}) {
   const maxChunk = opts.maxChunk ?? MAX_CHUNK;
   const backfillCap = opts.backfillCap ?? BACKFILL_CAP;
+  const maxPending = opts.maxPending ?? MAX_PENDING;
   const size = fs.statSync(transcriptPath).size;
   if (offset > size) offset = 0; // file shrank: rotated or regenerated, re-scan
   if (offset >= size) {
@@ -175,8 +181,8 @@ export function aggregate(transcriptPath, offset, opts = {}) {
       }
     }
     // Interrupted calls never get a result; keep the map bounded.
-    if (Object.keys(pending).length > MAX_PENDING) {
-      for (const k of Object.keys(pending).slice(0, Object.keys(pending).length - MAX_PENDING)) delete pending[k];
+    if (Object.keys(pending).length > maxPending) {
+      for (const k of Object.keys(pending).slice(0, Object.keys(pending).length - maxPending)) delete pending[k];
     }
     return { delta: saw ? delta : null, conductor, nextOffset: offset + end, pending, truncatedBackfill };
   } finally {
