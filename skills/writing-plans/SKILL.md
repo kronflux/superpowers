@@ -172,6 +172,7 @@ Every step must contain the actual content an engineer needs; placeholder or han
 - Complete code in every step — if a step changes code, show the code
 - Exact commands with expected output
 - DRY, YAGNI, TDD, frequent commits
+- Commit steps stage explicit paths only — `skills/shared/git-hygiene.md` is the contract; never write `git add -A` or `git add .` into a plan step
 
 ## Self-Review
 
