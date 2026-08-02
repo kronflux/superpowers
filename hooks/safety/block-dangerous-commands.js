@@ -49,6 +49,22 @@ const PATTERNS = [
   { level: 'strict', id: 'crontab-r',        regex: /\bcrontab\s+-r/,                                                      reason: 'removes all cron jobs' },
 ];
 
+// ASK tier — legitimate-but-sweeping git forms. Never denied: these raise the
+// native permission prompt so deliberate bulk staging survives one click.
+// Short-flag regexes use -(?!-) so long flags like --amend cannot match.
+const ASK_PATTERNS = [
+  { id: 'git-add-all', regex: /\bgit\s+add\s+(?:\S+\s+)*(?:-(?!-)[a-zA-Z]*A[a-zA-Z]*|--all)(?:\s|$|[;&|])/, reason: 'bulk staging sweeps unrelated local changes into the commit - stage explicit paths (skills/shared/git-hygiene.md), or allow if bulk staging is intended' },
+  { id: 'git-add-dot', regex: /\bgit\s+add\s+(?:-\S+\s+)*["']?\.\/?["']?\s*(?:$|[;&|])/, reason: 'git add . stages everything under the cwd - stage explicit paths (skills/shared/git-hygiene.md), or allow if bulk staging is intended' },
+  { id: 'git-commit-all', regex: /\bgit\s+commit\s+(?:\S+\s+)*(?:-(?!-)[a-zA-Z]*a[a-zA-Z]*\b|--all\b)/, reason: 'git commit -a stages every modified file - commit explicit paths (skills/shared/git-hygiene.md), or allow if intended' },
+];
+
+function checkAsk(cmd) {
+  for (const p of ASK_PATTERNS) {
+    if (p.regex.test(cmd)) return { ask: true, pattern: p };
+  }
+  return { ask: false, pattern: null };
+}
+
 const LEVELS = { critical: 1, high: 2, strict: 3 };
 const EMOJIS = { critical: '🚨', high: '⛔', strict: '⚠️' };
 
@@ -101,6 +117,20 @@ async function main() {
       return;
     }
 
+    const askResult = checkAsk(cmd);
+    if (askResult.ask) {
+      const p = askResult.pattern;
+      log({ level: 'ASK', id: p.id, cmd, session_id, cwd, permission_mode });
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'ask',
+          permissionDecisionReason: `[${p.id}] ${p.reason}`,
+        },
+      }));
+      return;
+    }
+
     process.stdout.write('{}');
   } catch (e) {
     log({ level: 'ERROR', error: e.message });
@@ -113,4 +143,4 @@ if (isMain) {
   main();
 }
 
-export { PATTERNS, LEVELS, SAFETY_LEVEL, checkCommand };
+export { PATTERNS, ASK_PATTERNS, LEVELS, SAFETY_LEVEL, checkCommand, checkAsk };
