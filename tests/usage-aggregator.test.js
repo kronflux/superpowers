@@ -120,6 +120,7 @@ describe('health record', () => {
     expect(h.lastError).toBeNull();
     expect(h.transcriptSize).toBe(fs.statSync(t).size);
     expect(h.offset).toBe(h.transcriptSize);
+    expect(h.sessionId).toBe('s1');
   });
 
   it('records the error when aggregation throws (invalid read position)', () => {
@@ -150,7 +151,7 @@ describe('health record', () => {
     }
   });
 
-  it('records a health file when transcript is missing', () => {
+  it('records a health file when transcript is missing, and a later success does not carry the note forward', () => {
     // Run with a transcript path that does not exist; health should record no error but note absence.
     const missingPath = path.join(home, 'does-not-exist.jsonl');
     const env = { ...process.env, HOME: home, USERPROFILE: home };
@@ -161,13 +162,28 @@ describe('health record', () => {
     });
     expect(JSON.parse(out)).toEqual({});
 
-    const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+    let h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
     expect(h.lastError).toBeNull();
     expect(h.note).toBe('no transcript_path');
+    expect(h.sessionId).toBe('s-missing');
+    expect(h.offset).toBeNull();
+    expect(h.transcriptSize).toBeNull();
+
+    // A later, fully successful run (same session) must write a complete record,
+    // not merge over the earlier note: writeHealth no longer reads the previous file.
+    const t = path.join(home, 'ok.jsonl');
+    fs.writeFileSync(t, asst(3, 3));
+    run('s-missing', t);
+    h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+    expect(h.note).toBeNull();
+    expect(h.lastError).toBeNull();
+    expect(h.offset).toBe(fs.statSync(t).size);
+    expect(h.transcriptSize).toBe(fs.statSync(t).size);
+    expect(h.sessionId).toBe('s-missing');
   });
 
-  it('records the error when a hook error occurs (malformed stdin)', () => {
-    // Trigger an error by passing malformed stdin (JSON parsing fails).
+  it('records the error when a hook error occurs (malformed stdin), and a later success clears it with no stale fields', () => {
+    // Trigger an error by passing malformed stdin (JSON parsing fails, so no session id is known).
     const env = { ...process.env, HOME: home, USERPROFILE: home };
     delete env.CLAUDE_CONFIG_DIR;
     const out = execFileSync('node', [HOOK], {
@@ -176,9 +192,24 @@ describe('health record', () => {
     });
     expect(JSON.parse(out)).toEqual({});
 
-    const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+    let h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
     expect(h.lastError).not.toBeNull();
     expect(String(h.lastError.message).length).toBeGreaterThan(0);
+    expect(h.sessionId).toBeNull();
+    expect(h.offset).toBeNull();
+    expect(h.transcriptSize).toBeNull();
+
+    // A later, unrelated successful run must not report next to the stale error,
+    // offset, or transcriptSize from the failed run: the record is global (one file)
+    // but every write is a complete record, so nothing survives across runs.
+    const t = path.join(home, 'after-error.jsonl');
+    fs.writeFileSync(t, asst(4, 4));
+    run('s1', t);
+    h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+    expect(h.lastError).toBeNull();
+    expect(h.offset).toBe(fs.statSync(t).size);
+    expect(h.transcriptSize).toBe(fs.statSync(t).size);
+    expect(h.sessionId).toBe('s1');
   });
 });
 

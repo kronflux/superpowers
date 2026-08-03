@@ -31,14 +31,19 @@ const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 const HEALTH_FILE = () => path.join(LOG_DIR, 'usage-aggregator-health.json');
 
 // Single overwritten file, never appended: a hook that dies every turn must
-// leave exactly one current record, not an unbounded error log.
-function writeHealth(fields) {
+// leave exactly one current record, not an unbounded error log. The record is
+// always written whole, with explicit nulls for fields unknown on a given
+// path: merging over the previous record is what let a stale note or a
+// cleared error survive into an unrelated later run.
+function writeHealth(record) {
   try {
     fs.mkdirSync(LOG_DIR, { recursive: true });
-    let prev = {};
-    try { prev = JSON.parse(fs.readFileSync(HEALTH_FILE(), 'utf8')); } catch {}
-    fs.writeFileSync(HEALTH_FILE(), JSON.stringify({ ...prev, ...fields }, null, 2));
+    fs.writeFileSync(HEALTH_FILE(), JSON.stringify(record, null, 2));
   } catch { /* health reporting is best-effort */ }
+}
+
+function healthRecord({ sessionId = null, lastError = null, offset = null, transcriptSize = null, truncatedBackfill = null, note = null }) {
+  return { lastRunAt: new Date().toISOString(), sessionId, lastError, offset, transcriptSize, truncatedBackfill, note };
 }
 
 // Bounded work per invocation. buf.toString() over the whole unread region is
@@ -113,7 +118,7 @@ export function aggregate(transcriptPath, offset, opts = {}) {
   if (offset >= size) {
     return {
       delta: null, nextOffset: offset, truncatedBackfill: false,
-      conductor: {}, pending: { ...(opts.pending || {}) },
+      conductor: {}, pending: { ...(opts.pending || {}) }, size,
     };
   }
 
@@ -144,11 +149,11 @@ export function aggregate(transcriptPath, offset, opts = {}) {
         return want === maxChunk
           ? {
               delta: null, nextOffset: offset + want, truncatedBackfill,
-              conductor: {}, pending: { ...(opts.pending || {}) },
+              conductor: {}, pending: { ...(opts.pending || {}) }, size,
             }
           : {
               delta: null, nextOffset: offset, truncatedBackfill,
-              conductor: {}, pending: { ...(opts.pending || {}) },
+              conductor: {}, pending: { ...(opts.pending || {}) }, size,
             };
       }
     }
@@ -196,25 +201,26 @@ export function aggregate(transcriptPath, offset, opts = {}) {
     if (Object.keys(pending).length > maxPending) {
       for (const k of Object.keys(pending).slice(0, Object.keys(pending).length - maxPending)) delete pending[k];
     }
-    return { delta: saw ? delta : null, conductor, nextOffset: offset + end, pending, truncatedBackfill };
+    return { delta: saw ? delta : null, conductor, nextOffset: offset + end, pending, truncatedBackfill, size };
   } finally {
     fs.closeSync(fd);
   }
 }
 
 async function main() {
+  let sessionId = null;
   try {
     let input = '';
     for await (const chunk of process.stdin) input += chunk;
     const { session_id, transcript_path } = JSON.parse(input);
+    sessionId = String(session_id || 'unknown');
     if (typeof transcript_path !== 'string' || !transcript_path || !fs.existsSync(transcript_path)) {
-      writeHealth({ lastRunAt: new Date().toISOString(), lastError: null, note: 'no transcript_path' });
+      writeHealth(healthRecord({ sessionId, note: 'no transcript_path' }));
       process.stdout.write('{}');
       return;
     }
-    const sessionId = String(session_id || 'unknown');
     const st = readState(sessionId);
-    const { delta, conductor, nextOffset, pending, truncatedBackfill } =
+    const { delta, conductor, nextOffset, pending, truncatedBackfill, size } =
       aggregate(transcript_path, st.offset, { pending: st.pending });
     writeState(sessionId, { offset: nextOffset, pending, truncatedBackfill: st.truncatedBackfill || truncatedBackfill });
     const hasConductor = Object.keys(conductor).length > 0;
@@ -243,13 +249,15 @@ async function main() {
         ...(hasConductor ? { conductor } : {}),
       }) + '\n');
     }
-    writeHealth({
-      lastRunAt: new Date().toISOString(), lastError: null,
-      offset: nextOffset, transcriptSize: fs.statSync(transcript_path).size,
+    writeHealth(healthRecord({
+      sessionId, offset: nextOffset, transcriptSize: size,
       truncatedBackfill: st.truncatedBackfill || truncatedBackfill,
-    });
+    }));
   } catch (e) {
-    writeHealth({ lastRunAt: new Date().toISOString(), lastError: { ts: new Date().toISOString(), message: String(e && e.message || e).slice(0, 300) } });
+    writeHealth(healthRecord({
+      sessionId,
+      lastError: { ts: new Date().toISOString(), message: String(e && e.message || e).slice(0, 300) },
+    }));
   }
   process.stdout.write('{}');
 }
