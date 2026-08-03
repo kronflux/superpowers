@@ -8,11 +8,19 @@ Resolve the active config root: `$CLAUDE_CONFIG_DIR` if set, else `~/.claude`. E
 below lives under it and may be absent — report "no data yet" for a missing one and continue.
 Read them in a single script or `ctx_execute` run rather than dumping raw files into context.
 
-**First, check collection health.** Read `hooks-logs/usage-aggregator-health.json`. If
-`lastError` is non-null, or if `offset` is unchanged from the previous record while
-`transcriptSize` grew, LEAD the report with a clear warning that usage collection is broken
-and every number below is stale — then still show what exists. A silently dead collector is
-the failure this file exists to expose.
+**First, check collection health.** Read `hooks-logs/usage-aggregator-health.json` and evaluate,
+in order:
+
+- **File absent** — the collector has never completed a run under this config root. Say so and
+  treat every figure below as absent rather than zero.
+- **`lastError` non-null** — collection failed on the most recent run. LEAD the report with that
+  error and the fact that all numbers below are stale as of `lastRunAt`.
+- **`lastRunAt` more than ~15 minutes old** while you are in an active session — the Stop hook is
+  not running. LEAD with that; it is the failure mode that once went unnoticed for days.
+
+Do NOT treat `offset` trailing `transcriptSize` as a fault on its own. Reads are chunked and
+first-sight backfill is capped, so the collector is normally some way behind and catches up over
+successive turns; a gap there is expected, not a stall.
 
 1. **Session totals** — sum `hooks-logs/claude-usage.jsonl`, filtered to the `sessionId` of
    its most recent record (the command cannot read its own session id; the newest record is
