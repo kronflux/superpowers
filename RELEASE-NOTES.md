@@ -1,5 +1,22 @@
 # Superpowers Release Notes
 
+## 7.7.0
+
+- **Usage collection no longer dies on large sessions** — the Stop-hook aggregator read the
+  entire unread transcript region into one string, which throws past V8's ~512 MB string cap.
+  The exception landed before the byte offset was saved, so every later turn retried from zero
+  and failed identically, silently, forever. Reads are now bounded chunks, first-sight backfill
+  on an already-huge transcript is capped, and the offset always advances so no input can stall
+  the collector.
+- **Conductor usage is attributable** — per-capability call counts and result bytes (codegraph,
+  serena, context7, obsidian, middleware) are recorded alongside token deltas and reported by
+  `/superpowers:usage`. Bytes measure context consumed by tool results; the token figure is an
+  estimate, since MCP results land inside the main session's token count.
+- **A dead collector now announces itself** — `hooks-logs/usage-aggregator-health.json` records
+  every run, and `/superpowers:usage` leads with a warning when collection has failed or
+  stalled. `/superpowers:usage` also computes session totals from the durable per-turn log
+  rather than `session-stats.json`, which is config-root-wide and expires after two hours.
+
 ## 7.6.0 — conductor activation, usage announcements, git hygiene
 
 Three improvements in tool-selection nudging, external model attribution, and explicit staging practices.
