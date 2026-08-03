@@ -123,10 +123,13 @@ describe('health record', () => {
     expect(h.sessionId).toBe('s1');
   });
 
-  it('records the error when aggregation throws (invalid read position)', () => {
-    // Seed the offset-state file with a negative offset to cause fs.readSync to throw EINVAL.
-    // readState() accepts negative offsets (Number.isFinite(-5) is true), both early guards
-    // fall through, and fs.readSync(fd, buf, 0, want, -5) throws — genuine aggregate() error.
+  it('recovers from a corrupt negative-offset state file instead of stalling forever', () => {
+    // Previously: readState() accepted negative offsets (Number.isFinite(-5) is true), both
+    // early guards in aggregate() fell through, and fs.readSync(fd, buf, 0, want, -5) threw
+    // before writeState() ran — so the offset stayed -5 and every later run failed identically,
+    // forever. readState() now rejects any offset that is not a non-negative integer and
+    // degrades to the empty state (offset 0), so the run below no longer throws at all: this
+    // proves recovery, not merely that an error gets logged.
     const sessionId = 's-throw-test';
     const statePath = path.join(os.tmpdir(), `sp-usage-${sessionId}`);
     fs.writeFileSync(statePath, JSON.stringify({ offset: -5, pending: {} }));
@@ -137,15 +140,76 @@ describe('health record', () => {
 
       const env = { ...process.env, HOME: home, USERPROFILE: home };
       delete env.CLAUDE_CONFIG_DIR;
-      const out = execFileSync('node', [HOOK], {
+      let out = execFileSync('node', [HOOK], {
         input: JSON.stringify({ session_id: sessionId, transcript_path: t }),
         encoding: 'utf8', env,
       });
       expect(JSON.parse(out)).toEqual({});
 
+      // First run recovers immediately: no throw, and the offset advances from the
+      // corrupt -5 to a real, non-negative position instead of stalling there.
+      let h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+      expect(h.lastError).toBeNull();
+      const firstOffset = h.offset;
+      expect(firstOffset).toBe(fs.statSync(t).size);
+
+      // Second run: recovery must persist — new content is picked up as a delta,
+      // proving the state file was left in a genuinely usable position, not just
+      // masked for one run.
+      fs.appendFileSync(t, asst(1, 1));
+      out = execFileSync('node', [HOOK], {
+        input: JSON.stringify({ session_id: sessionId, transcript_path: t }),
+        encoding: 'utf8', env,
+      });
+      expect(JSON.parse(out)).toEqual({});
+
+      h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+      expect(h.lastError).toBeNull();
+      expect(h.offset).toBeGreaterThan(firstOffset);
+    } finally {
+      fs.rmSync(statePath, { force: true });
+    }
+  });
+
+  it('still accepts a legitimate offset of exactly 0', () => {
+    const sessionId = 's-zero-offset';
+    const statePath = path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+    fs.writeFileSync(statePath, JSON.stringify({ offset: 0, pending: {} }));
+    try {
+      const t = path.join(home, 'zero.jsonl');
+      fs.writeFileSync(t, asst(6, 2));
+      const env = { ...process.env, HOME: home, USERPROFILE: home };
+      delete env.CLAUDE_CONFIG_DIR;
+      const out = execFileSync('node', [HOOK], {
+        input: JSON.stringify({ session_id: sessionId, transcript_path: t }),
+        encoding: 'utf8', env,
+      });
+      expect(JSON.parse(out)).toEqual({});
       const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
-      expect(h.lastError).not.toBeNull();
-      expect(String(h.lastError.message).length).toBeGreaterThan(0);
+      expect(h.lastError).toBeNull();
+      expect(h.offset).toBe(fs.statSync(t).size);
+    } finally {
+      fs.rmSync(statePath, { force: true });
+    }
+  });
+
+  it('degrades a non-integer offset to 0 rather than only rejecting negatives', () => {
+    const sessionId = 's-noninteger-offset';
+    const statePath = path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+    fs.writeFileSync(statePath, JSON.stringify({ offset: 5.5, pending: {} }));
+    try {
+      const t = path.join(home, 'noninteger.jsonl');
+      fs.writeFileSync(t, asst(8, 4));
+      const env = { ...process.env, HOME: home, USERPROFILE: home };
+      delete env.CLAUDE_CONFIG_DIR;
+      const out = execFileSync('node', [HOOK], {
+        input: JSON.stringify({ session_id: sessionId, transcript_path: t }),
+        encoding: 'utf8', env,
+      });
+      expect(JSON.parse(out)).toEqual({});
+      const h = JSON.parse(fs.readFileSync(healthPath(), 'utf8'));
+      expect(h.lastError).toBeNull();
+      expect(h.offset).toBe(fs.statSync(t).size); // re-scanned from 0, not stuck or truncated at 5
     } finally {
       fs.rmSync(statePath, { force: true });
     }

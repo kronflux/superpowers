@@ -79,18 +79,27 @@ function statePath(sessionId) {
   return path.join(os.tmpdir(), `sp-usage-${sessionId}`);
 }
 
+// A negative, NaN, or non-integer offset is corruption, not a valid resume
+// point: fs.readSync throws on a negative position, and that throw lands
+// before writeState runs, so the bad offset never advances — a permanent
+// stall wearing the original bug's signature. Degrade to 0 instead; the
+// existing first-sight backfill cap bounds the resulting re-scan.
+function validOffset(n) {
+  return Number.isInteger(n) && n >= 0;
+}
+
 function readState(sessionId) {
   const empty = { offset: 0, pending: {}, truncatedBackfill: false };
   try {
     const raw = fs.readFileSync(statePath(sessionId), 'utf8');
     try {
       const s = JSON.parse(raw);
-      if (s && typeof s === 'object' && Number.isFinite(s.offset)) {
+      if (s && typeof s === 'object' && validOffset(s.offset)) {
         return { offset: s.offset, pending: s.pending || {}, truncatedBackfill: !!s.truncatedBackfill };
       }
     } catch { /* fall through to the legacy bare-integer format */ }
     const n = parseInt(raw, 10);
-    if (Number.isFinite(n)) return { ...empty, offset: n };
+    if (validOffset(n)) return { ...empty, offset: n };
   } catch {}
   return empty;
 }
