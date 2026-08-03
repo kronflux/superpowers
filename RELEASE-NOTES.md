@@ -13,9 +13,12 @@
   `/superpowers:usage`. Bytes measure context consumed by tool results; the token figure is an
   estimate, since MCP results land inside the main session's token count.
 - **A dead collector now announces itself** — `hooks-logs/usage-aggregator-health.json` records
-  every run, and `/superpowers:usage` leads with a warning when collection has failed or
-  stalled. `/superpowers:usage` also computes session totals from the durable per-turn log
-  rather than `session-stats.json`, which is config-root-wide and expires after two hours.
+  every run, keyed by `sessionId`, and `/superpowers:usage` leads with a warning when collection
+  has failed or stalled. Stall detection is a `lastRunAt` staleness check, not an offset
+  comparison: a single overwritten health record cannot express "offset unchanged since the
+  previous record," so an `offset` trailing `transcriptSize` is normal chunked catch-up, not a
+  fault. `/superpowers:usage` also computes session totals from the durable per-turn log rather
+  than `session-stats.json`, which is config-root-wide and expires after two hours.
 
 ## 7.6.0 — conductor activation, usage announcements, git hygiene
 

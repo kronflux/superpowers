@@ -17,18 +17,26 @@ in order:
   error and the fact that all numbers below are stale as of `lastRunAt`.
 - **`lastRunAt` more than ~15 minutes old** while you are in an active session — the Stop hook is
   not running. LEAD with that; it is the failure mode that once went unnoticed for days.
+- **State whose record this is.** The health record carries the `sessionId` of whichever session
+  last wrote it — not necessarily yours. Name that session id, and if it differs from the session
+  id the totals in section 1 are summed for, flag that mismatch explicitly: it means another
+  session sharing this config root last touched the collector, and this health record says
+  nothing about your own session's collection status.
 
 Do NOT treat `offset` trailing `transcriptSize` as a fault on its own. Reads are chunked and
 first-sight backfill is capped, so the collector is normally some way behind and catches up over
 successive turns; a gap there is expected, not a stall.
 
-1. **Session totals** — sum `hooks-logs/claude-usage.jsonl`, filtered to the `sessionId` of
-   its most recent record (the command cannot read its own session id; the newest record is
-   the current session in practice, though two sessions sharing a config root can interleave —
-   say so if their ids differ within the last few records). Report input, output, cache-read
-   and cache-creation as separate figures. Do NOT use `session-stats.json` for this: that file
-   is config-root-wide and `loadStats` expires it after two hours, so its totals silently reset
-   mid-session.
+1. **Most recent session in this config root** — sum `hooks-logs/claude-usage.jsonl`, filtered
+   to the `sessionId` of its most recent record (the command cannot read its own session id; the
+   newest record is the current session in practice, though two sessions sharing a config root
+   can interleave — say so if their ids differ within the last few records). Always name the
+   session id summed, the number of records it covers, and the time span those records' `ts`
+   values cover — the title says "most recent session," not "your session," because a fresh
+   window with zero records of its own would otherwise silently report someone else's totals
+   with full confidence. Report input, output, cache-read and cache-creation as separate figures.
+   Do NOT use `session-stats.json` for this: that file is config-root-wide and `loadStats`
+   expires it after two hours, so its totals silently reset mid-session.
 2. **Conductor usage** — per-capability rollup from the `conductor` key on those same records:
    calls and result bytes per capability (codegraph, serena, context7, obsidian, middleware),
    with an approximate token figure at roughly 4 bytes per token. Bytes are the real
