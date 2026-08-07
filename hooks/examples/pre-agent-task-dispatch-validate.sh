@@ -66,6 +66,71 @@ except Exception:
     print(json.dumps({}))
     sys.exit(0)
 
+# Pass 1: collect every TaskCreate tool_use (its tool_use_id, subject,
+# description, and a positional fallback id) plus the text of every
+# tool_result keyed by tool_use_id. IDs are not reliably 1-based in a real
+# session, so the authoritative id comes from the TaskCreate tool_result
+# ("Task #<N> created successfully"); the positional counter is kept only
+# as a fallback for a TaskCreate whose tool_result is missing.
+create_calls = []       # ordered [{tool_use_id, subject, description, fallback_id}]
+tool_result_by_id = {}  # tool_use_id -> text
+
+for line in lines:
+    try:
+        e = json.loads(line)
+    except Exception:
+        continue
+    etype = e.get("type")
+    if etype == "user":
+        msg = e.get("message") or {}
+        content = msg.get("content")
+        if isinstance(content, list):
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "tool_result":
+                    tuid = c.get("tool_use_id")
+                    inner = c.get("content")
+                    text = ""
+                    if isinstance(inner, str):
+                        text = inner
+                    elif isinstance(inner, list):
+                        text = "\n".join(
+                            ic.get("text", "") or ""
+                            for ic in inner
+                            if isinstance(ic, dict) and ic.get("type") == "text"
+                        )
+                    if tuid and text.strip():
+                        tool_result_by_id[tuid] = text
+        continue
+    if etype != "assistant":
+        continue
+    for c in (e.get("message") or {}).get("content") or []:
+        if not isinstance(c, dict) or c.get("type") != "tool_use":
+            continue
+        if c.get("name") == "TaskCreate":
+            inp = c.get("input") or {}
+            create_calls.append({
+                "tool_use_id": c.get("id"),
+                "subject": inp.get("subject", "") or "",
+                "description": inp.get("description", "") or "",
+                "fallback_id": str(next_id),
+            })
+            next_id += 1
+        elif c.get("name") == "TaskUpdate":
+            tid = str((c.get("input") or {}).get("taskId", ""))
+            try:
+                if int(tid) >= next_id:
+                    next_id = int(tid) + 1
+            except (ValueError, TypeError):
+                pass
+
+id_re = re.compile(r"Task #(\d+) created successfully")
+for call in create_calls:
+    m2 = id_re.search(tool_result_by_id.get(call["tool_use_id"], ""))
+    real_id = m2.group(1) if m2 else call["fallback_id"]
+    tasks[real_id] = {"subject": call["subject"], "description": call["description"]}
+
+# Pass 2: TaskUpdate overrides (description edits, in_progress tracking) in
+# chronological order — current_inprogress depends on processing order.
 for line in lines:
     try:
         e = json.loads(line)
@@ -76,33 +141,21 @@ for line in lines:
     for c in (e.get("message") or {}).get("content") or []:
         if not isinstance(c, dict) or c.get("type") != "tool_use":
             continue
-        name = c.get("name", "")
+        if c.get("name") != "TaskUpdate":
+            continue
         inp = c.get("input") or {}
-        if name == "TaskCreate":
-            tid = str(next_id)
-            tasks[tid] = {
-                "subject": inp.get("subject", "") or "",
-                "description": inp.get("description", "") or "",
-            }
-            next_id += 1
-        elif name == "TaskUpdate":
-            tid = str(inp.get("taskId", ""))
-            if not tid:
-                continue
-            if tid not in tasks:
-                tasks[tid] = {"subject": "", "description": ""}
-            if inp.get("description"):
-                tasks[tid]["description"] = inp["description"]
-            status = inp.get("status")
-            if status == "in_progress":
-                current_inprogress = tid
-            elif status in ("completed", "cancelled", "deleted") and current_inprogress == tid:
-                current_inprogress = None
-            try:
-                if int(tid) >= next_id:
-                    next_id = int(tid) + 1
-            except (ValueError, TypeError):
-                pass
+        tid = str(inp.get("taskId", ""))
+        if not tid:
+            continue
+        if tid not in tasks:
+            tasks[tid] = {"subject": "", "description": ""}
+        if inp.get("description"):
+            tasks[tid]["description"] = inp["description"]
+        status = inp.get("status")
+        if status == "in_progress":
+            current_inprogress = tid
+        elif status in ("completed", "cancelled", "deleted") and current_inprogress == tid:
+            current_inprogress = None
 
 out = {"task_id": current_inprogress, "subject": "",
        "subagentType": None, "model": None, "dispatchBrief": None}

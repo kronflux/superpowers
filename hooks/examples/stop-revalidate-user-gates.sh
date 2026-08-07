@@ -80,12 +80,43 @@ except Exception:
     sys.exit(0)
 
 next_id = 1
+# Pass 1: collect every TaskCreate tool_use (its tool_use_id, subject,
+# description, and a positional fallback id), the assistant-text stream
+# (unaffected by id resolution), and the text of every tool_result keyed by
+# tool_use_id. IDs are not reliably 1-based in a real session, so the
+# authoritative id comes from the TaskCreate tool_result ("Task #<N> created
+# successfully"); the positional counter is kept only as a fallback for a
+# TaskCreate whose tool_result is missing.
+create_calls = []       # ordered [{tool_use_id, subject, description, fallback_id}]
+tool_result_by_id = {}  # tool_use_id -> text
+
 for idx, line in enumerate(lines):
     try:
         entry = json.loads(line)
     except Exception:
         continue
-    if entry.get("type") != "assistant":
+    etype = entry.get("type")
+    if etype == "user":
+        msg = entry.get("message") or {}
+        content = msg.get("content")
+        if isinstance(content, list):
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "tool_result":
+                    tuid = c.get("tool_use_id")
+                    inner = c.get("content")
+                    text = ""
+                    if isinstance(inner, str):
+                        text = inner
+                    elif isinstance(inner, list):
+                        text = "\n".join(
+                            ic.get("text", "") or ""
+                            for ic in inner
+                            if isinstance(ic, dict) and ic.get("type") == "text"
+                        )
+                    if tuid and text.strip():
+                        tool_result_by_id[tuid] = text
+        continue
+    if etype != "assistant":
         continue
     msg = entry.get("message") or {}
     for c in msg.get("content") or []:
@@ -97,35 +128,62 @@ for idx, line in enumerate(lines):
                 assistant_texts.append((idx, txt))
                 last_text = txt
         elif c.get("type") == "tool_use":
-            name = c.get("name", "")
-            inp = c.get("input") or {}
-            if name == "TaskCreate":
-                tasks[str(next_id)] = {
-                    "subject": inp.get("subject", ""),
+            if c.get("name") == "TaskCreate":
+                inp = c.get("input") or {}
+                create_calls.append({
+                    "tool_use_id": c.get("id"),
+                    "subject": inp.get("subject", "") or "",
                     "description": inp.get("description", "") or "",
-                    "status": "pending",
-                    "userGate": False,
-                    "tags": [],
-                    "closedAtIdx": None,
-                }
+                    "fallback_id": str(next_id),
+                })
                 next_id += 1
-            elif name == "TaskUpdate":
-                tid = str(inp.get("taskId", ""))
-                if tid in tasks:
-                    if inp.get("description"):
-                        tasks[tid]["description"] = inp["description"]
-                    if inp.get("subject"):
-                        tasks[tid]["subject"] = inp["subject"]
-                    new_status = inp.get("status")
-                    if new_status:
-                        tasks[tid]["status"] = new_status
-                        if new_status == "completed":
-                            tasks[tid]["closedAtIdx"] = idx
+            elif c.get("name") == "TaskUpdate":
+                tid = str((c.get("input") or {}).get("taskId", ""))
                 try:
                     if int(tid) >= next_id:
                         next_id = int(tid) + 1
                 except (ValueError, TypeError):
                     pass
+
+id_re = re.compile(r"Task #(\d+) created successfully")
+for call in create_calls:
+    m2 = id_re.search(tool_result_by_id.get(call["tool_use_id"], ""))
+    real_id = m2.group(1) if m2 else call["fallback_id"]
+    tasks[real_id] = {
+        "subject": call["subject"],
+        "description": call["description"],
+        "status": "pending",
+        "userGate": False,
+        "tags": [],
+        "closedAtIdx": None,
+    }
+
+# Pass 2: TaskUpdate overrides — status/closedAtIdx/subject/description — in
+# chronological order (closedAtIdx depends on processing order).
+for idx, line in enumerate(lines):
+    try:
+        entry = json.loads(line)
+    except Exception:
+        continue
+    if entry.get("type") != "assistant":
+        continue
+    for c in (entry.get("message") or {}).get("content") or []:
+        if not isinstance(c, dict) or c.get("type") != "tool_use":
+            continue
+        if c.get("name") != "TaskUpdate":
+            continue
+        inp = c.get("input") or {}
+        tid = str(inp.get("taskId", ""))
+        if tid in tasks:
+            if inp.get("description"):
+                tasks[tid]["description"] = inp["description"]
+            if inp.get("subject"):
+                tasks[tid]["subject"] = inp["subject"]
+            new_status = inp.get("status")
+            if new_status:
+                tasks[tid]["status"] = new_status
+                if new_status == "completed":
+                    tasks[tid]["closedAtIdx"] = idx
 
 # Classify each completed task.
 for tid, t in tasks.items():

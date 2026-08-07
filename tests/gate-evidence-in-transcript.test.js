@@ -16,12 +16,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const HOOK = path.join(ROOT, 'hooks', 'examples', 'post-task-complete-revalidate.sh');
 
-// The hook requires python3 + jq + bash. Detect them so we skip with a clear
-// message rather than reporting a false green.
+// The hook requires jq + bash + a working python interpreter. Detect them so
+// we skip with a clear message rather than reporting a false green.
+//
+// The python check does NOT probe `python3 --version` directly. That alone
+// correctly reports the Windows Store App Execution Alias stub as broken
+// (it exits non-zero on `--version` too) — but the hook itself no longer
+// needs `python3` specifically: it falls back through `python`, then
+// `py -3`, via hooks/examples/lib-python.sh. A `python3`-only probe stays
+// stale relative to that fallback chain and skips tests the fixed hook can
+// actually run. Source the hook's own resolver instead, so this dep-check
+// finds exactly what the hook itself can find.
 function have(cmd) {
   return spawnSync(cmd, ['--version'], { encoding: 'utf8' }).status === 0;
 }
-const DEPS_OK = have('bash') && have('python3') && have('jq');
+function haveWorkingPython() {
+  const lib = path.join(ROOT, 'hooks', 'examples', 'lib-python.sh');
+  const r = spawnSync('bash', ['-c', 'source "$1"; sp_resolve_python', '_', lib], { encoding: 'utf8' });
+  return r.status === 0;
+}
+const DEPS_OK = have('bash') && haveWorkingPython() && have('jq');
 
 // Build a transcript JSONL mirroring what the hook parses:
 //   1. assistant tool_use TaskCreate (carries json:metadata fence, userGate)
