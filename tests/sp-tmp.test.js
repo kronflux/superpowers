@@ -71,4 +71,47 @@ describe('sp-tmp', () => {
     expect(result.startsWith(root + path.sep)).toBe(true);
     expect(result).not.toBe(root);
   });
+
+  it('recovers when a non-directory file occupies the root', () => {
+    // A stray regular file at <tmpdir>/sp permanently and silently breaks
+    // every writer (mkdirSync throws ENOTDIR/EEXIST, and each caller's own
+    // try/catch swallows the failed write). spTmpDir() must clear it and
+    // retry rather than leaving it broken forever.
+    //
+    // Mocked, like the "cannot be created" test above, rather than actually
+    // replacing the real <tmpdir>/sp: other test files write real state under
+    // that same shared root concurrently, and recursively deleting it here
+    // would race them.
+    const dir = path.join(os.tmpdir(), ROOT_NAME);
+    const realMkdir = fs.mkdirSync;
+    const realLstat = fs.lstatSync;
+    const realRm = fs.rmSync;
+    let mkdirCalls = 0;
+    let clearedNonDir = false;
+    fs.mkdirSync = (p, opts) => {
+      if (p !== dir) return realMkdir(p, opts);
+      mkdirCalls++;
+      if (mkdirCalls === 1) throw Object.assign(new Error('ENOTDIR'), { code: 'ENOTDIR' });
+      return undefined; // retry succeeds
+    };
+    fs.lstatSync = (p) => {
+      if (p !== dir) return realLstat(p);
+      if (clearedNonDir) return { isDirectory: () => true, isSymbolicLink: () => false };
+      return { isDirectory: () => false, isSymbolicLink: () => false };
+    };
+    fs.rmSync = (p, opts) => {
+      if (p !== dir) return realRm(p, opts);
+      clearedNonDir = true;
+    };
+    try {
+      const result = spTmpDir();
+      expect(result).toBe(dir);
+      expect(mkdirCalls).toBe(2);
+      expect(clearedNonDir).toBe(true);
+    } finally {
+      fs.mkdirSync = realMkdir;
+      fs.lstatSync = realLstat;
+      fs.rmSync = realRm;
+    }
+  });
 });

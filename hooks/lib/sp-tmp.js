@@ -17,10 +17,29 @@ const ROOT_NAME = 'sp';
 /** Absolute path to the plugin temp root, created on demand. */
 function spTmpDir() {
   const dir = path.join(os.tmpdir(), ROOT_NAME);
+  try {
+    // Never create or write through a symlinked root: an attacker who
+    // pre-creates it pointing at a directory we can write to would otherwise
+    // get us writing state into their directory silently.
+    if (fs.lstatSync(dir).isSymbolicLink()) return dir;
+  } catch { /* doesn't exist yet */ }
   // Failing open matters more than reporting: every caller already wraps its
   // write in try/catch, so a creation failure surfaces there as the same
   // no-op it would have been before this directory existed.
-  try { fs.mkdirSync(dir, { recursive: true }); } catch { /* caller's write handles it */ }
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    // A stray non-directory at this path (e.g. a regular file) makes mkdir
+    // fail every time and silently breaks every writer under this root.
+    // Clear it and retry once; if that also fails, still return the path.
+    try {
+      const st = fs.lstatSync(dir);
+      if (!st.isDirectory() && !st.isSymbolicLink()) {
+        fs.rmSync(dir, { force: true });
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } catch { /* caller's write handles it */ }
+  }
   return dir;
 }
 
