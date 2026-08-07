@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pluginForPath, extensionOf } from './lib/lsp-plugins.js';
-import { spTmp } from './lib/sp-tmp.js';
+import { spTmp, spSafe } from './lib/sp-tmp.js';
 
 const CLASSES = ['codegraph', 'codegraph-init', 'lsp', 'middleware'];
 
@@ -38,7 +38,7 @@ const FAIL_RE = /\bFAIL(ED)?\b|\b[1-9]\d* (failed|errors?)\b|\bError[:\s]|Traceb
 const MIN_OUTPUT_BYTES = 2048;
 
 function statePath(sessionId) {
-  return spTmp(`conductor-${String(sessionId).replace(/[^A-Za-z0-9_-]/g, '_')}`);
+  return spTmp(`conductor-${spSafe(sessionId)}`);
 }
 
 function claimNudge(sessionId, cls) {

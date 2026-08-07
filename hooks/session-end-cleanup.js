@@ -18,7 +18,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spTmp, spTmpDir } from './lib/sp-tmp.js';
+import { spTmp, spTmpDir, spSafe } from './lib/sp-tmp.js';
 
 // Ephemeral kinds only. `usage-` is conspicuously absent, and must stay so.
 const EPHEMERAL = [
@@ -34,7 +34,7 @@ function removeForSession(sessionId) {
   // conductor state is one base file plus one claim file per nudge class, and
   // the class list can grow — match by prefix rather than enumerating classes.
   try {
-    const base = `conductor-${sessionId}`;
+    const base = `conductor-${spSafe(sessionId)}`;
     for (const entry of fs.readdirSync(spTmpDir())) {
       if (entry === base || entry.startsWith(`${base}-`)) {
         try { fs.rmSync(path.join(spTmpDir(), entry), { force: true }); } catch {}
