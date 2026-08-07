@@ -12,6 +12,7 @@
 // bottom of the terminal on EVERY assistant message. So: nothing throws past
 // the top-level handler, and any fault prints an empty line and exits 0.
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { configDir } from '../hooks/lib/config-dir.js';
 import { loadConfig } from '../hooks/lib/statusline-config.js';
 import { segCapabilities, segDelegation, segPlan, segUsage } from '../hooks/lib/statusline-segments.js';
@@ -109,4 +110,13 @@ async function main() {
   process.stdout.write(line + '\n');
 }
 
-main().catch(() => { process.stdout.write('\n'); });
+// Only render when this file IS the entry point. Without the guard, merely
+// importing the module (a test wanting `render`, a tool inspecting exports)
+// runs main(): it waits on stdin up to the timeout and emits a stray newline.
+// statusline-launcher.mjs sets process.argv[1] to this file's path before its
+// dynamic import precisely so the delegated run still counts as direct.
+const isEntry = process.argv[1]
+  && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+if (isEntry) main().catch(() => { process.stdout.write('\n'); });
+
+export { render, sanitizeLineValue };

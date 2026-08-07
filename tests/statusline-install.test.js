@@ -93,6 +93,24 @@ describe('patchSettings', () => {
     expect(result).toEqual({ changed: false, state: 'unparseable' });
     expect(fs.readFileSync(file, 'utf8')).toBe(before);
   });
+
+  it('treats valid-JSON non-objects as unparseable rather than throwing or lying', () => {
+    // JSON.parse succeeds on these, so a `catch`-only guard lets them through:
+    // `"str"` threw an uncaught TypeError on property assignment, and `[]`
+    // reported changed:true while JSON.stringify silently dropped the added
+    // key — a success report for a write that never landed.
+    for (const [i, body] of ['[]', 'null', '"str"', '42', 'true'].entries()) {
+      const cwd = path.join(root, `p5-${i}`);
+      fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
+      const file = path.join(cwd, '.claude', 'settings.json');
+      fs.writeFileSync(file, body);
+      let result;
+      expect(() => { result = patchSettings(cwd, 'node /x/launcher.mjs'); },
+        `body ${body} must not throw`).not.toThrow();
+      expect(result, `body ${body}`).toEqual({ changed: false, state: 'unparseable' });
+      expect(fs.readFileSync(file, 'utf8'), `body ${body} must be untouched`).toBe(body);
+    }
+  });
 });
 
 describe('ensureGitignored', () => {

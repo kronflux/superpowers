@@ -33,7 +33,18 @@ function patchSettings(cwd, command) {
   try { raw = fs.readFileSync(file, 'utf8'); } catch { raw = null; }
   let json = {};
   if (raw !== null) {
-    try { json = JSON.parse(raw) || {}; } catch { return { changed: false, state: 'unparseable' }; }
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { return { changed: false, state: 'unparseable' }; }
+    // JSON.parse succeeds on arrays, null, strings, numbers and booleans, so a
+    // catch-only guard lets them through to the assignment below. `"str"` then
+    // throws an uncaught TypeError, and `[]` accepts the property but
+    // JSON.stringify drops it — reporting changed:true for a write that never
+    // landed. A settings file that is valid JSON but not an object is no more
+    // safely overwritable than a malformed one: refuse both the same way.
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { changed: false, state: 'unparseable' };
+    }
+    json = parsed;
   }
   if (json.statusLine && json.statusLine.command === command) return { changed: false };
   json.statusLine = { type: 'command', command };

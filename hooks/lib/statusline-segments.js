@@ -102,7 +102,13 @@ function segPlan(ctx) {
 function segUsage(ctx) {
   const sid = ctx.stdin?.session_id;
   if (!sid) return null;
-  const lines = tailLines(path.join(ctx.logDir, 'claude-usage.jsonl'), 16384);
+  // claude-usage.jsonl is append-only, unrotated, and interleaves every
+  // session's per-Stop deltas. A window too small drops this session's OWN
+  // early records once enough later ones accumulate, and the displayed total
+  // then DECREASES mid-session. At ~153 B/record, 256 KB holds ~1,700 records
+  // — far beyond any plausible session, where 16 KB held only ~106. Still one
+  // bounded read. The residual limit is real but unreachable in practice.
+  const lines = tailLines(path.join(ctx.logDir, 'claude-usage.jsonl'), 262144);
   let cacheRead = 0; let output = 0; let seen = false;
   for (const l of lines) {
     let r;
