@@ -54,13 +54,15 @@ export default {
     },
     {
       event: 'PreToolUse',
-      matcher: 'Grep|Glob|Read|Edit',
+      matcher: 'Grep|Glob|Read',
       command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/conductor-nudges.js"',
       platforms: ['claude-code'],
     },
     {
+      // Edit moved to PostToolUse: the LSP offer is about what happens AFTER an
+      // edit, and a PostToolUse hook cannot delay the edit itself.
       event: 'PostToolUse',
-      matcher: 'Bash',
+      matcher: 'Bash|Edit',
       command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/conductor-nudges.js"',
       platforms: ['claude-code'],
     },

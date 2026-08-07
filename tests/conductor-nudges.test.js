@@ -31,16 +31,22 @@ beforeEach(() => {
 afterEach(() => {
   fs.rmSync(home, { recursive: true, force: true });
   fs.rmSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), { force: true });
-  for (const cls of ['codegraph', 'serena', 'middleware']) {
+  for (const cls of ['codegraph', 'codegraph-init', 'lsp', 'middleware']) {
     fs.rmSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}-${cls}`), { force: true });
   }
 });
 
 function seedState(caps, spent = {}) {
-  const base = { codegraph: false, serena: false, middleware: false };
+  const base = {
+    codegraph: false,
+    'codegraph-init': false,
+    lsp: { extensions: [], declined: [], declinedAll: false },
+    middleware: false,
+  };
+  const spentBase = { codegraph: false, 'codegraph-init': false, lsp: false, middleware: false };
   fs.writeFileSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), JSON.stringify({
     caps: { ...base, ...caps },
-    spent: { ...base, ...spent },
+    spent: { ...spentBase, ...spent },
   }));
 }
 
@@ -65,12 +71,6 @@ describe('conductor-nudges', () => {
     expect(second).toEqual({});
   });
 
-  it('nudges serena on first Edit only', () => {
-    seedState({ serena: true });
-    expect(ctx(run({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: {} }))).toMatch(/[Ss]erena/);
-    expect(run({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: {} })).toEqual({});
-  });
-
   it('nudges middleware only on large failing Bash output', () => {
     seedState({ middleware: true });
     const big = 'FAIL tests/x.test.js\n' + 'assertion detail line\n'.repeat(200);
@@ -83,12 +83,18 @@ describe('conductor-nudges', () => {
   });
 
   it('does not nudge a class whose capability is absent', () => {
-    seedState({ serena: true }); // codegraph false
+    seedState({ middleware: true }); // codegraph false
     expect(run({ hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} })).toEqual({});
   });
 
   it('creates a state file on first run with no capabilities in an empty home', () => {
-    expect(run({ hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} })).toEqual({});
+    // PATH sandboxed like the other real-probe tests below: an unrestricted
+    // PATH would leak a host-installed `codegraph` binary into the probe and
+    // fire the codegraph-init offer, which this test is not about.
+    expect(run(
+      { hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} },
+      { PATH: SANDBOX_PATH }
+    )).toEqual({});
     expect(fs.existsSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`))).toBe(true);
   });
 
@@ -132,4 +138,96 @@ describe('conductor-nudges', () => {
     expect(withCtx.length).toBe(1);
     expect(ctx(withCtx[0])).toMatch(/codegraph explore/);
   }, 10000);
+
+  it('offers codegraph init on an unindexed repo, once', () => {
+    seedState({ 'codegraph-init': true });
+    const first = run({ hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: 'a.md' } });
+    expect(ctx(first)).toMatch(/codegraph init/);
+    expect(ctx(first)).toMatch(/natural break/);
+    expect(run({ hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: {} })).toEqual({});
+  });
+
+  it('prefers the codegraph tip over the init offer when the repo is indexed', () => {
+    seedState({ codegraph: true });
+    expect(ctx(run({ hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} }))).toMatch(/codegraph explore/);
+  });
+
+  it('offers codegraph init through the real probe on an unindexed repo', () => {
+    // No seedState: this drives probe() for real, which the existing positive
+    // nudge tests never do. A probe field rename would silently zero every
+    // nudge and no other test would notice.
+    const bin = path.join(home, 'bin');
+    fs.mkdirSync(bin, { recursive: true });
+    const exe = process.platform === 'win32' ? 'codegraph.cmd' : 'codegraph';
+    fs.writeFileSync(path.join(bin, exe), '');
+    const out = run(
+      { hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: { pattern: 'x' } },
+      { PATH: [bin, SANDBOX_PATH].join(path.delimiter) }
+    );
+    expect(ctx(out)).toMatch(/codegraph init/);
+    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), 'utf8'));
+    expect(state.caps['codegraph-init']).toBe(true);
+    expect(state.caps.codegraph).toBe(false);
+  });
+
+  it('respects the codegraph decline marker for the init offer', () => {
+    fs.writeFileSync(path.join(home, '.superpowers-no-codegraph'), '');
+    const bin = path.join(home, 'bin');
+    fs.mkdirSync(bin, { recursive: true });
+    const exe = process.platform === 'win32' ? 'codegraph.cmd' : 'codegraph';
+    fs.writeFileSync(path.join(bin, exe), '');
+    const out = run(
+      { hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} },
+      { PATH: [bin, SANDBOX_PATH].join(path.delimiter) }
+    );
+    expect(out).toEqual({});
+  });
+
+  it('offers an LSP plugin after editing an uncovered file type', () => {
+    seedState({ lsp: { extensions: [], declined: [], declinedAll: false } });
+    const out = run({
+      hook_event_name: 'PostToolUse', tool_name: 'Edit',
+      tool_input: { file_path: 'src/index.ts' }, tool_response: {},
+    });
+    expect(ctx(out)).toMatch(/typescript-lsp/);
+    expect(ctx(out)).toMatch(/natural break/);
+  });
+
+  it('stays silent when a language server already covers the extension', () => {
+    seedState({ lsp: { extensions: ['.ts'], declined: [], declinedAll: false } });
+    expect(run({
+      hook_event_name: 'PostToolUse', tool_name: 'Edit',
+      tool_input: { file_path: 'src/index.ts' }, tool_response: {},
+    })).toEqual({});
+  });
+
+  it('stays silent for an unmapped extension', () => {
+    seedState({ lsp: { extensions: [], declined: [], declinedAll: false } });
+    expect(run({
+      hook_event_name: 'PostToolUse', tool_name: 'Edit',
+      tool_input: { file_path: 'notes.md' }, tool_response: {},
+    })).toEqual({});
+  });
+
+  it('respects a per-plugin LSP decline but still offers other languages', () => {
+    seedState({ lsp: { extensions: [], declined: ['typescript-lsp'], declinedAll: false } });
+    expect(run({
+      hook_event_name: 'PostToolUse', tool_name: 'Edit',
+      tool_input: { file_path: 'src/index.ts' }, tool_response: {},
+    })).toEqual({});
+    expect(ctx(run({
+      hook_event_name: 'PostToolUse', tool_name: 'Edit',
+      tool_input: { file_path: 'app/main.py' }, tool_response: {},
+    }))).toMatch(/pyright-lsp/);
+  });
+
+  it('never mentions serena', () => {
+    seedState({ codegraph: true, 'codegraph-init': false, middleware: true });
+    const outs = [
+      run({ hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} }),
+      run({ hook_event_name: 'PostToolUse', tool_name: 'Bash',
+            tool_response: { stdout: 'FAIL x\n' + 'line\n'.repeat(200), stderr: '' } }),
+    ];
+    for (const o of outs) expect(JSON.stringify(o)).not.toMatch(/serena/i);
+  });
 });
