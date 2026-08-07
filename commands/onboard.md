@@ -9,7 +9,7 @@ Walk the user through this fork's optional features one at a time. For each feat
 ## Ground rules
 
 - **Assume a clean slate.** Do NOT audit existing configuration beyond what each step needs to do its own job (Feature 2's dedupe check and Feature 4's already-enabled check are the only state reads this command performs — both are required by the step itself, not general auditing). Go straight to the questions.
-- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `.superpowers/model-routing.json`, `.superpowers/workflow.json`, `.serena/project.yml`, `$CLAUDE_CONFIG_DIR/middleware-config.json` (or `~/.claude/middleware-config.json` when no custom config root is active), and any settings file being merged.
+- **Discrepancy handling:** if a file you are about to write already exists with content that differs from what you are about to write, stop, show the diff (existing vs. proposed), and let the user decide free-form (keep / overwrite / adjust) before writing. This applies to `.superpowers/model-routing.json`, `.superpowers/workflow.json`, `$CLAUDE_CONFIG_DIR/middleware-config.json` (or `~/.claude/middleware-config.json` when no custom config root is active), and any settings file being merged.
 - Each feature is optional. Every question includes a way to decline; declining writes nothing and moves to the next feature.
 - **NEVER commit anything.** Files are written to the working tree only; committing is the user's call.
 - After the last feature, produce the Closing summary (see below) — what was written and where, what was skipped, and how to undo each.
@@ -183,13 +183,13 @@ One-line intro: third-party marketplaces do NOT auto-update by default, so new `
 
 ## Conductor integrations
 
-One-line intro: this fork's conductor layer (`skills/shared/conductor/`) adapts its behavior to optional external tools — CodeGraph (macro discovery), Serena (symbol-precise edits), Context7 (live docs), a middleware-exec provider, and obsidian-cli (vault tooling). None of them is required; each adapter falls back to native tools when its capability is absent.
+One-line intro: this fork's conductor layer (`skills/shared/conductor/`) adapts its behavior to optional external tools — CodeGraph (macro discovery), LSP (post-edit diagnostics), Context7 (live docs), and a middleware-exec provider. None of them is required; each adapter falls back to native tools when its capability is absent.
 
 **Detection.** Detection runs `probe()` from `hooks/lib/capability-registry.js` (or, equivalently, reads the session-start `[conductor]` line it feeds) — this is the primary, always-current read. `context-snapshot.json`'s `capabilities` key, when the file already exists, is written by `hooks/lib/session-start-probe.mjs` at session start and MAY corroborate `probe()`'s result; it is an update-when-present artifact, not the first read path, and its absence is never a blocker. For each capability below, offer it only if its `status` is `absent` AND no decline marker for it exists yet in the project root. Never offer a capability already `configured` or `verified`.
 
-**Decline persistence.** Each capability below has its own marker file, following the convention `hooks/lib/capability-registry.js` already uses for CodeGraph (`.superpowers-no-codegraph`): `.superpowers-no-serena`, `.superpowers-no-context7`, `.superpowers-no-middleware`, `.superpowers-no-obsidian-cli`. On "no" / "never ask again", create the empty marker file in the project root and move on; a future `/onboard` run must check for it before asking again. On "yes", proceed with that capability's steps below; no marker is written.
+**Decline persistence.** Each capability below has its own marker file, following the convention `hooks/lib/capability-registry.js` already uses for CodeGraph (`.superpowers-no-codegraph`): `.superpowers-no-context7`, `.superpowers-no-middleware`, `.superpowers-no-lsp`. On "no" / "never ask again", create the marker file in the project root and move on; a future `/onboard` run must check for it before asking again. `.superpowers-no-lsp` is the one exception to the empty-file convention: it holds newline-delimited plugin names, so a decline is per-language, and an empty file declines every language. On "yes", proceed with that capability's steps below; no marker is written.
 
-**Never auto-run.** Every install/registration command below is printed for the user to copy-paste and run in their own terminal — never execute it via Bash/PowerShell yourself. Only the local config-file writes explicitly described below (Serena's exclusion list, the middleware config copy) are things you write directly, the same way Features 1-4 write their own config files.
+**Never auto-run.** Every install/registration command below is printed for the user to copy-paste and run in their own terminal — never execute it via Bash/PowerShell yourself. Only the local config-file writes explicitly described below (the middleware config copy, decline markers) are things you write directly, the same way Features 1-4 write their own config files.
 
 ### CodeGraph
 
@@ -212,61 +212,42 @@ AskUserQuestion:
   3. Per-project (this repo), builds `.codegraph/` and the initial graph, then auto-syncs on every file change: `codegraph init`. This step is separate from step 2 and is also offered once more, on its own, by the CodeGraph adapter itself (`skills/shared/conductor/codegraph.md`, "Init offer") if skipped here.
 - **No** → write `.superpowers-no-codegraph` (empty file) in the project root.
 
-### Serena
+### LSP (language diagnostics)
 
-Pitch: symbol-precise navigation and edits (`find_symbol`, `find_referencing_symbols`, `replace_symbol_body`, etc.) that survive formatting drift, in place of string-match Edit during TDD/refactoring/debugging.
+Pitch: attach a language server so Claude sees type errors and warnings immediately after each
+edit, instead of spending a build cycle to discover them. Adapter:
+`skills/shared/conductor/lsp.md`.
 
-**Memory-tool exclusion runs UNCONDITIONALLY — do this step first, before the offer below, and do it whether Serena's status is `absent`, `configured`, or `verified`.** The exclusion is a safety contract, not a feature: Serena's own memory tools must never run alongside the four-layer superpowers memory (`skills/shared/conductor/serena.md`, "STRICT PROHIBITION"). Gating it behind the install offer means anyone who installed Serena *before* onboarding — the most common case — silently never gets it. Skip this step only when Serena is `absent` AND `.superpowers-no-serena` exists (nothing to protect against). Merge into `.serena/project.yml` (create `.serena/` and the file if absent; Ground rules diff-and-confirm applies if it exists with a different `excluded_tools` list):
+Determine the project's dominant language from its manifest or file mix, then map it to the
+matching official plugin: TypeScript/JavaScript → `typescript-lsp`, Python → `pyright-lsp`,
+Rust → `rust-analyzer-lsp`, Go → `gopls-lsp`, Ruby → `ruby-lsp`, Java → `jdtls-lsp`,
+Kotlin → `kotlin-lsp`, C# → `csharp-lsp`, C/C++ → `clangd-lsp`, PHP → `php-lsp`,
+Lua → `lua-lsp`, Swift → `swift-lsp`, Liquid → `liquid-lsp`. No match → skip this section
+silently; there is nothing to offer.
 
-```yaml
-excluded_tools:
-  - write_memory
-  - read_memory
-  - list_memories
-  - delete_memory
-  - rename_memory
-  - edit_memory
-```
-
-A global alternative exists (`excluded_tools` in `serena_config.yml`) but its on-disk location isn't verified here — write the per-project file only. If Serena's status is already `configured` or `verified`, do NOT present the offer below; the exclusion step above is the whole of this section.
+If the probe already reports `lsp diagnostics active` for that language, skip the offer.
 
 ```yaml
 AskUserQuestion:
-  question: "Set up Serena (symbol-precise edits, adapter: skills/shared/conductor/serena.md)?"
-  header: "Serena"
+  question: "Install <plugin> for inline diagnostics after each edit?"
+  header: "LSP"
   options:
     - label: "Yes"
-      description: "Shows the plugin-install command and the non-plugin alternative to run yourself, and writes this project's memory-tool exclusion config."
-    - label: "No, don't ask again"
-      description: "Writes .superpowers-no-serena in the project root. Nothing configured."
+      description: "Prints the /plugin install command for you to run. Nothing is executed here."
+    - label: "No"
+      description: "Appends <plugin> to .superpowers-no-lsp in the project root. Nothing configured."
 ```
 
-- **Yes** →
-  1. Print the registration commands for the user to run themselves (never execute).
+- **Yes** → print for the user to run themselves:
 
-     **Plugin install (this fork's plugin-first policy — see caveat below):** verified live in this fork's own profile (`installed_plugins.json`) — Serena runs as a Claude Code plugin via Anthropic's curated marketplace:
-     ```shell
-     /plugin marketplace add anthropics/claude-plugins-official
-     /plugin install serena@claude-plugins-official
-     ```
-     Skip the `marketplace add` line if `claude-plugins-official` is already registered (check via `/plugin`). Once installed, its files resolve under this harness's standard plugin-cache layout: `$CLAUDE_CONFIG_DIR/plugins/cache/claude-plugins-official/serena/<version>/` first, `$HOME/.claude/plugins/cache/claude-plugins-official/serena/<version>/` as fallback when no custom config root is active — the same location this command's own capability detection reads to mark Serena `configured` on the next run.
+  ```text
+  /plugin install <plugin>@claude-plugins-official
+  ```
 
-     **Caveat — tell the user this before they choose:** Serena's own README (`_reference/serena/README.md`) explicitly advises against this route: "Do not install Serena via an MCP or plugin marketplace! They contain outdated and suboptimal installation commands. Instead, follow our Quick Start instructions." No `/plugin marketplace add` command for Serena is published anywhere in its own repository — the marketplace above is Anthropic's third-party packaging, not something Serena's maintainers endorse. The uv/uvx route below is what Serena's own docs recommend.
-
-     **Alternative (non-plugin install) — Serena's own documented Quick Start:** install `serena` locally via `uv`, then register it once, machine-wide, for every project:
-     ```shell
-     uv tool install -p 3.13 serena-agent
-     serena init
-     claude mcp add --scope user serena -- serena start-mcp-server --context claude-code --project-from-cwd
-     ```
-     Use `claude mcp add serena -- serena start-mcp-server --context claude-code --project "$(pwd)"` instead of the third line to register Serena for this project only.
-     Alternative (`uvx`, no local install — always runs the latest commit from the repository, slower to start since every run re-syncs against upstream; previously the default way of running Serena, now only recommended if a proper install isn't wanted):
-     ```shell
-     claude mcp add --scope user serena -- uvx -p 3.13 --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project-from-cwd
-     ```
-     If Serena is slow to start and Claude Code gives up on the connection, raise the MCP startup timeout: `export MCP_TIMEOUT=60000` in the shell profile.
-  2. The memory-tool exclusion is NOT repeated here — it was already written unconditionally at the top of this section, before the offer, and applies identically under the plugin and non-plugin routes.
-- **No** → write `.superpowers-no-serena` (empty file) in the project root. The exclusion written above stays in place; it costs nothing when Serena is absent and protects the moment Serena ever appears.
+  Then state the limit plainly: diagnostics are a fast first signal, never a substitute for the
+  project's own typecheck or test gate (`skills/shared/conductor/lsp.md`).
+- **No** → append `<plugin>` on its own line to `.superpowers-no-lsp` in the project root,
+  creating the file if absent. Declining one language does not silence the others.
 
 ### Context7
 
@@ -331,26 +312,6 @@ AskUserQuestion:
      - For `cli`: write an endpoint using the `agy` preset (see the example's `agy-cli` entry) and set `active_provider` to it. No `api_key_env` is required. Tell the user the preset can be swapped to `opencode` or `claude` by changing the `preset` field; full schema and hazards are documented in `skills/shared/conductor/middleware.md`, "Transports".
 - **No** → write `.superpowers-no-middleware` (empty file) in the project root.
 
-### obsidian-cli
-
-Pitch: drive a running Obsidian vault (read/search/append notes, ADR index views) from the session, gated on both a `.obsidian` directory above the project and the CLI being on `PATH`.
-
-Not an install offer — the `obsidian` CLI ships with Obsidian itself (there is no separate package-manager install for it); using it requires Obsidian already installed and **running**. This offer is detection guidance only.
-
-```yaml
-AskUserQuestion:
-  question: "obsidian-cli wasn't detected. Show setup guidance (drives a running Obsidian instance, no separate install)?"
-  header: "Obsidian"
-  options:
-    - label: "Yes, show me the guidance"
-      description: "Points to Obsidian's own CLI docs and the running-instance requirement. Nothing installed by this offer - there is nothing to install."
-    - label: "No, don't ask again"
-      description: "Writes .superpowers-no-obsidian-cli in the project root. Nothing configured."
-```
-
-- **Yes** → tell the user: the CLI ships with Obsidian itself, so there's no separate install step — make sure Obsidian is installed and running, then the `obsidian` command becomes available; full command reference via `obsidian help`, canonical docs at `https://help.obsidian.md/cli`. Note the requirement plainly: it shells out to a **running** Obsidian instance — it does nothing if Obsidian isn't open, and it isn't headless or an MCP server. Nothing is written by this offer.
-- **No** → write `.superpowers-no-obsidian-cli` (empty file) in the project root.
-
 ## Final step: remove the upstream double-install (optional)
 
 This fork (`superpowers@superpowers-dev`) is a drop-in replacement for the original `obra/superpowers`. Having both installed at once leaves every shared skill and command doubled under two namespaces and makes session-start skill loading ambiguous.
@@ -382,9 +343,8 @@ Report in one block, per feature: configured or skipped, the exact absolute path
 - **Commit strategy** — delete `.superpowers/workflow.json`, or remove its `commitStrategy` key.
 - **Auto-update** — set `extraKnownMarketplaces["superpowers-dev"].autoUpdate` back to `false` (or remove the key) in the settings file you wrote it to.
 - **CodeGraph** — nothing written by this offer besides an optional `.superpowers-no-codegraph` decline marker (delete it to be asked again); the CLI/agent-wiring/index steps are all run by the user outside this flow.
-- **Serena** — remove the `excluded_tools` key (or the six memory-tool entries within it) from `.serena/project.yml`; delete `.superpowers-no-serena` to be asked again.
+- **LSP** — nothing written besides an optional `.superpowers-no-lsp` decline list; delete a line from it to be asked about that language again.
 - **Context7** — nothing written by this offer besides an optional `.superpowers-no-context7` decline marker; `npx ctx7 remove` undoes the setup command itself.
 - **Middleware** — delete `middleware-config.json` from wherever it was written (`$CLAUDE_CONFIG_DIR/` if a custom config root was active, else `~/.claude/`); delete `.superpowers-no-middleware` to be asked again.
-- **obsidian-cli** — nothing written besides an optional `.superpowers-no-obsidian-cli` decline marker.
 
 Do not commit. Do not re-ask any question already answered in this run.
