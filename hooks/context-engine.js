@@ -21,6 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { ensureGitignored } from './lib/gitignore.js';
 import { configDir } from './lib/config-dir.js';
+import { sweep } from './lib/tmp-reaper.js';
 
 const MAX_FILES = 10;    // cap blast radius queries to avoid slowness on large diffs
 const MIN_NAME_LEN = 3;  // skip very short filenames to avoid false-positive grep hits
@@ -53,12 +54,20 @@ async function main() {
   for await (const chunk of process.stdin) input += chunk;
 
   let cwd;
+  let sessionId = '';
   try {
     const data = JSON.parse(input);
     cwd = data.cwd || process.cwd();
+    sessionId = String(data.session_id || '');
   } catch {
     cwd = process.cwd();
   }
+
+  // Reap aged plugin tmpfiles. Throttled to once per 24h internally, confined to
+  // <tmpdir>/sp/, and unable to touch the live session's files — so the typical
+  // cost here is a single stat and any failure is a silent no-op. Runs before the
+  // git bail-out below: a session outside a repo still accumulates tmp state.
+  try { sweep({ sessionId }); } catch {}
 
   // Bail silently if not a git repo
   const gitDir = run('git rev-parse --git-dir', cwd);

@@ -115,6 +115,11 @@ export default {
       platforms: ['claude-code'],
     },
     {
+      event: 'SessionEnd',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/session-end-cleanup.js"',
+      platforms: ['claude-code'],
+    },
+    {
       event: 'SessionStart',
       command: './hooks/run-hook.cmd session-start',
       platforms: ['cursor'],

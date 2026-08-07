@@ -23,6 +23,7 @@ export const VALID_EVENTS = new Set([
   'Stop',
   'SubagentStop',
   'PreCompact',
+  'SessionEnd',
 ]);
 
 export function validate(entries) {
