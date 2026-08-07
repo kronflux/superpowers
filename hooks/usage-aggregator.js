@@ -7,7 +7,7 @@
  * session-stats.json (tokens key), and appends a per-turn delta record to
  * hooks-logs/claude-usage.jsonl. Transcript-derived ESTIMATE: it reflects what
  * the harness recorded, not billing. Fail-open: any error -> {} and exit 0.
- * Offset state: os.tmpdir()/sp-usage-<session_id>.
+ * Offset state: <tmpdir>/sp/usage-<session_id>.
  *
  * Reads are chunked: a single invocation never materializes more than
  * MAX_CHUNK bytes as a string, so a huge transcript cannot stall the hook.
@@ -23,11 +23,11 @@
  */
 
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { configDir } from './lib/config-dir.js';
 import { loadStats, saveStats } from './track-session-stats.js';
+import { spTmp } from './lib/sp-tmp.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 const HEALTH_FILE = () => path.join(LOG_DIR, 'usage-aggregator-health.json');
@@ -78,7 +78,7 @@ function bump(conductor, cap, field, n) {
 }
 
 function statePath(sessionId) {
-  return path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+  return spTmp(`usage-${sessionId}`);
 }
 
 // A negative, NaN, or non-integer offset is corruption, not a valid resume

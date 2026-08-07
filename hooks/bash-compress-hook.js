@@ -10,11 +10,11 @@
 
 import path from 'path';
 import fs from 'fs';
-import os from 'os';
 import { fileURLToPath } from 'url';
 import { RULES, NEVER_COMPRESS } from './compression-rules.js';
 import { isContextModeActive } from './lib/ctx-detect.js';
 import { checkAsk } from './safety/block-dangerous-commands.js';
+import { spTmp } from './lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,7 +35,7 @@ if (process.env.SP_NO_COMPRESS === '1') {
  * cleaned up by the OS.
  */
 function shouldSkipForRerun(cmd, sessionId) {
-  const trackFile = path.join(os.tmpdir(), `sp-compress-${sessionId || 'default'}.json`);
+  const trackFile = spTmp(`compress-${sessionId || 'default'}.json`);
   let tracking = {};
   try { tracking = JSON.parse(fs.readFileSync(trackFile, 'utf8')); } catch {}
   const key = cmd.replace(/\s+/g, ' ').trim();
@@ -49,7 +49,7 @@ function shouldSkipForRerun(cmd, sessionId) {
 }
 
 function markCompressed(cmd, sessionId) {
-  const trackFile = path.join(os.tmpdir(), `sp-compress-${sessionId || 'default'}.json`);
+  const trackFile = spTmp(`compress-${sessionId || 'default'}.json`);
   let tracking = {};
   try { tracking = JSON.parse(fs.readFileSync(trackFile, 'utf8')); } catch {}
   const key = cmd.replace(/\s+/g, ' ').trim();

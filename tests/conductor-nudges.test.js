@@ -30,9 +30,9 @@ beforeEach(() => {
 });
 afterEach(() => {
   fs.rmSync(home, { recursive: true, force: true });
-  fs.rmSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), { force: true });
+  fs.rmSync(path.join(os.tmpdir(), 'sp', `conductor-${sessionId}`), { force: true });
   for (const cls of ['codegraph', 'codegraph-init', 'lsp', 'middleware']) {
-    fs.rmSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}-${cls}`), { force: true });
+    fs.rmSync(path.join(os.tmpdir(), 'sp', `conductor-${sessionId}-${cls}`), { force: true });
   }
 });
 
@@ -44,7 +44,7 @@ function seedState(caps, spent = {}) {
     middleware: false,
   };
   const spentBase = { codegraph: false, 'codegraph-init': false, lsp: false, middleware: false };
-  fs.writeFileSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), JSON.stringify({
+  fs.writeFileSync(path.join(os.tmpdir(), 'sp', `conductor-${sessionId}`), JSON.stringify({
     caps: { ...base, ...caps },
     spent: { ...spentBase, ...spent },
   }));
@@ -98,7 +98,7 @@ describe('conductor-nudges', () => {
       { hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} },
       { PATH: SANDBOX_PATH }
     )).toEqual({});
-    expect(fs.existsSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`))).toBe(true);
+    expect(fs.existsSync(path.join(os.tmpdir(), 'sp', `conductor-${sessionId}`))).toBe(true);
   });
 
   it('fails open on malformed stdin', () => {
@@ -114,7 +114,7 @@ describe('conductor-nudges', () => {
       { PATH: SANDBOX_PATH }
     );
     expect(out).toEqual({});
-    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), 'utf8'));
+    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'sp', `conductor-${sessionId}`), 'utf8'));
     expect(state.caps.codegraph).toBe(false);
   });
 
@@ -168,7 +168,7 @@ describe('conductor-nudges', () => {
       { PATH: [bin, SANDBOX_PATH].join(path.delimiter) }
     );
     expect(ctx(out)).toMatch(/codegraph init/);
-    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), 'utf8'));
+    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'sp', `conductor-${sessionId}`), 'utf8'));
     expect(state.caps['codegraph-init']).toBe(true);
     expect(state.caps.codegraph).toBe(false);
   });
@@ -263,7 +263,7 @@ describe('conductor-nudges', () => {
       { PATH: SANDBOX_PATH, CLAUDE_CONFIG_DIR: prof }
     );
     expect(ctx(out)).toMatch(/typescript-lsp/);
-    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), 'utf8'));
+    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'sp', `conductor-${sessionId}`), 'utf8'));
     expect(state.caps.lsp.extensions).toContain('.go');
   });
 

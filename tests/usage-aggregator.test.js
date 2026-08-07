@@ -9,7 +9,7 @@ import { aggregate } from '../hooks/usage-aggregator.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.join(__dirname, '..', 'hooks', 'usage-aggregator.js');
 
-// The hook's byte-offset state lives at os.tmpdir()/sp-usage-<session_id> — outside
+// The hook's byte-offset state lives at <tmpdir>/sp/usage-<session_id> — outside
 // each test's per-case `home`, by design (production resumes offsets across Stop
 // events for the same real session). That means a stale offset left by a previous
 // run of this suite (same literal session ids) would corrupt the next run's "first
@@ -18,7 +18,7 @@ const HOOK = path.join(__dirname, '..', 'hooks', 'usage-aggregator.js');
 const SESSION_IDS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', `legacy-${process.pid}`];
 function clearOffsets() {
   for (const id of SESSION_IDS) {
-    fs.rmSync(path.join(os.tmpdir(), `sp-usage-${id}`), { force: true });
+    fs.rmSync(path.join(os.tmpdir(), 'sp', `usage-${id}`), { force: true });
   }
 }
 
@@ -131,7 +131,7 @@ describe('health record', () => {
     // degrades to the empty state (offset 0), so the run below no longer throws at all: this
     // proves recovery, not merely that an error gets logged.
     const sessionId = 's-throw-test';
-    const statePath = path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+    const statePath = path.join(os.tmpdir(), 'sp', `usage-${sessionId}`);
     fs.writeFileSync(statePath, JSON.stringify({ offset: -5, pending: {} }));
 
     try {
@@ -173,7 +173,7 @@ describe('health record', () => {
 
   it('still accepts a legitimate offset of exactly 0', () => {
     const sessionId = 's-zero-offset';
-    const statePath = path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+    const statePath = path.join(os.tmpdir(), 'sp', `usage-${sessionId}`);
     fs.writeFileSync(statePath, JSON.stringify({ offset: 0, pending: {} }));
     try {
       const t = path.join(home, 'zero.jsonl');
@@ -195,7 +195,7 @@ describe('health record', () => {
 
   it('degrades a non-integer offset to 0 rather than only rejecting negatives', () => {
     const sessionId = 's-noninteger-offset';
-    const statePath = path.join(os.tmpdir(), `sp-usage-${sessionId}`);
+    const statePath = path.join(os.tmpdir(), 'sp', `usage-${sessionId}`);
     fs.writeFileSync(statePath, JSON.stringify({ offset: 5.5, pending: {} }));
     try {
       const t = path.join(home, 'noninteger.jsonl');
@@ -404,7 +404,7 @@ describe('conductor attribution', () => {
   it('reads a legacy bare-integer offset file', () => {
     const t = path.join(home, 'legacy.jsonl');
     fs.writeFileSync(t, asst(5, 5));
-    fs.writeFileSync(path.join(os.tmpdir(), `sp-usage-${sessionId}`), '0');
+    fs.writeFileSync(path.join(os.tmpdir(), 'sp', `usage-${sessionId}`), '0');
     run(sessionId, t);
     expect(readStats().tokens.input).toBe(5);
   });

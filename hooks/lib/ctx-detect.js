@@ -1,12 +1,12 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { configDir } from './config-dir.js';
+import { spTmp } from './sp-tmp.js';
 
 const MCP_MARKER = 'mcp__plugin_context-mode_context-mode__ctx_';
 
 function _cacheFile(sessionId) {
-  return path.join(os.tmpdir(), `sp-ctx-${sessionId || 'default'}.json`);
+  return spTmp(`ctx-${sessionId || 'default'}.json`);
 }
 
 // Signal 1: an MCP tool marker for context-mode is visible in the environment.
@@ -48,8 +48,9 @@ function detect({ env, configDir, installedPluginsPath }) {
 
 /**
  * Returns true when context-mode is active. Result is cached per session in a
- * tmpdir file (sp-ctx-<sessionId>.json) so all hooks in a session agree and
- * avoid repeated filesystem probing. Fail-open to false on any error.
+ * file under the sp/ tmp root (<tmpdir>/sp/ctx-<sessionId>.json) so all hooks
+ * in a session agree and avoid repeated filesystem probing. Fail-open to false
+ * on any error.
  */
 function isContextModeActive(opts = {}) {
   if (process.env.SP_TEST_FORCE_CTX === '1') return true;

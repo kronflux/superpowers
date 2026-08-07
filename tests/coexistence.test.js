@@ -38,7 +38,7 @@ function bashEvent(command) {
 
 describe('coexistence with context-mode', () => {
   it.skipIf(!hasBashCompress || !hasStopReminders)(
-    'all plugin tmpdir markers use the sp- prefix (no context-mode-/cm- collision)', () => {
+    'plugin tmpfiles live under the sp/ root (no context-mode-/cm- collision)', () => {
     const hookFiles = [
       'hooks/bash-compress-hook.js',
       'hooks/stop-reminders.js',
@@ -51,9 +51,9 @@ describe('coexistence with context-mode', () => {
     }
   });
 
-  it.skipIf(!hasStopReminders)('stop lock is per-session (sp-stop-<sessionId>), not a global lock', () => {
+  it.skipIf(!hasStopReminders)('stop lock is per-session, under the sp/ tmp root', () => {
     const src = fs.readFileSync(path.join(ROOT, 'hooks/stop-reminders.js'), 'utf8');
-    expect(src).toMatch(/sp-stop-\$\{/);
+    expect(src).toMatch(/spTmp\(`stop-\$\{/);
     expect(src.includes('stop-hook-fired.lock')).toBe(false);
   });
 
@@ -64,8 +64,8 @@ describe('coexistence with context-mode', () => {
     // The real guardFile() must produce a per-session tmpdir path, not a global one.
     const gf1 = guardFile(s1);
     const gf2 = guardFile(s2);
-    expect(gf1).toBe(path.join(os.tmpdir(), `sp-stop-${s1}.lock`));
-    expect(gf2).toBe(path.join(os.tmpdir(), `sp-stop-${s2}.lock`));
+    expect(gf1).toBe(path.join(os.tmpdir(), 'sp', `stop-${s1}.lock`));
+    expect(gf2).toBe(path.join(os.tmpdir(), 'sp', `stop-${s2}.lock`));
     expect(gf1).not.toBe(gf2);
 
     // Setting the guard for s1 must create exactly that session's lock,
@@ -73,7 +73,7 @@ describe('coexistence with context-mode', () => {
     setGuard(s1);
     try {
       expect(fs.existsSync(gf1)).toBe(true);
-      expect(fs.existsSync(path.join(os.tmpdir(), 'sp-stop-default.lock'))).toBe(false);
+      expect(fs.existsSync(path.join(os.tmpdir(), 'sp', 'stop-default.lock'))).toBe(false);
 
       // Within the TTL, the guarded session must not re-fire, while a different
       // session is unaffected — proving the lock is keyed per session.

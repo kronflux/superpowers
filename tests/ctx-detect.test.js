@@ -67,7 +67,7 @@ describe('ctx-detect', () => {
     expect(second).toBe(false);
   });
 
-  it('cache file uses sp-ctx-<sessionId> prefix', () => {
-    expect(path.basename(_cacheFile('abc'))).toBe('sp-ctx-abc.json');
+  it('cache file lives under the sp/ tmp root as ctx-<sessionId>.json', () => {
+    expect(_cacheFile('abc')).toBe(path.join(os.tmpdir(), 'sp', 'ctx-abc.json'));
   });
 });

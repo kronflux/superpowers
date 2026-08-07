@@ -8,9 +8,9 @@
  *
  * Uses a PER-SESSION file-based guard to fire only once per session lock and
  * prevent infinite loops (a Stop hook returning content causes Claude to
- * resume). The lock is keyed by sessionId in tmpdir (sp-stop-<sessionId>.lock)
- * — never a global lock — so concurrent sessions and other plugins' Stop hooks
- * do not collide (spec §6.3, criterion 7).
+ * resume). The lock is keyed by sessionId under the sp/ tmp root
+ * (<tmpdir>/sp/stop-<sessionId>.lock) — never a global lock — so concurrent
+ * sessions and other plugins' Stop hooks do not collide (spec §6.3, criterion 7).
  *
  * Input:  stdin JSON with { session_id, cwd, ... }
  * Output: stdout JSON with decision/reason continuation payload (only when
@@ -20,10 +20,10 @@
 
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { configDir } from './lib/config-dir.js';
+import { spTmp } from './lib/sp-tmp.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 const EDIT_LOG = path.join(LOG_DIR, 'edit-log.txt');
@@ -35,10 +35,10 @@ const STATS_FILE = path.join(LOG_DIR, 'session-stats.json');
 // fires. It auto-expires after 15 minutes so later Claude stops can show reminders.
 const GUARD_TTL_MS = 15 * 60 * 1000;
 
-// Per-session Stop lock in tmpdir (sp-stop-<sessionId>.lock) — never a global
-// lock, so concurrent sessions / other plugins do not collide (spec §6.3).
+// Per-session Stop lock under the sp/ tmp root (stop-<sessionId>.lock) — never a
+// global lock, so concurrent sessions / other plugins do not collide (spec §6.3).
 function guardFile(sessionId) {
-  return path.join(os.tmpdir(), `sp-stop-${sessionId || 'default'}.lock`);
+  return spTmp(`stop-${sessionId || 'default'}.lock`);
 }
 
 function shouldFire(sessionId) {

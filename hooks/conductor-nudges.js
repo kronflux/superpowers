@@ -10,16 +10,16 @@
  *   codegraph-init — Grep/Glob/Read when CodeGraph is installed but unindexed
  *   lsp            — Edit of a file type no installed language server covers
  *   middleware     — large failing Bash output while middleware is configured
- * State (probed capabilities + spent flags) lives in one sp- tmpfile per
- * session, so after every nudge has fired the hook is a read + exit.
+ * State (probed capabilities + spent flags) lives in one file under the sp/
+ * tmp root per session, so after every nudge has fired the hook is a read + exit.
  * Never denies anything. Fail-open: any error -> {}.
  */
 
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pluginForPath, extensionOf } from './lib/lsp-plugins.js';
+import { spTmp } from './lib/sp-tmp.js';
 
 const CLASSES = ['codegraph', 'codegraph-init', 'lsp', 'middleware'];
 
@@ -38,7 +38,7 @@ const FAIL_RE = /\bFAIL(ED)?\b|\b[1-9]\d* (failed|errors?)\b|\bError[:\s]|Traceb
 const MIN_OUTPUT_BYTES = 2048;
 
 function statePath(sessionId) {
-  return path.join(os.tmpdir(), `sp-conductor-${String(sessionId).replace(/[^A-Za-z0-9_-]/g, '_')}`);
+  return spTmp(`conductor-${String(sessionId).replace(/[^A-Za-z0-9_-]/g, '_')}`);
 }
 
 function claimNudge(sessionId, cls) {
