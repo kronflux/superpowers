@@ -12,17 +12,16 @@ an error surfaced to the user. Mechanics per tool live in the adapter files in t
 | Job | Chain (first available wins) | Adapter |
 |---|---|---|
 | Macro discovery / flow tracing / blast-radius | CodeGraph `codegraph_explore` → context-mode search → native Grep/Read | [codegraph.md](codegraph.md) |
-| Symbol-precise edit (rename, replace body, references) | Serena symbol tools → native Edit | [serena.md](serena.md) |
+| Symbol-precise edit (rename, replace body, references) | CodeGraph blast-radius → context-mode search → native Edit | [codegraph.md](codegraph.md) |
+| Post-edit fast signal | LSP diagnostics, THEN the project's own gate — see below | [lsp.md](lsp.md) |
 | External framework/API docs | Context7 → other docs MCP (e.g. docfork) → ctx_fetch_and_index / web | [context7.md](context7.md) |
 | Output handling (logs, tests, terminal dumps) | context-mode (unchanged contract) | [context-mode-adapter.md](context-mode-adapter.md) |
 | Mechanical subagent work (log digests, boilerplate) | middleware-exec → Claude mechanical tier → existing methodology | [middleware.md](middleware.md) |
-| Memory / ADR persistence | Obsidian-valid markdown always; obsidian-cli first, then Basic Memory MCP, when present → filesystem | [obsidian.md](obsidian.md) |
+| Memory / ADR persistence | filesystem, per the authoring contract | [doc-format.md](doc-format.md) |
 
-## Memory — STRICT PROHIBITION
-
-Serena's memory tools (`write_memory`, `read_memory`, `list_memories`, `delete_memory`,
-`rename_memory`, `edit_memory` — and any variant) MUST NEVER be used. The four-layer
-memory + ADR layer is the sole memory system. A second store is split-brain memory.
+**The post-edit row is the one exception to first-available-wins.** Every other row means "use
+the first available and stop". This one does not: LSP diagnostics and the project's gate are
+sequential and both apply. Reading a diagnostic never satisfies a gate. See [lsp.md](lsp.md).
 
 ## Verified vs configured
 

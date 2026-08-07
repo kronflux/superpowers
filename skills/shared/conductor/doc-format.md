@@ -1,10 +1,10 @@
-# Obsidian Adapter (memory / ADR persistence)
+# Documentation Format (memory / ADR persistence)
 
 Applies to routing.md's "Memory / ADR persistence" row. Source: comparative OFM-vs-ours
 review in `.superpowers/research/2026-07-24-fork-delta-audit.md` (`## OFM format review`,
-local). Conventions below apply UNCONDITIONALLY — they are already the right shape for
-GitHub rendering, grep, and `ctx_search` with zero Obsidian in the loop; vault tooling is
-additive on top, never a requirement.
+local). These conventions apply UNCONDITIONALLY and depend on no tooling — they are the right
+shape for GitHub rendering, grep, and `ctx_search` with zero Obsidian in the loop. A vault user
+gets correctly-shaped notes for free; superpowers claims no vault integration.
 
 ## Authoring conventions
 
@@ -42,29 +42,7 @@ additive on top, never a requirement.
   vault (broken alt-text on GitHub, invisible to grep/`ctx_search`). Reference files by relative
   path in prose instead.
 
-## Vault tooling (optional)
+## Persistence
 
-- **obsidian-cli:** gated on the `obsidian-cli` capability (binary on PATH) AND its `vault` flag
-  (a `.obsidian` directory found above cwd — see `hooks/lib/capability-registry.js`). Per the
-  reference dossier, the CLI drives a **running Obsidian instance** — it is not headless and not
-  an MCP server; it does nothing if Obsidian isn't open. Only invoke when both signals are
-  present, never uninvited, and demote silently on any call failure per routing.md.
-- **`.base` ADR-index view:** strictly vault-detected and opt-in. When both capability signals
-  above hold, may offer once to create `docs/adr/index.base` — a table view filtering
-  `file.inFolder("docs/adr")`, ordered by `status`, `date`, `tags`. Declined or absent → skip
-  silently, no filesystem-only substitute needed since ADRs are already plain browsable files.
-- **`.canvas` diagrams:** same gating — optional visual architecture maps inside a detected
-  vault only, never a required reading path for architecture docs (those stay in `docs/`).
-- **defuddle:** only when the user explicitly wants a clean copy of a web page saved as a vault
-  note. `ctx_fetch_and_index` remains the default fetch path per
-  `skills/shared/conductor/context-mode-adapter.md` for all other web-content retrieval.
-- **basic-memory MCP:** second choice, after obsidian-cli — when obsidian-cli is absent or a call
-  fails (routing.md capability chain), it may serve vault search/read for ADR lookup — same
-  optional, never-required footing. Absent or the call fails → fall through to plain filesystem,
-  same as every other tool in this section.
-
-## Absent
-
-No `obsidian-cli` and no `basic-memory` MCP (routing.md chain) → plain filesystem, per the
-Authoring conventions above — no behavior changes, since those conventions were never
-conditional on tooling in the first place.
+Plain filesystem, per the Authoring conventions above. There is no tool chain for this row and
+no capability gate — the conventions were never conditional on tooling in the first place.
