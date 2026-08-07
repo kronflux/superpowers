@@ -23,19 +23,62 @@ function normalizeDir(p) {
   return resolved;
 }
 
-function pluginServers(root) {
+// One walk over installed, enabled plugins. Both the MCP-server probe and the
+// LSP probe need the install paths, and reading installed_plugins.json twice
+// would be the only difference between them.
+function installedPlugins(root) {
   const idx = readJson(path.join(root, 'plugins', 'installed_plugins.json'));
   if (!idx || !idx.plugins) return [];
   const enabled = readJson(path.join(root, 'settings.json'))?.enabledPlugins;
-  const names = [];
+  const out = [];
   for (const [key, entries] of Object.entries(idx.plugins)) {
     if (!Array.isArray(entries) || entries.length === 0) continue;
     if (enabled && enabled[key] === false) continue;
+    out.push({ key, installPath: entries[entries.length - 1].installPath || '' });
+  }
+  return out;
+}
+
+function pluginServers(root) {
+  const names = [];
+  for (const { key, installPath } of installedPlugins(root)) {
     names.push(key.split('@')[0]);
-    const mcp = readJson(path.join(entries[entries.length - 1].installPath || '', '.mcp.json'));
+    const mcp = readJson(path.join(installPath, '.mcp.json'));
     if (mcp && mcp.mcpServers) names.push(...Object.keys(mcp.mcpServers));
   }
   return names;
+}
+
+// File extensions covered by an installed language server. LSP config is
+// plugin-scoped only — Claude Code ignores lspServers in project settings — so
+// installed plugins are the complete search space. Returns a sorted array, not
+// a Set: conductor-nudges caches probe() output as JSON.
+function lspExtensions(root) {
+  const exts = new Set();
+  for (const { installPath } of installedPlugins(root)) {
+    if (!installPath) continue;
+    const cfg = readJson(path.join(installPath, '.lsp.json'))
+      || readJson(path.join(installPath, 'plugin.json'))?.lspServers;
+    if (!cfg || typeof cfg !== 'object') continue;
+    for (const server of Object.values(cfg)) {
+      const map = server && server.extensionToLanguage;
+      if (!map || typeof map !== 'object') continue;
+      for (const ext of Object.keys(map)) exts.add(String(ext).toLowerCase());
+    }
+  }
+  return [...exts].sort();
+}
+
+// Per-plugin decline list. An empty marker file declines every language, so a
+// single decline in a polyglot repo does not silence the others.
+function lspDeclines(cwd) {
+  try {
+    const raw = fs.readFileSync(path.join(cwd, '.superpowers-no-lsp'), 'utf8');
+    const declined = raw.split('\n').map((s) => s.trim()).filter(Boolean);
+    return { declined, declinedAll: declined.length === 0 };
+  } catch {
+    return { declined: [], declinedAll: false };
+  }
 }
 
 function mcpConfigured(pattern, cwd, home, env = {}) {
@@ -67,41 +110,23 @@ function mcpConfigured(pattern, cwd, home, env = {}) {
   return pluginServers(root).some((name) => re.test(name));
 }
 
-function vaultAbove(cwd) {
-  let dir = cwd;
-  for (;;) {
-    if (exists(path.join(dir, '.obsidian'))) return true;
-    const parent = path.dirname(dir);
-    if (parent === dir) return false;
-    dir = parent;
-  }
-}
-
 function probe(cwd = process.cwd(), opts = {}) {
   const home = opts.home || os.homedir();
   const env = opts.env || process.env;
   const st = (cond) => (cond ? STATUS.CONFIGURED : STATUS.ABSENT);
+  const extensions = lspExtensions(configDir(env));
   return {
     codegraph: {
       status: st(onPath('codegraph', env) || mcpConfigured('codegraph', cwd, home, env)),
       indexed: exists(path.join(cwd, '.codegraph')),
       declined: exists(path.join(cwd, '.superpowers-no-codegraph')),
     },
-    serena: {
-      status: st(mcpConfigured('serena', cwd, home, env)),
-      declined: exists(path.join(cwd, '.superpowers-no-serena')),
-    },
+    lsp: { status: st(extensions.length > 0), extensions, ...lspDeclines(cwd) },
     context7: {
       status: st(mcpConfigured('context7', cwd, home, env)),
       declined: exists(path.join(cwd, '.superpowers-no-context7')),
     },
     docfork: { status: st(mcpConfigured('docfork', cwd, home, env)) },
-    'basic-memory': { status: st(mcpConfigured('basic-?memory', cwd, home, env)) },
-    'obsidian-cli': {
-      status: st(onPath('obsidian', env) || onPath('obsidian-cli', env)),
-      vault: vaultAbove(cwd),
-      declined: exists(path.join(cwd, '.superpowers-no-obsidian-cli')),
-    },
     middleware: {
       // Same candidate chain as scripts/middleware-exec.mjs resolveConfig():
       // project -> active config root -> legacy home. Omitting the config-root
@@ -115,11 +140,17 @@ function probe(cwd = process.cwd(), opts = {}) {
   };
 }
 
+// `lsp` is deliberately not in the "use first" list. It exposes no callable
+// tool — announcing it as something to reach for is the exact mistake that
+// made the Serena line noise.
 function summaryLine(caps) {
   const present = Object.entries(caps)
-    .filter(([, v]) => v.status !== STATUS.ABSENT).map(([k]) => k);
-  return present.length
-    ? `[conductor] use first: ${present.join(', ')}`
+    .filter(([k, v]) => k !== 'lsp' && v.status !== STATUS.ABSENT).map(([k]) => k);
+  const parts = [];
+  if (present.length) parts.push(`use first: ${present.join(', ')}`);
+  if (caps.lsp && caps.lsp.status !== STATUS.ABSENT) parts.push('lsp diagnostics active');
+  return parts.length
+    ? `[conductor] ${parts.join(' | ')}`
     : '[conductor] no optional integrations detected';
 }
 

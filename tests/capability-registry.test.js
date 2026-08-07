@@ -9,16 +9,18 @@ beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'capreg-')); });
 afterEach(() => { fs.rmSync(tmp, { recursive: true, force: true }); });
 
 describe('capability-registry', () => {
-  it('returns all seven capabilities as absent in an empty dir', () => {
+  it('returns exactly the five live capabilities, all absent, in an empty dir', () => {
     const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
     expect(Object.keys(caps).sort()).toEqual(
-      ['basic-memory', 'codegraph', 'context7', 'docfork', 'middleware', 'obsidian-cli', 'serena'].sort());
+      ['codegraph', 'context7', 'docfork', 'lsp', 'middleware'].sort());
     for (const v of Object.values(caps)) expect(v.status).toBe(STATUS.ABSENT);
   });
 
-  it('detects serena from project .mcp.json', () => {
-    fs.writeFileSync(path.join(tmp, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
-    expect(probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).serena.status).toBe(STATUS.CONFIGURED);
+  it('no longer probes serena, obsidian-cli, or basic-memory', () => {
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
+    expect(caps.serena).toBeUndefined();
+    expect(caps['obsidian-cli']).toBeUndefined();
+    expect(caps['basic-memory']).toBeUndefined();
   });
 
   it('detects context7 from home .claude.json project scope', () => {
@@ -70,66 +72,49 @@ describe('capability-registry', () => {
     expect(summaryLine(caps).length).toBeLessThanOrEqual(120);
   });
 
-  it('probes decline markers for serena, context7, middleware, obsidian-cli', () => {
-    fs.writeFileSync(path.join(tmp, '.superpowers-no-serena'), '');
+  it('probes decline markers for context7 and middleware', () => {
     fs.writeFileSync(path.join(tmp, '.superpowers-no-middleware'), '');
     const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
-    expect(caps.serena.declined).toBe(true);
     expect(caps.middleware.declined).toBe(true);
     expect(caps.context7.declined).toBe(false);
-    expect(caps['obsidian-cli'].declined).toBe(false);
-  });
-
-  it('detects serena from configRoot .claude.json via CLAUDE_CONFIG_DIR', () => {
-    const prof = path.join(tmp, 'prof'); fs.mkdirSync(prof, { recursive: true });
-    fs.writeFileSync(path.join(prof, '.claude.json'), JSON.stringify({ mcpServers: { serena: {} } }));
-    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
-    expect(caps.serena.status).toBe(STATUS.CONFIGURED);
   });
 
   it('detects a plugin-installed MCP server via installed_plugins.json', () => {
     const prof = path.join(tmp, 'prof');
-    const inst = path.join(prof, 'plugins', 'cache', 'm', 'serena', '1.0.0');
+    const inst = path.join(prof, 'plugins', 'cache', 'm', 'context7', '1.0.0');
     fs.mkdirSync(inst, { recursive: true });
-    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
+    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { context7: {} } }));
     fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
     fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
-      JSON.stringify({ version: 1, plugins: { 'serena@m': [{ installPath: inst }] } }));
+      JSON.stringify({ version: 1, plugins: { 'context7@m': [{ installPath: inst }] } }));
     const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
-    expect(caps.serena.status).toBe(STATUS.CONFIGURED);
+    expect(caps.context7.status).toBe(STATUS.CONFIGURED);
   });
 
   it('excludes a disabled plugin', () => {
     const prof = path.join(tmp, 'prof');
-    const inst = path.join(prof, 'plugins', 'cache', 'm', 'serena', '1.0.0');
+    const inst = path.join(prof, 'plugins', 'cache', 'm', 'context7', '1.0.0');
     fs.mkdirSync(inst, { recursive: true });
-    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
+    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { context7: {} } }));
     fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
     fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
-      JSON.stringify({ version: 1, plugins: { 'serena@m': [{ installPath: inst }] } }));
+      JSON.stringify({ version: 1, plugins: { 'context7@m': [{ installPath: inst }] } }));
     fs.writeFileSync(path.join(prof, 'settings.json'),
-      JSON.stringify({ enabledPlugins: { 'serena@m': false } }));
+      JSON.stringify({ enabledPlugins: { 'context7@m': false } }));
     const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
-    expect(caps.serena.status).toBe(STATUS.ABSENT);
+    expect(caps.context7.status).toBe(STATUS.ABSENT);
   });
 
   it('treats installed as enabled when settings.json or the field is absent', () => {
     const prof = path.join(tmp, 'prof');
-    const inst = path.join(prof, 'plugins', 'cache', 'm', 'serena', '1.0.0');
+    const inst = path.join(prof, 'plugins', 'cache', 'm', 'context7', '1.0.0');
     fs.mkdirSync(inst, { recursive: true });
-    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { serena: {} } }));
+    fs.writeFileSync(path.join(inst, '.mcp.json'), JSON.stringify({ mcpServers: { context7: {} } }));
     fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
     fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
-      JSON.stringify({ version: 1, plugins: { 'serena@m': [{ installPath: inst }] } }));
+      JSON.stringify({ version: 1, plugins: { 'context7@m': [{ installPath: inst }] } }));
     const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
-    expect(caps.serena.status).toBe(STATUS.CONFIGURED);
-  });
-
-  it('detects obsidian by bare binary name', () => {
-    const bin = path.join(tmp, 'bin'); fs.mkdirSync(bin, { recursive: true });
-    fs.writeFileSync(path.join(bin, process.platform === 'win32' ? 'obsidian.exe' : 'obsidian'), '');
-    const caps = probe(tmp, { home: tmp, env: { PATH: bin, CLAUDE_CONFIG_DIR: path.join(tmp, 'none') } });
-    expect(caps['obsidian-cli'].status).toBe(STATUS.CONFIGURED);
+    expect(caps.context7.status).toBe(STATUS.CONFIGURED);
   });
 
   it('survives corrupt installed_plugins.json and settings.json', () => {
@@ -138,6 +123,88 @@ describe('capability-registry', () => {
     fs.writeFileSync(path.join(prof, 'settings.json'), '{bad');
     let caps;
     expect(() => { caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } }); }).not.toThrow();
-    expect(caps.serena.status).toBe(STATUS.ABSENT);
+    expect(caps.context7.status).toBe(STATUS.ABSENT);
+  });
+
+  // --- lsp -------------------------------------------------------------
+
+  function installLspPlugin(prof, name, file, body) {
+    const inst = path.join(prof, 'plugins', 'cache', 'm', name, '1.0.0');
+    fs.mkdirSync(inst, { recursive: true });
+    fs.writeFileSync(path.join(inst, file), typeof body === 'string' ? body : JSON.stringify(body));
+    fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    const idxPath = path.join(prof, 'plugins', 'installed_plugins.json');
+    const idx = fs.existsSync(idxPath)
+      ? JSON.parse(fs.readFileSync(idxPath, 'utf8'))
+      : { version: 1, plugins: {} };
+    idx.plugins[`${name}@m`] = [{ installPath: inst }];
+    fs.writeFileSync(idxPath, JSON.stringify(idx));
+    return inst;
+  }
+
+  it('reads covered extensions from a plugin .lsp.json', () => {
+    const prof = path.join(tmp, 'prof');
+    installLspPlugin(prof, 'gopls-lsp', '.lsp.json', {
+      go: { command: 'gopls', args: ['serve'], extensionToLanguage: { '.go': 'go' } },
+    });
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.lsp.status).toBe(STATUS.CONFIGURED);
+    expect(caps.lsp.extensions).toEqual(['.go']);
+  });
+
+  it('reads covered extensions from inline plugin.json lspServers', () => {
+    const prof = path.join(tmp, 'prof');
+    installLspPlugin(prof, 'typescript-lsp', 'plugin.json', {
+      name: 'typescript-lsp',
+      lspServers: {
+        ts: { command: 'typescript-language-server', extensionToLanguage: { '.ts': 'typescript', '.TSX': 'typescriptreact' } },
+      },
+    });
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.lsp.extensions).toEqual(['.ts', '.tsx']);
+  });
+
+  it('contributes no extensions from a disabled LSP plugin', () => {
+    const prof = path.join(tmp, 'prof');
+    installLspPlugin(prof, 'gopls-lsp', '.lsp.json', {
+      go: { command: 'gopls', extensionToLanguage: { '.go': 'go' } },
+    });
+    fs.writeFileSync(path.join(prof, 'settings.json'),
+      JSON.stringify({ enabledPlugins: { 'gopls-lsp@m': false } }));
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.lsp.status).toBe(STATUS.ABSENT);
+    expect(caps.lsp.extensions).toEqual([]);
+  });
+
+  it('degrades to no coverage on a malformed LSP manifest', () => {
+    const prof = path.join(tmp, 'prof');
+    installLspPlugin(prof, 'lua-lsp', '.lsp.json', '{not json');
+    let caps;
+    expect(() => { caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } }); }).not.toThrow();
+    expect(caps.lsp.extensions).toEqual([]);
+  });
+
+  it('parses .superpowers-no-lsp as a per-plugin decline list', () => {
+    fs.writeFileSync(path.join(tmp, '.superpowers-no-lsp'), 'typescript-lsp\npyright-lsp\n');
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
+    expect(caps.lsp.declined).toEqual(['typescript-lsp', 'pyright-lsp']);
+    expect(caps.lsp.declinedAll).toBe(false);
+  });
+
+  it('treats an empty .superpowers-no-lsp as declining everything', () => {
+    fs.writeFileSync(path.join(tmp, '.superpowers-no-lsp'), '');
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
+    expect(caps.lsp.declined).toEqual([]);
+    expect(caps.lsp.declinedAll).toBe(true);
+  });
+
+  it('summaryLine reports lsp as a state, not a use-first entry', () => {
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
+    for (const v of Object.values(caps)) v.status = STATUS.CONFIGURED;
+    const line = summaryLine(caps);
+    expect(line).toMatch(/use first: /);
+    expect(line).not.toMatch(/use first: [^|]*lsp/);
+    expect(line).toMatch(/lsp diagnostics active/);
+    expect(line.length).toBeLessThanOrEqual(120);
   });
 });
