@@ -18,3 +18,7 @@ project-map.md
 session-log.md
 state.md
 known-issues.md
+
+# Conductor decline markers are a local, per-developer choice — committing one
+# imposes it on everyone who clones the repo.
+.superpowers-no-*

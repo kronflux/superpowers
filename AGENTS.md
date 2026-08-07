@@ -56,6 +56,9 @@ manifests by the bump script.
   registered gates (`hooks/examples/`) block.
 - **`sp-*` tmpdir namespace:** all plugin tmpfiles use the `sp-` prefix (e.g. `sp-stop-<sessionId>`)
   to avoid colliding with context-mode. No hook uses `PreCompact`; WebFetch is owned by context-mode.
+- **Decline markers:** `.superpowers-no-<capability>` files at the project root record a user's
+  "no" for a capability offer and are gitignored — they are a local choice, never committed.
+  `.superpowers-no-lsp` is newline-delimited plugin names; empty means decline all.
 - **Four-layer memory** (auto-capture → `state.md` → durable git-committed artifacts → harness
   memory) is documented in `docs/ARCHITECTURE.md`.
 - **Model-tier routing** is opt-in via `.superpowers/model-routing.json` (canonical) → legacy
