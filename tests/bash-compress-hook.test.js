@@ -1,18 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { _cacheFile } from '../hooks/lib/ctx-detect.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.resolve(__dirname, '../hooks/bash-compress-hook.js');
 
-function ctxCacheFile(sid) {
-  return path.join(os.tmpdir(), `sp-ctx-${sid}.json`);
-}
 function seedCtx(sid, active) {
-  fs.writeFileSync(ctxCacheFile(sid), JSON.stringify({ active, ts: Date.now() }));
+  fs.writeFileSync(_cacheFile(sid), JSON.stringify({ active, ts: Date.now() }));
 }
 function runHook(payload, env = {}) {
   const res = spawnSync('node', [HOOK], {

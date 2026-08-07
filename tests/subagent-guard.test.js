@@ -68,11 +68,11 @@ describe('subagent-guard (namespace-scoped)', () => {
 });
 
 describe('stop-reminders (per-session lock)', () => {
-  it('uses a per-session lock filename with the sp-stop- prefix and sessionId', async () => {
+  it('uses a per-session lock filename under the sp/ tmp root, keyed by sessionId', async () => {
     const { guardFile } = await import('../hooks/stop-reminders.js');
     const gf = guardFile('abc123');
-    expect(path.dirname(gf)).toBe(os.tmpdir());
-    expect(path.basename(gf)).toBe('sp-stop-abc123.lock');
+    expect(path.dirname(gf)).toBe(path.join(os.tmpdir(), 'sp'));
+    expect(path.basename(gf)).toBe('stop-abc123.lock');
   });
 
   it('two different sessions do not share the lock', async () => {
@@ -94,7 +94,7 @@ describe('stop-reminders (per-session lock)', () => {
 
   it('runs end-to-end without crashing and emits valid JSON', () => {
     const sid = `stp-e2e-${Date.now()}`;
-    const gf = path.join(os.tmpdir(), `sp-stop-${sid}.lock`);
+    const gf = path.join(os.tmpdir(), 'sp', `stop-${sid}.lock`);
     try { fs.unlinkSync(gf); } catch {}
     const r = runStop(sid);
     expect(r.status).toBe(0);
