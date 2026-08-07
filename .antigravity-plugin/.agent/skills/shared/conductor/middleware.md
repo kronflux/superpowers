@@ -34,7 +34,7 @@ internals either way. context-mode inactive: pipe the source file directly into 
 | Job | Route |
 |---|---|
 | Mechanical (log digests, test-failure summaries, boilerplate) | `middleware-exec` when configured → Claude mechanical tier → existing methodology |
-| Symbol-precise refactors | primary agent + [serena.md](serena.md) adapter |
+| Symbol-precise refactors | primary agent + [codegraph.md](codegraph.md) adapter |
 | Spec / quality-gate review | primary agent — NEVER middleware |
 
 ## Transports

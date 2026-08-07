@@ -99,7 +99,7 @@ You MUST complete each phase before proceeding to the next.
 
    Worked example (multi-layer CI → build → signing pipeline): see `multi-component-example.md` in this directory.
 
-   Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery → `codegraph.md`; symbol edits → `serena.md` when available); surface the layer-by-layer evidence in-transcript regardless.
+   Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery and blast-radius → `codegraph.md`); surface the layer-by-layer evidence in-transcript regardless.
 
 5. **Trace Data Flow**
 

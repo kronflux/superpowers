@@ -110,7 +110,7 @@ Do not skip this step. An approach that survives adversarial questioning is an a
   - (User preferences for spec location override this default)
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
-- Distill the approved design into an ADR in `docs/adr/` (committable), per `skills/shared/conductor/obsidian.md` conventions, in addition to the local spec — skip silently if the project has no `docs/` convention or the user declines
+- Distill the approved design into an ADR in `docs/adr/` (committable), per `skills/shared/conductor/doc-format.md` conventions, in addition to the local spec — skip silently if the project has no `docs/` convention or the user declines
 
 **Spec Self-Review:**
 After writing the spec document, look at it with fresh eyes:

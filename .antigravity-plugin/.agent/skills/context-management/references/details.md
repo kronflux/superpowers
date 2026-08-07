@@ -42,7 +42,7 @@ Read any matching `[saved]` entries and ask: does the new decision *directly con
 
 **Offering when ambiguous:** `docs/` exists but no `docs/adr/` precedent → offer once, e.g. *"Want this design captured as an ADR under `docs/adr/`? A short, committable file distilled from the spec."* Declined → skip silently, do not re-offer in the same session.
 
-**Writing:** follow `skills/shared/conductor/obsidian.md` Authoring conventions for filename, frontmatter, and links. The ADR distills the approved design — decision, options considered, consequences — it is not a copy of the full spec.
+**Writing:** follow `skills/shared/conductor/doc-format.md` Authoring conventions for filename, frontmatter, and links. The ADR distills the approved design — decision, options considered, consequences — it is not a copy of the full spec.
 
 ## What belongs in a [saved] entry vs state.md, and hard limits
 

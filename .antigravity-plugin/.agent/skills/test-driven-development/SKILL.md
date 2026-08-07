@@ -146,7 +146,7 @@ Echo pass/fail in-transcript (output job, see Test Infrastructure Check above). 
 
 ### GREEN - Minimal Code
 
-Write simplest code to pass the test. For symbol navigation and code edits, follow `skills/shared/conductor/serena.md` when serena is available.
+Write simplest code to pass the test. Before changing a symbol's signature, establish its call sites via `skills/shared/conductor/codegraph.md`.
 
 <Good>
 ```typescript

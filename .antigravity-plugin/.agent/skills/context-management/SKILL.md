@@ -61,9 +61,9 @@ offer wording, and skip conditions: see [references/details.md](references/detai
   cross-cutting convention) — not routine features; trivial designs stay in `.superpowers/specs/`
   only (brainstorming's judgment call).
 - **Format:** filename, frontmatter, links owned by
-  [`obsidian.md`](../shared/conductor/obsidian.md#authoring-conventions) — not duplicated here.
+  [`doc-format.md`](../shared/conductor/doc-format.md#authoring-conventions) — not duplicated here.
 - **Read trigger:** brainstorming's context-exploration step checks `docs/adr/` if present.
-- **Search chain:** obsidian-cli first, basic-memory MCP second, when detected; else grep/`ctx_search` —
+- **Search chain:** grep / `ctx_search` over the memory files —
   filesystem is the universal fallback.
 - **Never a blocker:** no `docs/` convention or the user declines → skip the write silently; the
   spec in `.superpowers/specs/` remains the record of truth.
