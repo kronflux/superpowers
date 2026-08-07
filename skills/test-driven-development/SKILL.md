@@ -146,7 +146,7 @@ Echo pass/fail in-transcript (output job, see Test Infrastructure Check above). 
 
 ### GREEN - Minimal Code
 
-Write simplest code to pass the test. Before changing a symbol's signature, establish its call sites with `skills/shared/conductor/codegraph.md`; edits themselves are native Edit.
+Write simplest code to pass the test. Before changing a symbol's signature, establish its call sites via `skills/shared/conductor/codegraph.md`.
 
 <Good>
 ```typescript

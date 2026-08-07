@@ -136,9 +136,9 @@ that `feat/config-dir-isolation` did not touch again (folded in per the snapshot
 | `skills/shared/conductor/codegraph.md` | Entire file | `net-new` | CodeGraph adapter. |
 | `skills/shared/conductor/context-mode-adapter.md` | Entire file | `moved` | Was `skills/shared/context-mode-adapter.md` on the pre-`conductor-v7.1` base; pure relocation into `conductor/` as part of the routing-table migration. Anything that still links the old path is stale. |
 | `skills/shared/conductor/context7.md` | Entire file | `net-new` | Context7 / live-docs adapter. |
-| `skills/shared/conductor/middleware.md` | Entire file | `net-new` | middleware-exec adapter. |
 | `skills/shared/conductor/doc-format.md` | Entire file | `net-new` | Documentation-format contract (was `obsidian.md`; vault tooling removed in 7.8.0, authoring conventions retained). |
 | `skills/shared/conductor/lsp.md` | Entire file | `net-new` | LSP post-edit-signal adapter. Replaced `serena.md`, deleted in 7.8.0. |
+| `skills/shared/conductor/middleware.md` | Entire file | `net-new` | middleware-exec adapter. |
 | `skills/shared/task-format-reference.md` | The `context-mode-adapter.md` citation path | `router-pointer` | Shared reference; rest of the task-JSON schema is upstream-shared. |
 | `skills/specifying-gates/SKILL.md` | Entire file | `net-new` | Fork-only skill. |
 | `skills/subagent-driven-development/SKILL.md` | Tool Selection pointer paragraph | `router-pointer` | Shared skill; upstream also edits this path. |
