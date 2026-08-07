@@ -225,7 +225,12 @@ Kotlin → `kotlin-lsp`, C# → `csharp-lsp`, C/C++ → `clangd-lsp`, PHP → `p
 Lua → `lua-lsp`, Swift → `swift-lsp`, Liquid → `liquid-lsp`. No match → skip this section
 silently; there is nothing to offer.
 
-If the probe already reports `lsp diagnostics active` for that language, skip the offer.
+The session line's `lsp diagnostics active` is a **global** signal — true if any installed LSP
+plugin covers any language anywhere in the repo — it does NOT mean this particular language is
+covered. Check the per-language signal instead: `probe().lsp.extensions`, a lowercased,
+dot-prefixed array (e.g. `['.go', '.ts']`) of extensions covered by installed servers. If the
+dominant language's extension (e.g. `.py` for Python, `.rb` for Ruby) is already in that array,
+skip the offer — a server for that language is already active.
 
 ```yaml
 AskUserQuestion:
@@ -241,8 +246,12 @@ AskUserQuestion:
 - **Yes** → print for the user to run themselves:
 
   ```text
+  /plugin marketplace add anthropics/claude-plugins-official
   /plugin install <plugin>@claude-plugins-official
   ```
+
+  Skip the `marketplace add` line if `claude-plugins-official` is already registered (check via
+  `/plugin`).
 
   Then state the limit plainly: diagnostics are a fast first signal, never a substitute for the
   project's own typecheck or test gate (`skills/shared/conductor/lsp.md`).
