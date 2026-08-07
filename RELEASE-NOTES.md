@@ -1,5 +1,35 @@
 # Superpowers Release Notes
 
+## 7.10.0 — conductor statusline
+
+- **`/superpowers:statusline`** installs a conductor statusline: active capabilities, the last
+  model-routing dispatch, plan progress, and session token usage, rendered by
+  `scripts/statusline.mjs` from config at `.superpowers/statusline.json`. A plugin cannot ship
+  the `statusLine` setting itself — only `agent`/`subagentStatusLine` — so this interview is the
+  only way the statusline reaches a user; it writes the setting into their own
+  `.claude/settings.json`. Two modes: the default emits only conductor segments for a
+  ccstatusline Custom Command widget; `--full` prefixes model name and context-window
+  percentage and needs no third-party install.
+- **Version-stable launcher.** The interview copies `scripts/statusline-launcher.mjs` to the
+  active config root, outside the versioned plugin directory, and `settings.json` points there
+  instead of at a versioned plugin path. The launcher re-resolves the highest installed plugin
+  version's `scripts/statusline.mjs` on every invocation, so a plugin update never breaks the
+  pointer.
+- **Fail-silent by design.** Renders on every assistant message, so the renderer never throws
+  past its top-level handler — any internal fault prints an empty line and exits 0 rather than a
+  stack trace across the prompt line.
+- **Gitignore honesty.** The install step reports which of three states it hit for `.claude/`:
+  already covered, a rule added, or already tracked by git — in the tracked case a
+  `.gitignore` rule cannot untrack the path, so nothing is written and `git rm --cached -r
+  .claude` is offered as the user's own decision, never run automatically.
+- **Scope note: middleware-exec runs are not represented in the delegation segment.**
+  `scripts/middleware-exec.mjs` is a standalone CLI spawned from Bash with no session in scope,
+  so its usage records carry no session identity to match against the statusline's session.
+  Bounding its records by a time window would mis-attribute exactly when two sessions overlap.
+  Middleware cost stays reported in `/superpowers:usage`.
+- Does not install or configure ccstatusline itself; the interview only prints how to point its
+  Custom Command widget at the launcher.
+
 ## 7.9.0 — runtime artifact hygiene
 
 - **Every plugin tmpfile now lives under `<tmpdir>/sp/`** and is named via `spTmp()`. Measured

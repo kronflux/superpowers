@@ -127,6 +127,19 @@ Capabilities this fork adds on top of the upstream skills library:
   tailored surface (`.codex-plugin`, `.cursor-plugin`, `.kimi-plugin`, `.opencode`, `GEMINI.md`,
   `.pi`), generated/synced from this repo.
 
+## Statusline
+
+`/superpowers:statusline` is a short interview that installs a conductor statusline: active
+capabilities, the last model-routing dispatch, plan progress, and session token usage. A
+plugin cannot ship the `statusLine` setting itself (only `agent`/`subagentStatusLine`), so the
+interview writes it into your own `.claude/settings.json`. Two modes — a default that emits
+only conductor segments for pasting into a ccstatusline Custom Command widget, and `--full`,
+which adds a model + context-% prefix and needs no
+third-party tool. It installs a version-stable launcher outside the versioned plugin directory
+so plugin updates never break the `settings.json` pointer, and reports the true state of your
+`.gitignore` rather than assuming one worked. Re-run the interview any time to change segments
+or the separator — it reads your existing choice back instead of starting blank.
+
 ## The Conductor
 
 `skills/shared/conductor/routing.md` is the central tool-selection authority. Skills declare

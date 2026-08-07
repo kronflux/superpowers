@@ -73,6 +73,17 @@ manifests by the bump script.
   `docs/superpowers/model-routing.json` (still read, migration offered) →
   `$CLAUDE_CONFIG_DIR/superpowers/model-routing.json` → `~/.claude/superpowers/model-routing.json`
   (first match wins); see `/onboard`.
+- **Statusline:** `/superpowers:statusline` (`skills/statusline/SKILL.md`) is the only way to
+  activate the conductor statusline — a plugin can ship `agent`/`subagentStatusLine` but not
+  `statusLine` itself, so the interview writes the user's own `.claude/settings.json`. Two
+  modes: default (conductor segments only, for a ccstatusline Custom Command widget) and
+  `--full` (adds a model + context-% prefix, standalone). Config lives at
+  `.superpowers/statusline.json`; the interview installs a version-stable launcher
+  (`hooks/lib/statusline-install.js`) outside the versioned plugin directory so a plugin update
+  never breaks the pointer in `.claude/settings.json`. **Fail-silent:** `scripts/statusline.mjs`
+  never throws past its top-level handler — any internal fault prints an empty line and exits 0,
+  since this renders on every assistant message and a visible failure would put a stack trace
+  across the prompt line.
 
 ## Releases
 
