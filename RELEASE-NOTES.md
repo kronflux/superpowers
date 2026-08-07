@@ -18,10 +18,13 @@
 - **Fail-silent by design.** Renders on every assistant message, so the renderer never throws
   past its top-level handler — any internal fault prints an empty line and exits 0 rather than a
   stack trace across the prompt line.
-- **Gitignore honesty.** The install step reports which of three states it hit for `.claude/`:
-  already covered, a rule added, or already tracked by git — in the tracked case a
-  `.gitignore` rule cannot untrack the path, so nothing is written and `git rm --cached -r
-  .claude` is offered as the user's own decision, never run automatically.
+- **Gitignore honesty.** The install step reports which of four states it hit for `.claude/`:
+  already covered; a rule added; already tracked by git; or the check was inconclusive. In the
+  tracked case a `.gitignore` rule cannot untrack the path, so nothing is written and `git rm
+  --cached -r .claude` is offered as the user's own decision, never run automatically. In the
+  inconclusive case the `git ls-files` probe itself failed against a real repository — nothing is
+  written and the install says so, rather than claiming a rule was added when the directory may
+  still be tracked.
 - **Scope note: middleware-exec runs are not represented in the delegation segment.**
   `scripts/middleware-exec.mjs` is a standalone CLI spawned from Bash with no session in scope,
   so its usage records carry no session identity to match against the statusline's session.
