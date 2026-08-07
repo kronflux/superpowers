@@ -829,8 +829,8 @@ describe('routing-dispatch.log', () => {
     run('agent', denyingAgent(dir, transcript));
 
     const added = readLog().slice(before.length);
-    expect(added).toMatch(/ALLOW model=haiku allowed=haiku,sonnet tasks=1/);
-    expect(added).toMatch(/BLOCK model=opus allowed=haiku,sonnet tasks=1/);
+    expect(added).toMatch(/ALLOW session=- model=haiku allowed=haiku,sonnet tasks=1/);
+    expect(added).toMatch(/BLOCK session=- model=opus allowed=haiku,sonnet tasks=1/);
   });
 
   it('logs allowed=- and tasks=- when dispatch is routed but no tasks are in-progress', () => {
@@ -850,7 +850,35 @@ describe('routing-dispatch.log', () => {
     });
 
     const added = readLog().slice(before.length);
-    expect(added).toMatch(/ALLOW model=haiku allowed=- tasks=-/);
+    expect(added).toMatch(/ALLOW session=- model=haiku allowed=- tasks=-/);
+  });
+
+  it('stamps the dispatch record with the session id', () => {
+    // Without this, a second Claude Code window's dispatch is indistinguishable
+    // from this one's — both append to the same config-root-wide log, so the
+    // statusline would confidently show the other window's activity.
+    const cfgRoot = fs.mkdtempSync(path.join(spTmpDir(), 'mr-sid-'));
+    const dir = makeProject(ROUTING);
+    const transcript = mechanicalInProgressTranscript();
+    try {
+      run('agent', {
+        session_id: 'sid-under-test',
+        tool_name: 'Agent',
+        cwd: dir,
+        transcript_path: transcript,
+        tool_input: { description: 'impl', prompt: 'do it', model: 'haiku' },
+      }, { CLAUDE_CONFIG_DIR: cfgRoot });
+      const log = fs.readFileSync(
+        path.join(cfgRoot, 'hooks-logs', 'routing-dispatch.log'), 'utf8');
+      expect(log).toMatch(/\bsession=sid-under-test\b/);
+      // The pre-existing fields must survive unchanged — other readers parse them.
+      expect(log).toMatch(/\b(ALLOW|BLOCK)\b/);
+      expect(log).toMatch(/\bmodel=/);
+      expect(log).toMatch(/\ballowed=/);
+      expect(log).toMatch(/\btasks=/);
+    } finally {
+      fs.rmSync(cfgRoot, { recursive: true, force: true });
+    }
   });
 
   it('writes nothing when routing is dormant', () => {
