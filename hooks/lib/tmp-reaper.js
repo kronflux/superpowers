@@ -46,7 +46,10 @@ function retentionMs(env) {
 
 function isThrottled(markerPath, now) {
   try {
-    return now - fs.statSync(markerPath).mtimeMs < THROTTLE_MS;
+    const delta = now - fs.statSync(markerPath).mtimeMs;
+    // A future-dated marker (clock skew, tampering) must not wedge the
+    // throttle open forever — degrade to one extra sweep instead.
+    return delta >= 0 && delta < THROTTLE_MS;
   } catch {
     return false; // no marker yet — first sweep
   }
