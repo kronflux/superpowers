@@ -142,11 +142,14 @@ a job type and follow that row's chain, left to right, using the first capabilit
 | Mechanical subagent work (log digests, boilerplate) | middleware-exec → Claude mechanical tier |
 | Memory / ADR persistence | filesystem, per the authoring contract in `doc-format.md` |
 
+The post-edit row is the one exception to first-available-wins: LSP diagnostics and the
+project's own gate are sequential and both apply — a diagnostic never satisfies a gate.
+
 Every row is capability-gated: a hook probes what's installed and configured at session start,
 absent tools are skipped silently, and a tool that fails mid-session is demoted for the rest
 of that session — never surfaced as an error. **Every integration is optional.** Nothing here
 is required, and nothing is skipped when present. Run `/onboard` to review and install any of
-CodeGraph, LSP, Context7, middleware-exec, or context-mode.
+CodeGraph, LSP, Context7, or middleware-exec.
 
 ## Context economy
 

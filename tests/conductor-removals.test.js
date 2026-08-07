@@ -9,7 +9,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // RELEASE-NOTES is a changelog, docs/adr and docs/superpowers are a committed
 // design archive, .superpowers is local scratch. Rewriting any of them to make
 // a grep return clean would be falsifying the record.
-const SCAN_DIRS = ['skills', 'hooks', 'commands'];
+const SCAN_DIRS = ['skills', 'hooks', 'commands', 'agents', 'scripts'];
 
 // plugin.universal.mjs isn't a .md file, so the root markdown glob below
 // doesn't pick it up. It's the single source for all hook manifests and must

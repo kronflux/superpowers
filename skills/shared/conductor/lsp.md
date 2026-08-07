@@ -25,13 +25,16 @@ Reporting work green because no diagnostic appeared is a verification failure, n
 `routing.md`'s taxonomy is otherwise first-available-wins. This row is NOT. LSP diagnostics and
 the project's own gate are sequential and both apply.
 
-## Install offer (once per language, per project)
+## Install offer (once per session, decline per language)
 
 When an edited file's language has an official LSP plugin and no installed server covers it,
-`hooks/conductor-nudges.js` surfaces a one-time offer. Defer it to a natural break in the
-current task; never install uninvited. On decline, append the plugin name on its own line to
-`.superpowers-no-lsp` in the project root — per-language, so declining one does not silence the
-others. An empty marker file declines every language.
+`hooks/conductor-nudges.js` surfaces an offer — at most one LSP offer per session, for
+whichever language triggers it first; a polyglot repo does not get one offer per language in
+the same session. If the offer is deferred rather than declined, it recurs in later sessions
+until acted on. Defer it to a natural break in the current task; never install uninvited. On
+decline, append the plugin name on its own line to `.superpowers-no-lsp` in the project root —
+per-language, so declining one does not silence the others. An empty marker file declines every
+language.
 
 ## Absent
 

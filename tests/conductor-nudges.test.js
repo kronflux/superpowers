@@ -243,9 +243,11 @@ describe('conductor-nudges', () => {
 
   it('offers an LSP plugin through the real probe, with extensions read from an installed server', () => {
     // No seedState: this drives probe() for real, mirroring the codegraph-init
-    // real-probe test above. A rename of probe().lsp.{extensions,declined,
-    // declinedAll} would silently zero every LSP nudge with the rest of this
-    // suite still green.
+    // real-probe test above. This proves probe().lsp.extensions is read
+    // correctly; a rename of that field would fail here. It does NOT cover
+    // probe().lsp.declined or .declinedAll — those are only exercised via
+    // seedState() elsewhere in this file, so a rename of just those two
+    // sub-fields would default permissively and stay green.
     const prof = path.join(home, 'prof');
     // Covers .go - a different extension than the one edited below - so a
     // non-empty extensions array from the real probe is what lets the

@@ -8,8 +8,9 @@
   authoring convention retained, the vault-tooling section and the `obsidian-cli` /
   `basic-memory` probes deleted.
 - **New `lsp` capability.** Detects language-server coverage from installed plugins and offers
-  the matching official plugin once per language per project. Diagnostics are documented as a
-  non-authoritative fast signal that never replaces a verification gate.
+  the matching official plugin once per session (decline is tracked per language, in
+  `.superpowers-no-lsp`). Diagnostics are documented as a non-authoritative fast signal that
+  never replaces a verification gate.
 - **CodeGraph init offer now fires.** New `codegraph-init` nudge class; the previous
   `indexed === true` guard filtered out exactly the repos the offer targets.
 - **Usage attribution** stops emitting `serena` and `obsidian` keys; logs written before 7.8.0
