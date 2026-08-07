@@ -49,23 +49,70 @@ function pluginServers(root) {
   return names;
 }
 
-// File extensions covered by an installed language server. LSP config is
-// plugin-scoped only — Claude Code ignores lspServers in project settings — so
-// installed plugins are the complete search space. Returns a sorted array, not
-// a Set: conductor-nudges caches probe() output as JSON.
+function collectExtensions(lspServers, into) {
+  if (!lspServers || typeof lspServers !== 'object') return;
+  for (const server of Object.values(lspServers)) {
+    const map = server && server.extensionToLanguage;
+    if (!map || typeof map !== 'object') continue;
+    for (const ext of Object.keys(map)) into.add(String(ext).toLowerCase());
+  }
+}
+
+// File extensions covered by an installed language server. Claude Code ignores
+// lspServers in project settings, so installed plugins are the complete search
+// space — but they declare their servers in TWO different places, and only
+// reading one of them was a shipped bug:
+//
+//   1. Plugin-local: `.lsp.json`, or `lspServers` in `plugin.json`. This is the
+//      layout the plugin-authoring docs describe, and it is what a hand-written
+//      LSP plugin uses.
+//   2. Marketplace manifest: the marketplace's own `.claude-plugin/marketplace.json`
+//      carries `lspServers` on each plugin's entry. This is how EVERY official
+//      LSP plugin actually ships — a marketplace install leaves only LICENSE and
+//      README in the install dir, with no manifest of its own.
+//
+// Path 2 was missing until 7.8.1, so the probe reported `absent` for every
+// official language server. Both paths are checked; a plugin using either is
+// detected, and the union covers a profile mixing the two.
+//
+// Returns a sorted array, not a Set: conductor-nudges caches probe() output as JSON.
 function lspExtensions(root) {
   const exts = new Set();
-  for (const { installPath } of installedPlugins(root)) {
+  const installed = installedPlugins(root);
+
+  for (const { installPath } of installed) {
     if (!installPath) continue;
-    const cfg = readJson(path.join(installPath, '.lsp.json'))
-      || readJson(path.join(installPath, 'plugin.json'))?.lspServers;
-    if (!cfg || typeof cfg !== 'object') continue;
-    for (const server of Object.values(cfg)) {
-      const map = server && server.extensionToLanguage;
-      if (!map || typeof map !== 'object') continue;
-      for (const ext of Object.keys(map)) exts.add(String(ext).toLowerCase());
+    collectExtensions(
+      readJson(path.join(installPath, '.lsp.json'))
+        || readJson(path.join(installPath, 'plugin.json'))?.lspServers,
+      exts,
+    );
+  }
+
+  // Marketplace manifests are read once each, not once per plugin: a profile
+  // with a dozen plugins from one marketplace should not parse it a dozen times.
+  const byMarket = new Map();
+  for (const { key } of installed) {
+    const at = key.lastIndexOf('@');
+    if (at <= 0) continue; // no marketplace suffix — plugin-local layout only
+    const name = key.slice(0, at);
+    const market = key.slice(at + 1);
+    if (!byMarket.has(market)) byMarket.set(market, new Set());
+    byMarket.get(market).add(name);
+  }
+  for (const [market, names] of byMarket) {
+    const manifest = readJson(
+      path.join(root, 'plugins', 'marketplaces', market, '.claude-plugin', 'marketplace.json'),
+    );
+    if (!manifest || !Array.isArray(manifest.plugins)) continue;
+    for (const entry of manifest.plugins) {
+      // Advertised is not installed: a marketplace lists every plugin it offers,
+      // and only the ones this profile actually installed may contribute.
+      if (!entry || !names.has(entry.name)) continue;
+      collectExtensions(entry.lspServers, exts);
     }
   }
+
   return [...exts].sort();
 }
 

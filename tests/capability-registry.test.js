@@ -128,6 +128,97 @@ describe('capability-registry', () => {
 
   // --- lsp -------------------------------------------------------------
 
+  // Mirrors how the OFFICIAL marketplace actually ships an LSP plugin, which is
+  // NOT the layout the authoring docs describe: the install dir carries only
+  // LICENSE/README, and `lspServers` lives in the marketplace manifest entry.
+  // Verified against a real `/plugin install typescript-lsp@claude-plugins-official`
+  // on 2026-08-06 — the original fixtures encoded the assumed layout instead, so
+  // the probe passed every test while detecting nothing in the field.
+  function installMarketplaceLspPlugin(prof, name, market, lspServers) {
+    const inst = path.join(prof, 'plugins', 'cache', market, name, '1.0.0');
+    fs.mkdirSync(inst, { recursive: true });
+    fs.writeFileSync(path.join(inst, 'README.md'), '# stub\n');
+    const mktDir = path.join(prof, 'plugins', 'marketplaces', market, '.claude-plugin');
+    fs.mkdirSync(mktDir, { recursive: true });
+    const mktPath = path.join(mktDir, 'marketplace.json');
+    const mkt = fs.existsSync(mktPath)
+      ? JSON.parse(fs.readFileSync(mktPath, 'utf8'))
+      : { name: market, plugins: [] };
+    mkt.plugins.push({ name, source: `./plugins/${name}`, lspServers });
+    fs.writeFileSync(mktPath, JSON.stringify(mkt));
+    fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    const idxPath = path.join(prof, 'plugins', 'installed_plugins.json');
+    const idx = fs.existsSync(idxPath)
+      ? JSON.parse(fs.readFileSync(idxPath, 'utf8'))
+      : { version: 1, plugins: {} };
+    idx.plugins[`${name}@${market}`] = [{ installPath: inst }];
+    fs.writeFileSync(idxPath, JSON.stringify(idx));
+  }
+
+  it('reads covered extensions from a marketplace manifest entry', () => {
+    const prof = path.join(tmp, 'prof');
+    installMarketplaceLspPlugin(prof, 'typescript-lsp', 'claude-plugins-official', {
+      typescript: {
+        command: 'typescript-language-server',
+        args: ['--stdio'],
+        extensionToLanguage: { '.ts': 'typescript', '.TSX': 'typescriptreact', '.mts': 'typescript' },
+      },
+    });
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.lsp.status).toBe(STATUS.CONFIGURED);
+    expect(caps.lsp.extensions).toEqual(['.mts', '.ts', '.tsx']);
+  });
+
+  it('ignores a marketplace LSP entry whose plugin is not installed', () => {
+    const prof = path.join(tmp, 'prof');
+    installMarketplaceLspPlugin(prof, 'gopls-lsp', 'm', {
+      go: { command: 'gopls', extensionToLanguage: { '.go': 'go' } },
+    });
+    // Uninstall it: the marketplace still advertises the plugin, but nothing
+    // installed references it. Advertised != installed.
+    fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
+      JSON.stringify({ version: 1, plugins: {} }));
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.lsp.status).toBe(STATUS.ABSENT);
+    expect(caps.lsp.extensions).toEqual([]);
+  });
+
+  it('contributes no extensions from a disabled marketplace LSP plugin', () => {
+    const prof = path.join(tmp, 'prof');
+    installMarketplaceLspPlugin(prof, 'ruby-lsp', 'm', {
+      ruby: { command: 'ruby-lsp', extensionToLanguage: { '.rb': 'ruby' } },
+    });
+    fs.writeFileSync(path.join(prof, 'settings.json'),
+      JSON.stringify({ enabledPlugins: { 'ruby-lsp@m': false } }));
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.lsp.extensions).toEqual([]);
+  });
+
+  it('unions extensions across both plugin-local and marketplace layouts', () => {
+    const prof = path.join(tmp, 'prof');
+    installMarketplaceLspPlugin(prof, 'typescript-lsp', 'claude-plugins-official', {
+      typescript: { command: 'x', extensionToLanguage: { '.ts': 'typescript' } },
+    });
+    installLspPlugin(prof, 'gopls-lsp', '.lsp.json', {
+      go: { command: 'gopls', extensionToLanguage: { '.go': 'go' } },
+    });
+    const caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } });
+    expect(caps.lsp.extensions).toEqual(['.go', '.ts']);
+  });
+
+  it('survives a corrupt marketplace manifest', () => {
+    const prof = path.join(tmp, 'prof');
+    const mktDir = path.join(prof, 'plugins', 'marketplaces', 'm', '.claude-plugin');
+    fs.mkdirSync(mktDir, { recursive: true });
+    fs.writeFileSync(path.join(mktDir, 'marketplace.json'), '{not json');
+    fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    fs.writeFileSync(path.join(prof, 'plugins', 'installed_plugins.json'),
+      JSON.stringify({ version: 1, plugins: { 'lua-lsp@m': [{ installPath: path.join(prof, 'nope') }] } }));
+    let caps;
+    expect(() => { caps = probe(tmp, { home: tmp, env: { PATH: '', CLAUDE_CONFIG_DIR: prof } }); }).not.toThrow();
+    expect(caps.lsp.extensions).toEqual([]);
+  });
+
   function installLspPlugin(prof, name, file, body) {
     const inst = path.join(prof, 'plugins', 'cache', 'm', name, '1.0.0');
     fs.mkdirSync(inst, { recursive: true });

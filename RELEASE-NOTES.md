@@ -1,5 +1,19 @@
 # Superpowers Release Notes
 
+## 7.8.1 — LSP detection actually works
+
+- **Fixed: the `lsp` capability detected nothing for any official language server.** The probe
+  looked only for a plugin-local `.lsp.json` or `plugin.json.lspServers` — the layouts the
+  plugin-authoring docs describe. Every plugin installed from a marketplace declares
+  `lspServers` on its entry in that marketplace's `.claude-plugin/marketplace.json` instead,
+  leaving only `LICENSE` and `README.md` in the install directory. `lspExtensions()` now reads
+  both layouts and unions them, so a profile mixing hand-authored and marketplace plugins is
+  fully covered. Verified against a real `/plugin install typescript-lsp@claude-plugins-official`:
+  the probe now reports `configured` with `.cjs .cts .js .jsx .mjs .mts .ts .tsx`.
+- Regression tests are built from the real on-disk marketplace layout. The 7.8.0 fixtures
+  encoded the assumed layout, so the probe read back exactly what the fixture wrote and passed
+  while detecting nothing in the field.
+
 ## 7.8.0 — conductor surface correction
 
 - **Serena removed.** The symbol-precise-edit row is now CodeGraph blast-radius → context-mode
