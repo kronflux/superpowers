@@ -53,6 +53,18 @@
 #                                        are treated as hard violations.
 #                                        Default: 50.
 
+# Trace logging — shared with the other hooks/examples/*.sh scripts so a
+# no-interpreter skip is visible in one place. Tail with:
+#   tail -F /tmp/claude-hooks/user-gate-trace.log
+TRACE_LOG="${SUPERPOWERS_USERGATE_TRACE_LOG:-/tmp/claude-hooks/user-gate-trace.log}"
+mkdir -p "$(dirname "$TRACE_LOG")" 2>/dev/null || true
+trace() {
+    local event="${1:-?}" reason="${2:-}"
+    printf '%s | stop-deflection | %s%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$event" \
+        "${reason:+ | $reason}" >> "$TRACE_LOG" 2>/dev/null || true
+}
+
 # Escape hatch.
 if [[ "${SUPERPOWERS_DEFLECTION_GUARD:-1}" == "0" ]]; then
     exit 0
@@ -113,12 +125,29 @@ for line in reversed(lines):
     )
     break
 
-print(json.dumps({"text": text, "tokens": tokens}))
+print(json.dumps({"parsed": True, "text": text, "tokens": tokens}))
 '
 
-RESULT=$(python3 -c "$PY_EXTRACT" "$TRANSCRIPT_PATH" 2>/dev/null || echo "")
+# See lib-python.sh: `command -v python3` alone is not a liveness check —
+# on Windows it is often the Store App Execution Alias stub, which exists
+# on PATH but exits non-zero instead of running anything.
+source "$(dirname "${BASH_SOURCE[0]}")/lib-python.sh"
+if ! sp_resolve_python; then
+    trace "skip" "no-python-interpreter"
+    exit 0
+fi
+
+RESULT=$("${SP_PYTHON[@]}" -c "$PY_EXTRACT" "$TRANSCRIPT_PATH" 2>/dev/null || echo "")
 
 [[ -z "$RESULT" ]] && exit 0
+
+# Fail-open: an absent "parsed" sentinel means the parse never completed —
+# that is "no information", not "checked, found nothing".
+PARSED=$(echo "$RESULT" | jq -r '.parsed // false' 2>/dev/null)
+if [[ "$PARSED" != "true" ]]; then
+    trace "skip" "parse-produced-no-result"
+    exit 0
+fi
 
 TEXT=$(echo "$RESULT" | jq -r '.text // empty' 2>/dev/null)
 TOKENS=$(echo "$RESULT" | jq -r '.tokens // 0' 2>/dev/null)

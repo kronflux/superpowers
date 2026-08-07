@@ -33,11 +33,15 @@ FIXDIR="$(mktemp -d)"
 trap 'rm -rf "$FIXDIR"' EXIT
 TRACE_LOG="$FIXDIR/trace.log"
 
-# Deps: the hooks hardcode `jq` and `python3`. The WindowsApps python3 alias
-# exists on PATH but cannot run code, so probe with -c, not command -v.
+# Deps: the hooks resolve a working interpreter via lib-python.sh (python3,
+# then python, then `py -3`), probing each by execution rather than trusting
+# `command -v` — the WindowsApps python3 alias exists on PATH but cannot run
+# code. Source the same resolver here so this dep-check matches what the
+# hooks themselves can actually find.
+source "$ROOT/hooks/examples/lib-python.sh"
 HAVE_DEPS=1
 command -v jq >/dev/null 2>&1 || HAVE_DEPS=0
-python3 -c 'print(1)' >/dev/null 2>&1 || HAVE_DEPS=0
+sp_resolve_python || HAVE_DEPS=0
 
 # On Git Bash, native jq/python3 need Windows-style paths; bash's -f test
 # accepts the mixed form (C:/...) too, so use it when cygpath is available.

@@ -76,9 +76,14 @@ task_id = str(sys.argv[2])
 
 description = ""
 subject = ""
-# IDs are 1-based and increment in creation order. Rebuild that counter as we
-# walk the transcript so we can match TaskCreate calls (which do not carry
-# taskId in their input) to the target taskId.
+# IDs are NOT reliably 1-based or sequential in a real session (this bug was
+# diagnosed on a session that ran tasks #32-#81). The authoritative id is
+# whatever the TaskCreate tool_result for Claude Code actually reports back:
+# "Task #<N> created successfully: ...". Pair each TaskCreate tool_use (by
+# its own "id") with the tool_result whose tool_use_id matches it, and read
+# the real id out of that text. Positional counting is kept ONLY as a
+# fallback for a TaskCreate whose tool_result is missing (e.g. a truncated
+# transcript).
 next_id = 1
 # Track line indices for the scan window below: where the most recent
 # in_progress status change occurred for this taskId, and all assistant-text
@@ -96,6 +101,75 @@ except Exception:
     print(json.dumps({}))
     sys.exit(0)
 
+# Pass 1: collect every TaskCreate tool_use (its tool_use_id, description,
+# subject, and a positional fallback id) plus the text of every tool_result
+# keyed by tool_use_id, then resolve each TaskCreate to its REAL task id
+# before pass 2 does anything id-sensitive.
+create_calls = []       # ordered [{tool_use_id, description, subject, fallback_id}]
+tool_result_by_id = {}  # tool_use_id -> text
+
+for line in lines:
+    try:
+        entry = json.loads(line)
+    except Exception:
+        continue
+    etype = entry.get("type")
+    if etype == "user":
+        msg = entry.get("message") or {}
+        content = msg.get("content")
+        if isinstance(content, list):
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "tool_result":
+                    tuid = c.get("tool_use_id")
+                    inner = c.get("content")
+                    text = ""
+                    if isinstance(inner, str):
+                        text = inner
+                    elif isinstance(inner, list):
+                        text = "\n".join(
+                            ic.get("text", "") or ""
+                            for ic in inner
+                            if isinstance(ic, dict) and ic.get("type") == "text"
+                        )
+                    if tuid and text.strip():
+                        tool_result_by_id[tuid] = text
+        continue
+    if etype != "assistant":
+        continue
+    for c in (entry.get("message") or {}).get("content") or []:
+        if not isinstance(c, dict) or c.get("type") != "tool_use":
+            continue
+        if c.get("name") == "TaskCreate":
+            inp = c.get("input") or {}
+            create_calls.append({
+                "tool_use_id": c.get("id"),
+                "description": inp.get("description", "") or "",
+                "subject": inp.get("subject", "") or "",
+                "fallback_id": str(next_id),
+            })
+            next_id += 1
+        elif c.get("name") == "TaskUpdate":
+            # Same self-correction as before: if a TaskUpdate references an
+            # id past our positional guess, bump the fallback counter past
+            # it too, so any still-unresolved TaskCreate guesses better.
+            tid = str((c.get("input") or {}).get("taskId", ""))
+            try:
+                if int(tid) >= next_id:
+                    next_id = int(tid) + 1
+            except (ValueError, TypeError):
+                pass
+
+id_re = re.compile(r"Task #(\d+) created successfully")
+for call in create_calls:
+    m2 = id_re.search(tool_result_by_id.get(call["tool_use_id"], ""))
+    real_id = m2.group(1) if m2 else call["fallback_id"]
+    if real_id == task_id:
+        description = call["description"]
+        subject = call["subject"]
+
+# Pass 2: everything else is unrelated to id resolution — TaskUpdate
+# overrides (description edits, in_progress marker) plus the text/user/
+# tool_result windows used by the evidence and assessment scans below.
 for idx, line in enumerate(lines):
     try:
         entry = json.loads(line)
@@ -153,25 +227,15 @@ for idx, line in enumerate(lines):
             continue
         name = c.get("name", "")
         inp = c.get("input") or {}
-        if name == "TaskCreate":
-            if str(next_id) == task_id:
-                description = inp.get("description", "") or ""
-                subject = inp.get("subject", "") or ""
-            next_id += 1
-        elif name == "TaskUpdate":
+        if name == "TaskUpdate":
             tid = str(inp.get("taskId", ""))
             if tid == task_id:
                 if inp.get("description"):
                     description = inp.get("description", "") or ""
                 if inp.get("status") == "in_progress":
                     last_inprogress_idx = idx
-            try:
-                if int(tid) >= next_id:
-                    next_id = int(tid) + 1
-            except (ValueError, TypeError):
-                pass
 
-out = {"subject": subject, "userGate": False, "tags": [],
+out = {"parsed": True, "subject": subject, "userGate": False, "tags": [],
        "criteria": [], "evidence_on_record": False,
        "user_verification_in_window": False,
        "agent_last_assessment": False,
@@ -296,7 +360,26 @@ if axes:
 print(json.dumps(out))
 '
 
-RESULT=$(python3 -c "$PY_PARSE" "$TRANSCRIPT_PATH" "$TASK_ID" 2>/dev/null || echo "{}")
+# See lib-python.sh: `command -v python3` alone is not a liveness check —
+# on Windows it is often the Store App Execution Alias stub, which exists
+# on PATH but exits non-zero instead of running anything.
+source "$(dirname "${BASH_SOURCE[0]}")/lib-python.sh"
+if ! sp_resolve_python; then
+    trace "$TASK_ID" "skip" "no-python-interpreter"
+    exit 0
+fi
+
+RESULT=$("${SP_PYTHON[@]}" -c "$PY_PARSE" "$TRANSCRIPT_PATH" "$TASK_ID" 2>/dev/null || echo "{}")
+
+# Fail-open contract (line 49): an absent "parsed" sentinel means the parse
+# never completed (crashed, interpreter died mid-script, empty transcript
+# read failure) — that is "no information", not "checked, found nothing".
+# Only a parse that actually ran gets to make a blocking decision below.
+PARSED=$(echo "$RESULT" | jq -r '.parsed // false' 2>/dev/null)
+if [[ "$PARSED" != "true" ]]; then
+    trace "$TASK_ID" "skip" "parse-produced-no-result"
+    exit 0
+fi
 
 USER_GATE_FLAG=$(echo "$RESULT" | jq -r '.userGate // false' 2>/dev/null)
 TAGS_LIST=$(echo "$RESULT" | jq -r '.tags // [] | join(",")' 2>/dev/null)

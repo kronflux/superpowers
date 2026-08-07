@@ -111,10 +111,30 @@ if current_inprogress and current_inprogress in tasks:
         except Exception:
             pass
 
+out["parsed"] = True
 print(json.dumps(out))
 '
 
-RESULT=$(python3 -c "$PY_SCAN" "$TRANSCRIPT_PATH" 2>/dev/null || echo "{}")
+# See lib-python.sh: `command -v python3` alone is not a liveness check —
+# on Windows it is often the Store App Execution Alias stub, which exists
+# on PATH but exits non-zero instead of running anything.
+source "$(dirname "${BASH_SOURCE[0]}")/lib-python.sh"
+if ! sp_resolve_python; then
+    trace "?" "skip" "no-python-interpreter"
+    exit 0
+fi
+
+RESULT=$("${SP_PYTHON[@]}" -c "$PY_SCAN" "$TRANSCRIPT_PATH" 2>/dev/null || echo "{}")
+
+# Fail-open: an absent "parsed" sentinel means the parse never completed —
+# that is "no information", not "checked, found nothing". Only a parse that
+# actually ran gets to make a blocking decision below.
+PARSED=$(echo "$RESULT" | jq -r '.parsed // false' 2>/dev/null)
+if [[ "$PARSED" != "true" ]]; then
+    trace "?" "skip" "parse-produced-no-result"
+    exit 0
+fi
+
 TASK_ID=$(echo "$RESULT" | jq -r '.task_id // "?"' 2>/dev/null)
 SUBJECT=$(echo "$RESULT" | jq -r '.subject // "?"' 2>/dev/null)
 AXES_JSON=$(echo "$RESULT" | jq -c '.axes // []' 2>/dev/null)
@@ -126,7 +146,7 @@ AXES_COUNT=$(echo "$AXES_JSON" | jq -r 'length // 0' 2>/dev/null)
 trace "$TASK_ID" "parsed" "axes=$AXES_COUNT subject='$SUBJECT'"
 
 # Check the subagent return against each axis.
-MISSING_JSON=$(python3 -c '
+MISSING_JSON=$("${SP_PYTHON[@]}" -c '
 import json, re, sys
 response = sys.argv[1]
 axes = json.loads(sys.argv[2])

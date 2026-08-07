@@ -140,6 +140,7 @@ for b in blockers:
         })
 
 print(json.dumps({
+    "parsed": True,
     "target": target,
     "target_subject": t.get("subject", "?"),
     "all_blockers": blockers,
@@ -147,7 +148,26 @@ print(json.dumps({
 }))
 '
 
-RESULT=$(python3 -c "$PY_SCAN" "$TRANSCRIPT_PATH" "$TASK_ID" 2>/dev/null || echo "{}")
+# See lib-python.sh: `command -v python3` alone is not a liveness check —
+# on Windows it is often the Store App Execution Alias stub, which exists
+# on PATH but exits non-zero instead of running anything.
+source "$(dirname "${BASH_SOURCE[0]}")/lib-python.sh"
+if ! sp_resolve_python; then
+    trace "$TASK_ID" "skip" "no-python-interpreter"
+    echo "$ALLOW"; exit 0
+fi
+
+RESULT=$("${SP_PYTHON[@]}" -c "$PY_SCAN" "$TRANSCRIPT_PATH" "$TASK_ID" 2>/dev/null || echo "{}")
+
+# Fail-open: an absent "parsed" sentinel means the parse never completed —
+# that is "no information", not "checked, found nothing". Only a parse that
+# actually ran gets to make a blocking decision below.
+PARSED=$(echo "$RESULT" | jq -r '.parsed // false' 2>/dev/null)
+if [[ "$PARSED" != "true" ]]; then
+    trace "$TASK_ID" "skip" "parse-produced-no-result"
+    echo "$ALLOW"; exit 0
+fi
+
 MISSING_COUNT=$(echo "$RESULT" | jq -r '.missing | length // 0' 2>/dev/null)
 ALL_BLOCKERS=$(echo "$RESULT" | jq -r '.all_blockers // [] | join(",")' 2>/dev/null)
 TARGET_SUBJECT=$(echo "$RESULT" | jq -r '.target_subject // "?"' 2>/dev/null)
