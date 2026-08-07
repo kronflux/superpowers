@@ -1,18 +1,25 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { isContextModeActive, _cacheFile } from '../hooks/lib/ctx-detect.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
+let sessionIds;
 function freshSession() {
   const id = 'test-' + Math.random().toString(36).slice(2);
   try { fs.unlinkSync(_cacheFile(id)); } catch {}
+  sessionIds.push(id);
   return id;
 }
 
 describe('ctx-detect', () => {
   let tmp;
-  beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxd-')); });
+  beforeEach(() => { tmp = fs.mkdtempSync(path.join(spTmpDir(), 'ctxd-')); sessionIds = []; });
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    for (const id of sessionIds) fs.rmSync(_cacheFile(id), { force: true });
+  });
 
   it('INACTIVE: no signals present', () => {
     const sid = freshSession();

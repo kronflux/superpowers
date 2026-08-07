@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TRACK_EDITS = path.resolve(__dirname, '../hooks/track-edits.js');
 
 function tmpDir(prefix) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  return fs.mkdtempSync(path.join(spTmpDir(), prefix));
 }
 
 describe('telemetry log root honors CLAUDE_CONFIG_DIR', () => {

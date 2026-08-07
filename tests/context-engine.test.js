@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ensureGitignored, SECTION_HEADER } from '../hooks/lib/gitignore.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.resolve(__dirname, '../hooks/context-engine.js');
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'sp-ce-'));
+  return fs.mkdtempSync(path.join(spTmpDir(), 'sp-ce-'));
 }
 
 describe('ensureGitignored (shared helper)', () => {

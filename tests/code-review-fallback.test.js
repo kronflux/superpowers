@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 // Plan 4 Task 9: wire the static dispatch+fallback contract test
 // (tests/test-code-review-fallback.sh) into `npm test`, and prove the
@@ -33,7 +33,7 @@ const BASH_OK = have('bash');
 // plus the .sh under tests/. Optionally apply a mutation to SKILL.md to break
 // the contract.
 function buildMirror({ mutateSkill } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-fallback-'));
+  const dir = fs.mkdtempSync(path.join(spTmpDir(), 'cr-fallback-'));
   for (const rel of CONTRACT_FILES) {
     const dest = path.join(dir, rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });

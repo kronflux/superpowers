@@ -2,15 +2,15 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { capInjection, INJECTION_CAP_BYTES } from '../hooks/skill-activator.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.join(__dirname, '..', 'hooks', 'skill-activator.js');
 
 // Isolated home so hook telemetry never touches the real ~/.claude/hooks-logs
-const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-activator-'));
+const tmpHome = fs.mkdtempSync(path.join(spTmpDir(), 'sp-activator-'));
 afterAll(() => { fs.rmSync(tmpHome, { recursive: true, force: true }); });
 
 function run(payload, env = {}) {
@@ -64,8 +64,8 @@ describe('skill-activator', () => {
 
 describe('skill-activator config root isolation', () => {
   it('writes telemetry under CLAUDE_CONFIG_DIR, not HOME/.claude, when both are set', () => {
-    const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-activator-profile-'));
-    const otherHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-activator-otherhome-'));
+    const profileDir = fs.mkdtempSync(path.join(spTmpDir(), 'sp-activator-profile-'));
+    const otherHome = fs.mkdtempSync(path.join(spTmpDir(), 'sp-activator-otherhome-'));
     try {
       const out = run(
         { prompt: 'there is a bug, the app crashes with an exception', cwd: '/tmp' },

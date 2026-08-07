@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SHIM = path.resolve(__dirname, '../scripts/resolve-plugin-script.sh');
@@ -11,7 +11,7 @@ const SHIM = path.resolve(__dirname, '../scripts/resolve-plugin-script.sh');
 const bashAvailable = spawnSync('bash', ['--version']).status === 0;
 
 function tmpDir(prefix) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  return fs.mkdtempSync(path.join(spTmpDir(), prefix));
 }
 
 function cacheBase(configDir) {

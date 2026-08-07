@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 // Context economy: the SessionStart hook injects the full using-superpowers
 // SKILL.md into EVERY session. That payload is an always-on context cost and
@@ -50,7 +50,7 @@ function runHook(cwd) {
 }
 
 function withScratch(fn) {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-payload-'));
+  const scratch = fs.mkdtempSync(path.join(spTmpDir(), 'sp-payload-'));
   try { return fn(scratch); } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 }
 
@@ -64,7 +64,7 @@ function writeRouting(scratch, relDir) {
 
 describe('session-start context economy', () => {
   it('assembled payload <= 5232 bytes', () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-payload-'));
+    const scratch = fs.mkdtempSync(path.join(spTmpDir(), 'sp-payload-'));
     let raw;
     try {
       raw = execSync(`bash "${HOOK}"`, {

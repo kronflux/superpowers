@@ -2,11 +2,11 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { loadRouting, normalizeRouting, TIERS, REQUIRED_TIERS } from '../hooks/lib/routing-config.js';
 import { checkDispatch, scanTranscript } from '../hooks/pre-agent-model-routing.js';
 import { checkTaskCreate } from '../hooks/pre-taskcreate-model-tier.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOKS = {
@@ -17,7 +17,7 @@ const HOOKS = {
 
 // Isolated home: the ~/.claude/superpowers fallback must never see a real
 // user config, and hook telemetry must never touch real ~/.claude/hooks-logs.
-const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-home-'));
+const tmpHome = fs.mkdtempSync(path.join(spTmpDir(), 'sp-routing-home-'));
 const tmpDirs = [tmpHome];
 afterAll(() => {
   for (const d of tmpDirs) fs.rmSync(d, { recursive: true, force: true });
@@ -30,7 +30,7 @@ const ROUTING = { mechanical: 'haiku', standard: 'sonnet', frontier: 'inherit' }
 const NORMALIZED_ROUTING = { mechanical: 'haiku', standard: 'sonnet', advanced: 'inherit', frontier: 'off', schema: 1 };
 
 function makeProject(config, { legacy = false } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-proj-'));
+  const dir = fs.mkdtempSync(path.join(spTmpDir(), 'sp-routing-proj-'));
   tmpDirs.push(dir);
   if (config !== undefined) {
     const cfgDir = legacy ? path.join(dir, 'docs', 'superpowers') : path.join(dir, '.superpowers');
@@ -42,7 +42,7 @@ function makeProject(config, { legacy = false } = {}) {
 }
 
 function makeProfile(config) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-profile-'));
+  const dir = fs.mkdtempSync(path.join(spTmpDir(), 'sp-routing-profile-'));
   tmpDirs.push(dir);
   const cfgDir = path.join(dir, 'superpowers');
   fs.mkdirSync(cfgDir, { recursive: true });
@@ -269,9 +269,9 @@ describe('loadRouting profile-scoped candidate', () => {
     const missCwd = makeProject(undefined);
     // Empty, dedicated HOME and CLAUDE_CONFIG_DIR for both calls: no legacy
     // or profile candidate exists anywhere, so the second call is a true miss.
-    const emptyHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-stale-home-'));
+    const emptyHome = fs.mkdtempSync(path.join(spTmpDir(), 'sp-routing-stale-home-'));
     tmpDirs.push(emptyHome);
-    const emptyProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-stale-profile-'));
+    const emptyProfile = fs.mkdtempSync(path.join(spTmpDir(), 'sp-routing-stale-profile-'));
     tmpDirs.push(emptyProfile);
     const [hit, miss] = loadRoutingSequenceProbe([hitCwd, missCwd], {
       HOME: emptyHome,
@@ -588,7 +588,7 @@ describe('normalizeRouting', () => {
 
 describe('loadRouting normalization end-to-end', () => {
   it('normalizes a legacy on-disk config to the four-key shape (criterion 1)', () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-normalize-'));
+    const tmp = fs.mkdtempSync(path.join(spTmpDir(), 'sp-routing-normalize-'));
     tmpDirs.push(tmp);
     const cfgDir = path.join(tmp, 'docs', 'superpowers');
     fs.mkdirSync(cfgDir, { recursive: true });
@@ -603,7 +603,7 @@ describe('loadRouting normalization end-to-end', () => {
   });
 
   it('rejects a legacy fable-mapped config on disk and logs the rejection (criterion 4)', () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-routing-normalize-reject-'));
+    const tmp = fs.mkdtempSync(path.join(spTmpDir(), 'sp-routing-normalize-reject-'));
     tmpDirs.push(tmp);
     const cfgDir = path.join(tmp, 'docs', 'superpowers');
     fs.mkdirSync(cfgDir, { recursive: true });

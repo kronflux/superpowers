@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 // Task 16 (criterion 9): the coexistence mitigation. A user-gate task closed
 // WITHOUT `AC:`/`PROVEN BY` evidence in the TRANSCRIPT must block (the
@@ -88,7 +88,7 @@ function runHook(transcriptPath) {
 }
 
 function withFixture(opts, fn) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-fixture-'));
+  const dir = fs.mkdtempSync(path.join(spTmpDir(), 'gate-fixture-'));
   const fp = path.join(dir, 'transcript.jsonl');
   fs.writeFileSync(fp, buildTranscript(opts));
   try {

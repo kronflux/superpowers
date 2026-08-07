@@ -1,24 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'child_process';
 import path from 'path';
-import os from 'os';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { checkCommand } from '../hooks/safety/block-dangerous-commands.js';
 import { check, isAllowlisted } from '../hooks/safety/protect-secrets.js';
 import { resolveSkillPath, stripFrontmatter } from '../hooks/lib/skills-core.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BLOCK_DANGEROUS_HOOK = path.resolve(__dirname, '../hooks/safety/block-dangerous-commands.js');
 
 function runHook(payload) {
-  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-safety-hooks-'));
-  const res = spawnSync('node', [BLOCK_DANGEROUS_HOOK], {
-    input: JSON.stringify(payload),
-    encoding: 'utf8',
-    env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
-  });
-  return JSON.parse(res.stdout || '{}');
+  const tmpHome = fs.mkdtempSync(path.join(spTmpDir(), 'safety-hooks-'));
+  try {
+    const res = spawnSync('node', [BLOCK_DANGEROUS_HOOK], {
+      input: JSON.stringify(payload),
+      encoding: 'utf8',
+      env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
+    });
+    return JSON.parse(res.stdout || '{}');
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
 }
 
 describe('block-dangerous-commands', () => {

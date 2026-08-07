@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { _cacheFile } from '../hooks/lib/ctx-detect.js';
+import { spTmp } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.resolve(__dirname, '../hooks/bash-compress-hook.js');
@@ -23,6 +24,10 @@ function runHook(payload, env = {}) {
 describe('bash-compress-hook', () => {
   let sid;
   beforeEach(() => { sid = 'cmp-' + Math.random().toString(36).slice(2); });
+  afterEach(() => {
+    fs.rmSync(_cacheFile(sid), { force: true });
+    fs.rmSync(spTmp(`compress-${sid}.json`), { force: true });
+  });
 
   it('YIELDS when context-mode active: no updatedInput', () => {
     seedCtx(sid, true);

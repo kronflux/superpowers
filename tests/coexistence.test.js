@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -85,22 +86,26 @@ describe('coexistence with context-mode', () => {
   });
 
   it.skipIf(!hasTrackEdits)('gitignore "# AI assistant artifacts" header is written idempotently', () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gi-'));
-    // Pre-seed a .gitignore already containing the header once.
-    const gi = path.join(tmp, '.gitignore');
-    fs.writeFileSync(gi, '# AI assistant artifacts\ncontext-snapshot.json\n');
-    // Run track-edits which writes an AI artifact and may touch .gitignore.
-    spawnSync('node', [path.join(ROOT, 'hooks/track-edits.js')], {
-      input: JSON.stringify({
-        tool_name: 'Write',
-        tool_input: { file_path: path.join(tmp, 'session-log.md') },
-        cwd: tmp, session_id: 's',
-      }),
-      encoding: 'utf8',
-    });
-    const after = fs.readFileSync(gi, 'utf8');
-    const headerCount = (after.match(/# AI assistant artifacts/g) || []).length;
-    expect(headerCount).toBe(1);
+    const tmp = fs.mkdtempSync(path.join(spTmpDir(), 'gi-'));
+    try {
+      // Pre-seed a .gitignore already containing the header once.
+      const gi = path.join(tmp, '.gitignore');
+      fs.writeFileSync(gi, '# AI assistant artifacts\ncontext-snapshot.json\n');
+      // Run track-edits which writes an AI artifact and may touch .gitignore.
+      spawnSync('node', [path.join(ROOT, 'hooks/track-edits.js')], {
+        input: JSON.stringify({
+          tool_name: 'Write',
+          tool_input: { file_path: path.join(tmp, 'session-log.md') },
+          cwd: tmp, session_id: 's',
+        }),
+        encoding: 'utf8',
+      });
+      const after = fs.readFileSync(gi, 'utf8');
+      const headerCount = (after.match(/# AI assistant artifacts/g) || []).length;
+      expect(headerCount).toBe(1);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 
   it('no hook references PreCompact', () => {

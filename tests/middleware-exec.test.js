@@ -7,11 +7,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolveConfig, endpointFor, renderTemplate, runHttp, cliDescriptor, runCli, PRESETS } from '../scripts/middleware-exec.mjs';
 import { configDir } from '../hooks/lib/config-dir.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const execFileAsync = promisify(execFile);
 
 let tmp;
-beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mwexec-')); });
+beforeEach(() => { tmp = fs.mkdtempSync(path.join(spTmpDir(), 'mwexec-')); });
 afterEach(() => { fs.rmSync(tmp, { recursive: true, force: true }); });
 
 describe('resolveConfig', () => {
@@ -481,10 +482,14 @@ describe('runCli delivery', () => {
   });
 
   it('honors an explicit cwd override', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-cwd-'));
-    const probe = ['-e', 'process.stdout.write(process.cwd())'];
-    const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', cwd: dir });
-    expect(fs.realpathSync((await runCli(d, '')).content)).toBe(fs.realpathSync(dir));
+    const dir = fs.mkdtempSync(path.join(spTmpDir(), 'mw-cwd-'));
+    try {
+      const probe = ['-e', 'process.stdout.write(process.cwd())'];
+      const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', cwd: dir });
+      expect(fs.realpathSync((await runCli(d, '')).content)).toBe(fs.realpathSync(dir));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('merges env over the parent instead of replacing it', async () => {
@@ -565,10 +570,14 @@ describe('runCli guards', () => {
     const tempUsed = (await runCli(auto, '')).content;
     expect(fs.existsSync(tempUsed)).toBe(false);
 
-    const mine = fs.mkdtempSync(path.join(os.tmpdir(), 'mw-keep-'));
-    const explicit = desc({ command: [NODE, ...probe], input_mode: 'stdin', cwd: mine });
-    await runCli(explicit, '');
-    expect(fs.existsSync(mine)).toBe(true);
+    const mine = fs.mkdtempSync(path.join(spTmpDir(), 'mw-keep-'));
+    try {
+      const explicit = desc({ command: [NODE, ...probe], input_mode: 'stdin', cwd: mine });
+      await runCli(explicit, '');
+      expect(fs.existsSync(mine)).toBe(true);
+    } finally {
+      fs.rmSync(mine, { recursive: true, force: true });
+    }
   });
 
   it('removes the temp cwd even when the run times out', async () => {

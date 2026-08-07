@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execFileSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -57,7 +57,7 @@ describe('antigravity profile sync', () => {
   });
 
   it('validator fails loud on legacy-pattern leakage', () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-profile-'));
+    const tmp = fs.mkdtempSync(path.join(spTmpDir(), 'agy-profile-'));
     fs.cpSync(PROFILE, path.join(tmp, '.agent'), { recursive: true });
     const target = path.join(tmp, '.agent', 'skills', 'using-superpowers', 'SKILL.md');
     fs.appendFileSync(target, '\nTodoWrite\n');
@@ -79,7 +79,7 @@ describe('antigravity profile sync', () => {
   });
 
   it('validator fails loud when AGENTS.md loses a mapping keyword', () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-agents-'));
+    const tmp = fs.mkdtempSync(path.join(spTmpDir(), 'agy-agents-'));
     fs.cpSync(PROFILE, path.join(tmp, '.agent'), { recursive: true });
     const agents = path.join(tmp, '.agent', 'AGENTS.md');
     fs.writeFileSync(agents, fs.readFileSync(agents, 'utf8').replaceAll('view_file', 'viewfile'));

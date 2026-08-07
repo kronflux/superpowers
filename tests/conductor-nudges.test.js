@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,7 +26,7 @@ const SANDBOX_PATH = [dirOf('node')].filter(Boolean).join(path.delimiter);
 
 let home; let sid = 0; let sessionId;
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-nudge-home-'));
+  home = fs.mkdtempSync(path.join(spTmpDir(), 'sp-nudge-home-'));
   sessionId = `nudge-test-${process.pid}-${sid++}`;
 });
 afterEach(() => {

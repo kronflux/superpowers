@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { probe, summaryLine, STATUS } from '../hooks/lib/capability-registry.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 let tmp;
-beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'capreg-')); });
+beforeEach(() => { tmp = fs.mkdtempSync(path.join(spTmpDir(), 'capreg-')); });
 afterEach(() => { fs.rmSync(tmp, { recursive: true, force: true }); });
 
 describe('capability-registry', () => {

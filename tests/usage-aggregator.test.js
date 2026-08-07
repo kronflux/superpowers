@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { aggregate } from '../hooks/usage-aggregator.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.join(__dirname, '..', 'hooks', 'usage-aggregator.js');
@@ -23,7 +24,7 @@ function clearOffsets() {
 }
 
 let home;
-beforeEach(() => { clearOffsets(); home = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-usage-home-')); });
+beforeEach(() => { clearOffsets(); home = fs.mkdtempSync(path.join(spTmpDir(), 'sp-usage-home-')); });
 afterEach(() => { fs.rmSync(home, { recursive: true, force: true }); clearOffsets(); });
 
 const asst = (input, output, extra = {}) => JSON.stringify({

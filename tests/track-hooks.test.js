@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ensureGitignored, SECTION_HEADER } from '../hooks/lib/gitignore.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TRACK_EDITS = path.resolve(__dirname, '../hooks/track-edits.js');
 const TRACK_STATS = path.resolve(__dirname, '../hooks/track-session-stats.js');
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'sp-track-'));
+  return fs.mkdtempSync(path.join(spTmpDir(), 'sp-track-'));
 }
 
 function runHook(hookPath, payload, home) {
