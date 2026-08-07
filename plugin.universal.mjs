@@ -100,6 +100,16 @@ export default {
       platforms: ['claude-code'],
     },
     {
+      // Automates the "Task Persistence Sync" step that controller-operations.md
+      // has documented all along and that no controller has ever performed —
+      // 9 of 11 plan snapshots in this repo still read 0/N. Cross-session resume
+      // and the statusline's plan segment both read that file.
+      event: 'PostToolUse',
+      matcher: 'TaskUpdate',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/sync-plan-tasks.js"',
+      platforms: ['claude-code'],
+    },
+    {
       event: 'Stop',
       command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/stop-reminders.js"',
       platforms: ['claude-code', 'codex'],
