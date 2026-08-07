@@ -23,10 +23,45 @@ const PROVIDERS = {
   usage: segUsage,
 };
 
-async function readStdin() {
+// Bounded so a stdin that never closes cannot hang the renderer: the failure
+// contract forbids blocking on I/O, and this runs on every assistant message.
+// On timeout the pending read is abandoned (stream destroyed so the event
+// loop can drain) and the caller sees the same fault as any other bad input.
+const STDIN_TIMEOUT_MS = 2000;
+
+async function readStdin(timeoutMs = STDIN_TIMEOUT_MS) {
   let input = '';
-  for await (const chunk of process.stdin) input += chunk;
+  const stream = process.stdin;
+  const reader = (async () => {
+    for await (const chunk of stream) input += chunk;
+    return input;
+  })();
+  // The reader promise is still pending after a timeout race; swallow
+  // whatever it eventually settles to so destroying the stream below never
+  // surfaces as an unhandled rejection.
+  reader.catch(() => {});
+
+  let timedOut = false;
+  const timer = new Promise((resolve) => {
+    const t = setTimeout(() => { timedOut = true; resolve(); }, timeoutMs);
+    t.unref?.();
+  });
+
+  await Promise.race([reader, timer]);
+  if (timedOut) {
+    try { stream.destroy(); } catch {}
+    throw new Error('stdin timeout');
+  }
   return input;
+}
+
+// Strips CR/LF and collapses whitespace runs in any stdin-sourced value that
+// reaches the output line. The renderer's own segment strings never contain
+// newlines, but stdin fields (e.g. model display_name) are attacker/tool
+// controlled — an embedded newline would smear the one-line output across
+// multiple terminal rows, breaking the single-line contract.
+function sanitizeLineValue(v) {
+  return String(v).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function render(stdin, cwd, full) {
@@ -44,7 +79,7 @@ function render(stdin, cwd, full) {
   const parts = [];
   if (full) {
     const model = stdin?.model?.display_name;
-    if (model) parts.push(String(model));
+    if (model) parts.push(sanitizeLineValue(model));
     const pct = stdin?.context_window?.used_percentage;
     if (Number.isFinite(pct)) parts.push(`${Math.round(pct)}%`);
   }

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -88,6 +89,37 @@ describe('statusline renderer', () => {
     const out = run(payload());
     expect(out.split('\n').filter((l) => l.length).length).toBe(1);
   });
+
+  it('sanitizes an embedded newline in a stdin-sourced value', () => {
+    seedUsage(); config({ segments: ['usage'] });
+    const out = run(payload({ model: { display_name: 'Opus\n5' } }), ['--full']);
+    // A raw newline in model.display_name must not smear the statusline
+    // across two terminal rows: exactly one non-empty line comes out, and
+    // the embedded break is collapsed to a space rather than dropped.
+    expect(out.split('\n').filter((l) => l.length).length).toBe(1);
+    expect(out).toMatch(/Opus 5/);
+  });
+
+  it('terminates within the timeout when stdin is never closed', async () => {
+    // No input is written and stdin is never ended, so the CLI's own
+    // for-await read would hang forever without a bounded timeout. A kill
+    // timer is the safety net: if the renderer's internal timeout ever
+    // regresses, this test fails fast instead of hanging the suite.
+    const child = spawn('node', [CLI], {
+      env: { ...process.env, CLAUDE_CONFIG_DIR: cfgRoot },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    child.stdout.on('data', (d) => { stdout += d; });
+    const killTimer = setTimeout(() => child.kill('SIGKILL'), 4000);
+    try {
+      const [code] = await once(child, 'exit');
+      expect(code).toBe(0);
+      expect(stdout).toBe('\n');
+    } finally {
+      clearTimeout(killTimer);
+    }
+  }, 8000);
 
   it('renders within the hot-path budget', () => {
     // Excludes process spawn. The statusline runs on every assistant message,
