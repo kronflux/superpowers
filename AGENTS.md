@@ -54,8 +54,16 @@ manifests by the bump script.
   `AC: <criterion> — PROVEN BY <evidence>`. Non-negotiable; hooks and gate skills key on this token.
 - **Hooks fail open:** every hook allows the action on any internal fault. Only deliberately
   registered gates (`hooks/examples/`) block.
-- **`sp-*` tmpdir namespace:** all plugin tmpfiles use the `sp-` prefix (e.g. `sp-stop-<sessionId>`)
-  to avoid colliding with context-mode. No hook uses `PreCompact`; WebFetch is owned by context-mode.
+- **`<tmpdir>/sp/` namespace:** every plugin tmpfile lives under one directory and is named
+  only via `spTmp()` from `hooks/lib/sp-tmp.js` — never `os.tmpdir()` directly. That confinement
+  is what lets `hooks/lib/tmp-reaper.js` reap by enumerating a directory we own instead of
+  pattern-matching the shared temp root. Aged entries are swept at SessionStart (7 days, override
+  `SUPERPOWERS_TMP_RETENTION_DAYS`, `0` disables); per-session ephemeral state is cleared at
+  SessionEnd, except the usage offset, which must survive for `claude-usage.jsonl` to stay
+  accurate. Enforced by `tests/tmp-namespace.test.js`, scoped to `hooks/` and `tests/` —
+  `scripts/middleware-exec.mjs` creates its CLI-subprocess working directory directly under the
+  bare temp root and is a deliberate, documented gap outside that scan. No hook uses
+  `PreCompact`; WebFetch is owned by context-mode.
 - **Decline markers:** `.superpowers-no-<capability>` files at the project root record a user's
   "no" for a capability offer and are gitignored — they are a local choice, never committed.
   `.superpowers-no-lsp` is newline-delimited plugin names; empty means decline all.

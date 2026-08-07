@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'child_process';
 import path from 'path';
-import os from 'os';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GUARD_HOOK = path.resolve(__dirname, '../hooks/subagent-guard.js');
@@ -19,7 +19,7 @@ function runGuard(lastMessage) {
 
 function runStop(sessionId) {
   const res = spawnSync('node', [STOP_HOOK], {
-    input: JSON.stringify({ session_id: sessionId, cwd: os.tmpdir() }),
+    input: JSON.stringify({ session_id: sessionId, cwd: spTmpDir() }),
     encoding: 'utf8',
   });
   return { json: JSON.parse(res.stdout || '{}'), status: res.status };
@@ -71,7 +71,7 @@ describe('stop-reminders (per-session lock)', () => {
   it('uses a per-session lock filename under the sp/ tmp root, keyed by sessionId', async () => {
     const { guardFile } = await import('../hooks/stop-reminders.js');
     const gf = guardFile('abc123');
-    expect(path.dirname(gf)).toBe(path.join(os.tmpdir(), 'sp'));
+    expect(path.dirname(gf)).toBe(spTmpDir());
     expect(path.basename(gf)).toBe('stop-abc123.lock');
   });
 
@@ -94,7 +94,7 @@ describe('stop-reminders (per-session lock)', () => {
 
   it('runs end-to-end without crashing and emits valid JSON', () => {
     const sid = `stp-e2e-${Date.now()}`;
-    const gf = path.join(os.tmpdir(), 'sp', `stop-${sid}.lock`);
+    const gf = path.join(spTmpDir(), `stop-${sid}.lock`);
     try { fs.unlinkSync(gf); } catch {}
     const r = runStop(sid);
     expect(r.status).toBe(0);

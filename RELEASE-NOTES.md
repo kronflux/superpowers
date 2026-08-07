@@ -1,5 +1,21 @@
 # Superpowers Release Notes
 
+## 7.9.0 — runtime artifact hygiene
+
+- **Every plugin tmpfile now lives under `<tmpdir>/sp/`** and is named via `spTmp()`. Measured
+  before this change: 302 of 570 temp entries were ours, across five hook writers and the test
+  suite.
+- **Reaping.** SessionStart sweeps entries older than 7 days (`SUPERPOWERS_TMP_RETENTION_DAYS`,
+  `0` disables), throttled to once per 24h and riding an existing hook so session start gains no
+  process spawn. SessionEnd clears the ending session's ephemeral state immediately — but never
+  the usage offset, and not at all on `reason: "resume"`, since both would corrupt the
+  append-only usage log for a session that comes back.
+- **The test suite stopped leaking.** `tests/safety-hooks.test.js` created a directory per hook
+  invocation and removed none — 133 of the 302. A full `npm test` now leaves a net-zero delta.
+- **`tests/tmp-namespace.test.js`** fails on any bare `os.tmpdir()` call outside the helper, so
+  the sprawl cannot regrow.
+- Aged pre-migration flat `sp-*` names are cleaned once by an exact, time-boxed prefix list.
+
 ## 7.8.1 — LSP detection actually works
 
 - **Fixed: the `lsp` capability detected nothing for any official language server.** The probe

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import { existsSync } from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
@@ -65,8 +64,8 @@ describe('coexistence with context-mode', () => {
     // The real guardFile() must produce a per-session tmpdir path, not a global one.
     const gf1 = guardFile(s1);
     const gf2 = guardFile(s2);
-    expect(gf1).toBe(path.join(os.tmpdir(), 'sp', `stop-${s1}.lock`));
-    expect(gf2).toBe(path.join(os.tmpdir(), 'sp', `stop-${s2}.lock`));
+    expect(gf1).toBe(path.join(spTmpDir(), `stop-${s1}.lock`));
+    expect(gf2).toBe(path.join(spTmpDir(), `stop-${s2}.lock`));
     expect(gf1).not.toBe(gf2);
 
     // Setting the guard for s1 must create exactly that session's lock,
@@ -74,7 +73,7 @@ describe('coexistence with context-mode', () => {
     setGuard(s1);
     try {
       expect(fs.existsSync(gf1)).toBe(true);
-      expect(fs.existsSync(path.join(os.tmpdir(), 'sp', 'stop-default.lock'))).toBe(false);
+      expect(fs.existsSync(path.join(spTmpDir(), 'stop-default.lock'))).toBe(false);
 
       // Within the TTL, the guarded session must not re-fire, while a different
       // session is unaffected — proving the lock is keyed per session.

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -583,19 +583,25 @@ describe('runCli guards', () => {
   it('removes the temp cwd even when the run times out', async () => {
     const probe = ['-e', 'process.stdout.write(process.cwd());setTimeout(()=>{},60000)'];
     const d = desc({ command: [NODE, ...probe], input_mode: 'stdin', timeout_ms: 300 });
-    const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('sp-mw-'));
+    // mkdtempSync's own return value pins down the exact directory scripts/
+    // middleware-exec.mjs owns for this run — this scoped spy replaces
+    // scanning the bare temp root for an 'sp-mw-' prefix (that prefix lives
+    // outside spTmpDir() by design; see the documented gap in CLAUDE.md).
+    const spy = vi.spyOn(fs, 'mkdtempSync');
     const e = await runCli(d, '').then(() => null, (err) => err);
+    const created = spy.mock.results[0]?.value;
+    spy.mockRestore();
     expect(e?.exit).toBe(3);
+    expect(created).toBeTruthy();
     // Cleanup lands on the child's close event, which fires shortly AFTER the
     // promise settles — measured at ~16ms. Poll rather than sleeping a fixed
     // amount: this exits as soon as the directory is gone, so it costs nothing
     // in the common case while removing the tail risk on a slow machine.
-    const countNow = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('sp-mw-')).length;
     const deadline = Date.now() + 5000;
-    while (countNow() > before.length && Date.now() < deadline) {
+    while (fs.existsSync(created) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 20));
     }
-    expect(countNow()).toBeLessThanOrEqual(before.length);
+    expect(fs.existsSync(created)).toBe(false);
   }, 10000);
 });
 

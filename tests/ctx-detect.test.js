@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { isContextModeActive, _cacheFile } from '../hooks/lib/ctx-detect.js';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
@@ -75,6 +74,6 @@ describe('ctx-detect', () => {
   });
 
   it('cache file lives under the sp/ tmp root as ctx-<sessionId>.json', () => {
-    expect(_cacheFile('abc')).toBe(path.join(os.tmpdir(), 'sp', 'ctx-abc.json'));
+    expect(_cacheFile('abc')).toBe(path.join(spTmpDir(), 'ctx-abc.json'));
   });
 });
