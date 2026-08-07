@@ -101,22 +101,39 @@ broken statusline is invisible: nothing surfaces the failure to the user.
 ## 5. Patch settings.json
 
 Call `patchSettings(cwd, command)`, `command` = `node "<launcher path>"` (append ` --full` when
-mode is full). It reports `{changed: true|false}` — `false` means an identical block was
-already present, not a failure; say so rather than reporting an error.
+mode is full). It reports `{changed: true|false}`, or `{changed: false, state: 'unparseable'}`.
+
+- **`changed: true`** or **`changed: false`** with no `state` — proceed to step 6.
+  `changed: false` means an identical block was already present, not a failure; say so rather
+  than reporting an error.
+- **`state: 'unparseable'`** — `<cwd>/.claude/settings.json` exists but is not valid JSON, so
+  `patchSettings` refused to touch it rather than replace it with a fresh object containing only
+  `statusLine` (that would silently discard the user's entire settings file — permissions,
+  hooks, model, everything — on a single JSON typo). **Stop here.** Do not retry the call, do
+  not offer to rewrite or repair the file yourself, and do not continue to steps 6 or 7 as
+  though the install succeeded — a statusline pointing at settings that were never patched is
+  worse than a clean refusal. Tell the user, naming the exact path
+  (`<cwd>/.claude/settings.json`), that the file has a syntax error they need to fix before the
+  statusline can be installed, then end the interview.
 
 ## 6. gitignore — report the state hit, never assume
 
-Call `ensureGitignored(cwd)` and report exactly which of its three states applied. Do not
+Call `ensureGitignored(cwd)` and report exactly which of its four states applied. Do not
 collapse them into one message — they mean different things:
 
 - **`already`** — `.claude/` is already covered by an existing `.gitignore` rule. Nothing
   written. Say so.
-- **`added`** — no rule existed and `.claude/` was not tracked; a `.claude/` line was appended
-  to `.gitignore`. Say so and show the line that was added.
+- **`added`** — no rule existed and `.claude/` was not tracked, or `cwd` is not a git repo at
+  all; a `.claude/` line was appended to `.gitignore`. Say so and show the line that was added.
 - **`tracked`** — `.claude/` is already tracked by git. **No rule was written.** A `.gitignore`
   rule never untracks a path already tracked, so writing one here would change nothing while
   implying the job was done. Tell the user this plainly, then offer `git rm --cached -r .claude`
   as **their** decision to run in their own terminal — never run it yourself.
+- **`unknown`** — `cwd` is a git repo but the tracked-files probe itself failed (lock
+  contention, permissions, timeout), so whether `.claude/` is tracked could not be determined.
+  **No rule was written.** Report this as **inconclusive**, not as success and not as `tracked`
+  — say plainly that the check could not complete and what that means (the tool cannot confirm
+  whether `.claude/` is safe to ignore). Do not claim a rule was added.
 
 ## 7. Point at ccstatusline (print only; do not install)
 

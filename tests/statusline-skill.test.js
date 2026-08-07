@@ -6,15 +6,16 @@ import { fileURLToPath } from 'node:url';
 // Structural test only. The statusline skill is model-executed prose, not code —
 // there is nothing here to unit-test behaviourally. This asserts the artifact
 // exists, its frontmatter parses within budget, and its body actually instructs
-// the four segment ids and the three distinct gitignore outcomes rather than
-// collapsing them into one vague sentence.
+// the four segment ids, the four distinct gitignore outcomes, and the
+// unparseable-settings refusal rather than collapsing any of them into one
+// vague sentence.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SKILL_PATH = path.join(ROOT, 'skills', 'statusline', 'SKILL.md');
 
 const SEGMENT_IDS = ['capabilities', 'delegation', 'plan', 'usage'];
-const GITIGNORE_STATES = ['already', 'added', 'tracked'];
+const GITIGNORE_STATES = ['already', 'added', 'tracked', 'unknown'];
 
 function readSkill() {
   return fs.readFileSync(SKILL_PATH, 'utf8');
@@ -74,16 +75,39 @@ describe('skills/statusline/SKILL.md', () => {
     expect(readSkill()).toMatch(/separator/i);
   });
 
-  it('names all three gitignore states distinctly, each with its own explanation', () => {
+  it('names all four gitignore states distinctly, each with its own explanation', () => {
     const src = readSkill();
     for (const state of GITIGNORE_STATES) {
       // Each state must appear as its own backtick-quoted term, not just
-      // buried in prose — this is what proves the three are kept distinct
+      // buried in prose — this is what proves the four are kept distinct
       // rather than collapsed into one generic gitignore paragraph.
       expect(src, `missing distinct gitignore state "${state}"`).toMatch(
         new RegExp('`' + state + '`'),
       );
     }
+  });
+
+  it('the unknown gitignore state is reported as inconclusive, not as success or as tracked', () => {
+    const src = readSkill();
+    const idx = src.indexOf('`unknown`');
+    expect(idx).toBeGreaterThan(-1);
+    const section = src.slice(idx, idx + 500);
+    expect(section).toMatch(/inconclusive/i);
+    expect(section).toMatch(/no rule was written|nothing.{0,20}written/i);
+  });
+
+  it('names the unparseable settings.json outcome and stops the install rather than continuing', () => {
+    const src = readSkill();
+    const idx = src.indexOf('unparseable');
+    expect(idx).toBeGreaterThan(-1);
+    // Normalize whitespace (prose is hard-wrapped at ~90 cols, so a phrase can
+    // legitimately span a newline) before matching multi-word phrases.
+    const section = src.slice(idx, idx + 800).replace(/\s+/g, ' ');
+    // Must instruct: stop, do not retry, do not offer to rewrite, name the file path.
+    expect(section).toMatch(/stop/i);
+    expect(section).toMatch(/do not retry/i);
+    expect(section).toMatch(/do not offer to rewrite|do not .{0,20}repair/i);
+    expect(section).toMatch(/settings\.json/);
   });
 
   it('the tracked state offers git rm --cached without instructing it be run automatically', () => {
