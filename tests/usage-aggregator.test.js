@@ -15,7 +15,7 @@ const HOOK = path.join(__dirname, '..', 'hooks', 'usage-aggregator.js');
 // run of this suite (same literal session ids) would corrupt the next run's "first
 // run sums everything" assumption. Clear known offset files before each case so
 // every test starts from a true first run, regardless of prior invocations.
-const SESSION_IDS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7'];
+const SESSION_IDS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', `legacy-${process.pid}`];
 function clearOffsets() {
   for (const id of SESSION_IDS) {
     fs.rmSync(path.join(os.tmpdir(), `sp-usage-${id}`), { force: true });
@@ -361,14 +361,24 @@ describe('conductor attribution', () => {
   it('rolls MCP tools up per capability with call counts and bytes', () => {
     const t = path.join(home, 'cap.jsonl');
     fs.writeFileSync(t,
-      use('a1', 'mcp__plugin_serena_serena__find_symbol') + res('a1', 'x'.repeat(100)) +
-      use('a2', 'codegraph_explore') + res('a2', 'y'.repeat(50)) +
-      use('a3', 'Read') + res('a3', 'z'.repeat(999)));
+      use('a1', 'codegraph_explore') + res('a1', 'y'.repeat(50)) +
+      use('a2', 'Read') + res('a2', 'z'.repeat(999)));
     const r = aggregate(t, 0, { maxChunk: 1 << 20 });
-    expect(r.conductor.serena.calls).toBe(1);
-    expect(r.conductor.serena.bytes).toBeGreaterThan(90);
     expect(r.conductor.codegraph.calls).toBe(1);
+    expect(r.conductor.codegraph.bytes).toBeGreaterThan(40);
     expect(r.conductor.Read).toBeUndefined();
+  });
+
+  it('no longer attributes serena, obsidian, or basic-memory tool calls', () => {
+    const t = path.join(home, 'removed-caps.jsonl');
+    fs.writeFileSync(t,
+      use('r1', 'mcp__plugin_serena_serena__find_symbol') + res('r1', 'x'.repeat(100)) +
+      use('r2', 'mcp__plugin_obsidian_obsidian__list_notes') + res('r2', 'notes') +
+      use('r3', 'mcp__plugin_basic_memory_basic-memory__write_note') + res('r3', 'note'));
+    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
+    expect(r.conductor.serena).toBeUndefined();
+    expect(r.conductor.obsidian).toBeUndefined();
+    expect(Object.keys(r.conductor)).toEqual([]);
   });
 
   it('counts middleware-exec Bash calls as the middleware capability', () => {
@@ -408,24 +418,6 @@ describe('conductor attribution', () => {
     expect(r.conductor.context7.bytes).toBeGreaterThan(0);
   });
 
-  it('recognizes the obsidian capability', () => {
-    const t = path.join(home, 'obsidian.jsonl');
-    fs.writeFileSync(t,
-      use('e1', 'mcp__plugin_obsidian_obsidian__list_notes') + res('e1', 'notes'.repeat(10)));
-    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
-    expect(r.conductor.obsidian.calls).toBe(1);
-    expect(r.conductor.obsidian.bytes).toBeGreaterThan(0);
-  });
-
-  it('recognizes the basic-memory alternate for the obsidian capability', () => {
-    const t = path.join(home, 'basic-memory.jsonl');
-    fs.writeFileSync(t,
-      use('f1', 'mcp__plugin_basic_memory_basic-memory__write_note') + res('f1', 'note') +
-      use('f2', 'mcp__plugin_basic-memory_basic-memory__read_note') + res('f2', 'note'));
-    const r = aggregate(t, 0, { maxChunk: 1 << 20 });
-    expect(r.conductor.obsidian.calls).toBe(2);
-  });
-
   it('caps the pending map at opts.maxPending, evicting the oldest unmatched calls', () => {
     const t = path.join(home, 'pending-cap.jsonl');
     let body = '';
@@ -437,5 +429,25 @@ describe('conductor attribution', () => {
     expect(r.pending.p9).toBe('codegraph');
     expect(r.pending.p7).toBe('codegraph');
     expect(r.pending.p0).toBeUndefined();
+  });
+
+  it('leaves a legacy serena key in session stats untouched', () => {
+    // configDir() with HOME set and CLAUDE_CONFIG_DIR deleted (what run() does)
+    // resolves to <home>/.claude, so this is where the hook's saveStats lands.
+    const statsDir = path.join(home, '.claude', 'hooks-logs');
+    fs.mkdirSync(statsDir, { recursive: true });
+    fs.writeFileSync(path.join(statsDir, 'session-stats.json'), JSON.stringify({
+      startedAt: new Date().toISOString(),
+      conductor: { serena: { calls: 7, bytes: 1234 } },
+    }));
+
+    const sessionId = `legacy-${process.pid}`;
+    const t = path.join(home, 'legacy.jsonl');
+    fs.writeFileSync(t, use('L1', 'codegraph_explore') + res('L1', 'y'.repeat(20)));
+    run(sessionId, t);
+
+    const stats = JSON.parse(fs.readFileSync(path.join(statsDir, 'session-stats.json'), 'utf8'));
+    expect(stats.conductor.serena).toEqual({ calls: 7, bytes: 1234 });
+    expect(stats.conductor.codegraph.calls).toBe(1);
   });
 });

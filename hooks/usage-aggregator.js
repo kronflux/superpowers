@@ -14,10 +14,12 @@
  * First sight of a transcript larger than BACKFILL_CAP starts near EOF
  * instead of counting the whole history.
  *
- * The same pass also attributes conductor tool usage (codegraph, serena,
- * context7, obsidian/basic-memory, middleware) per capability as call counts
- * and tool_result byte sizes. `bytes` measures context consumed by tool
- * results — it is NOT tokens billed, and is never presented as such.
+ * The same pass also attributes conductor tool usage (codegraph, context7,
+ * middleware) per capability as call counts and tool_result byte sizes.
+ * `bytes` measures context consumed by tool results — it is NOT tokens billed,
+ * and is never presented as such. Logs written before 7.8.0 also carry
+ * `serena` and `obsidian` keys; those are read and rendered as-is, never
+ * rewritten.
  */
 
 import fs from 'fs';
@@ -53,12 +55,12 @@ const MAX_CHUNK = 32 * 1024 * 1024;
 const BACKFILL_CAP = 64 * 1024 * 1024;
 
 // Conductor capabilities, matched against the tool_use name. Middleware is not
-// an MCP tool - it is a Bash call to scripts/middleware-exec.mjs.
+// an MCP tool - it is a Bash call to scripts/middleware-exec.mjs. LSP is
+// deliberately absent: it exposes no callable tool, so there is nothing to
+// attribute and a zero-valued key would misrepresent it as one the model uses.
 const CAPABILITY_PATTERNS = [
   ['codegraph', /codegraph/i],
-  ['serena',    /serena/i],
   ['context7',  /context7/i],
-  ['obsidian',  /obsidian|basic.?memory/i],
 ];
 const MAX_PENDING = 500;
 

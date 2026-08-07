@@ -38,10 +38,13 @@ successive turns; a gap there is expected, not a stall.
    Do NOT use `session-stats.json` for this: that file is config-root-wide and `loadStats`
    expires it after two hours, so its totals silently reset mid-session.
 2. **Conductor usage** — per-capability rollup from the `conductor` key on those same records:
-   calls and result bytes per capability (codegraph, serena, context7, obsidian, middleware),
-   with an approximate token figure at roughly 4 bytes per token. Bytes are the real
-   measurement; the token number is an estimate of context consumed, never billing data. If no
-   capability appears, say plainly that no conductor tool was used this session.
+   calls and result bytes per capability (codegraph, context7, middleware),
+   plus any other capability key present in the log — sessions recorded before
+   7.8.0 also carry `serena` and `obsidian`. Render whatever keys are found;
+   never drop or rewrite a legacy key. Report an approximate token figure at
+   roughly 4 bytes per token. Bytes are the real measurement; the token number
+   is an estimate of context consumed, never billing data. If no capability
+   appears, say plainly that no conductor tool was used this session.
 3. **Middleware per-request usage** — `hooks-logs/middleware-usage.jsonl`, last 10 records.
    `promptTokens`/`completionTokens` are exact for `http` endpoints; `cli` endpoints report
    `promptBytes`/`outputBytes` instead, because their plain-text output carries no token counts.
