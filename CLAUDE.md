@@ -47,7 +47,7 @@ manifests by the bump script.
 ## Load-bearing contracts
 
 - **Conductor:** `skills/shared/conductor/routing.md` is the central tool-selection authority
-  (CodeGraph, Serena, Context7, context-mode, middleware-exec, Obsidian); every integration is
+  (CodeGraph, LSP, Context7, context-mode, middleware-exec); every integration is
   optional and capability-gated. `skills/shared/context-mode-adapter.md` remains the
   single source of truth for native-vs-`ctx_*` routing within that chain.
 - **Evidence rule:** gate verification is asserted in-transcript as

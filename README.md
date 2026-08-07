@@ -135,17 +135,18 @@ a job type and follow that row's chain, left to right, using the first capabilit
 | Job | Chain (first available wins) |
 |---|---|
 | Macro discovery / flow tracing / blast-radius | CodeGraph → context-mode search → native Grep/Read |
-| Symbol-precise edit (rename, replace body, references) | Serena symbol tools → native Edit |
+| Symbol-precise edit (rename, replace body, references) | CodeGraph blast-radius → context-mode search → native Edit |
+| Post-edit fast signal | LSP diagnostics, then the project's own gate |
 | External framework/API docs | Context7 → other docs MCP → `ctx_fetch_and_index` / web |
 | Output handling (logs, tests, terminal dumps) | context-mode (unchanged contract) |
 | Mechanical subagent work (log digests, boilerplate) | middleware-exec → Claude mechanical tier |
-| Memory / ADR persistence | Obsidian-valid markdown always; obsidian-cli / Basic Memory MCP when present → filesystem |
+| Memory / ADR persistence | filesystem, per the authoring contract in `doc-format.md` |
 
 Every row is capability-gated: a hook probes what's installed and configured at session start,
 absent tools are skipped silently, and a tool that fails mid-session is demoted for the rest
 of that session — never surfaced as an error. **Every integration is optional.** Nothing here
 is required, and nothing is skipped when present. Run `/onboard` to review and install any of
-CodeGraph, Serena, Context7, middleware-exec, or obsidian-cli.
+CodeGraph, LSP, Context7, middleware-exec, or context-mode.
 
 ## Context economy
 

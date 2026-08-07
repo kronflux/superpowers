@@ -104,7 +104,7 @@ Full protocol lives in `skills/context-management/SKILL.md`; summary:
 A fifth layer, additive to the four above: `docs/adr/` holds architecture decision records for
 designs that are irreversible or architectural. Written by `brainstorming` on design approval,
 recalled by the context-management skill. Format is owned by
-`skills/shared/conductor/obsidian.md`. Optional — no `docs/adr/` convention or a user decline
+`skills/shared/conductor/doc-format.md`. Optional — no `docs/adr/` convention or a user decline
 skips the write silently; never a blocker.
 
 ## Coexistence contract

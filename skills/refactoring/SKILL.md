@@ -9,7 +9,7 @@ Change structure without changing behavior. Prove it at every step.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Running the test suite EXECUTES code and stays native regardless of job. For macro discovery, flow tracing, or blast-radius questions, follow `skills/shared/conductor/codegraph.md` first. For symbol navigation and code edits, follow `skills/shared/conductor/serena.md` when serena is available.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Running the test suite EXECUTES code and stays native regardless of job. For macro discovery, flow tracing, or blast-radius questions — including the call sites of any symbol you are about to move or rename — follow `skills/shared/conductor/codegraph.md` first. Edits themselves are native Edit.
 
 ## Why This Exists
 
