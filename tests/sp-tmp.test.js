@@ -32,4 +32,19 @@ describe('sp-tmp', () => {
       fs.mkdirSync = realMkdir;
     }
   });
+
+  it('confines a traversal payload inside the root', () => {
+    // Assert containment structurally (resolved-path prefix check), not by
+    // string-matching the sanitized name — that would only restate the
+    // implementation instead of proving the escape is closed.
+    const root = path.resolve(spTmpDir());
+    const escaped = path.resolve(spTmp('../../../../../../../../etc/passwd'));
+    expect(escaped.startsWith(root + path.sep)).toBe(true);
+  });
+
+  it('leaves an ordinary name unchanged', () => {
+    expect(spTmp('conductor-abc-123.def_ghi')).toBe(
+      path.join(os.tmpdir(), ROOT_NAME, 'conductor-abc-123.def_ghi')
+    );
+  });
 });

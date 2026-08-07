@@ -24,9 +24,20 @@ function spTmpDir() {
   return dir;
 }
 
-/** Absolute path to `name` inside the plugin temp root. */
+/**
+ * Absolute path to `name` inside the plugin temp root.
+ *
+ * `name` is sanitized here — not left to each caller — because callers build
+ * it from session ids that ultimately trace back to hook stdin. Anything
+ * outside [A-Za-z0-9._-] (notably `/`, `\`, and `..` segments) becomes `_`,
+ * so a path-separator or traversal payload can no longer walk the result
+ * outside spTmpDir(). Every name currently in use (usage-, stop-, ctx-,
+ * conductor-, compress- plus their session-id/class suffixes) is already
+ * within that set, so this is a no-op for real callers.
+ */
 function spTmp(name) {
-  return path.join(spTmpDir(), name);
+  const safe = String(name).replace(/[^A-Za-z0-9._-]/g, '_');
+  return path.join(spTmpDir(), safe);
 }
 
 export { ROOT_NAME, spTmpDir, spTmp };

@@ -42,8 +42,14 @@ describe('session-end-cleanup', () => {
   it('NEVER deletes the usage offset', () => {
     // claude-usage.jsonl is append-only. Losing the offset makes the next run
     // re-scan from zero and re-count usage already recorded.
+    //
+    // Also assert an ephemeral file WAS removed in this same run: proving only
+    // that usage- survives doesn't distinguish this hook from a no-op — a
+    // no-op passes that assertion trivially. Checking both proves the hook
+    // ran (deleted ephemeral state) AND specifically spared usage-.
     run({ session_id: sid, hook_event_name: 'SessionEnd', reason: 'clear' });
     expect(fs.existsSync(spTmp(`usage-${sid}`))).toBe(true);
+    expect(fs.existsSync(spTmp(`ctx-${sid}.json`))).toBe(false);
   });
 
   it('does nothing on reason=resume', () => {
