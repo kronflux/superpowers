@@ -1,5 +1,33 @@
 # Superpowers Release Notes
 
+## 7.11.0 — plan task snapshots that tell the truth
+
+- **`hooks/sync-plan-tasks.js` keeps `<plan>.md.tasks.json` in sync.**
+  `subagent-driven-development` has documented a "Task Persistence Sync" step since the skill was
+  written — after each `TaskUpdate`, write the new status through to the snapshot so a resumed
+  session sees real state. No controller has ever performed it: 9 of the 11 snapshots in this
+  repo still read `0/N`, including plans that were fully executed and merged weeks ago. Prose
+  asking a controller to remember something on every tool call is not a mechanism; a
+  `PostToolUse(TaskUpdate)` hook is. Two things silently depended on that file: cross-session
+  resume, which reads it to find remaining work and would re-dispatch tasks already done, and
+  the statusline's plan segment, which rendered a permanent `plan 0/N`. `deleted` is deliberately
+  not synced — dropping an entry would shrink the denominator and make a resumed plan look
+  shorter than it is. An id the plan does not contain leaves the file byte-identical, since
+  sessions run native tasks unrelated to any plan.
+- **Session token usage is read from a 256KB tail, not 16KB.** At roughly 153 bytes per record
+  the old window covered about 107 records, so a busy session undercounted and the displayed
+  total could visibly *decrease* as records scrolled out. The new bound holds roughly 1,700
+  records and is documented at the call site.
+- **`scripts/statusline.mjs` no longer runs on import.** `main()` was called at module scope, so
+  importing the renderer for a test or a wrapper drained stdin and printed a line. It now guards
+  on being the entry point and exports `render` and `sanitizeLineValue`.
+- **The statusline install refuses to overwrite valid-JSON non-objects.** The guard caught parse
+  failures but not `"str"`, `[]`, `null`, `42` or `true`, which parse fine: `"str"` threw an
+  uncaught `TypeError` on property assignment, and `[]` accepted the property only to lose it to
+  `JSON.stringify` — reporting a successful write that never landed. A settings file that is
+  valid JSON but not an object is no more safely overwritable than a malformed one; both are now
+  reported as `unparseable` and left alone.
+
 ## 7.10.0 — conductor statusline
 
 - **`/superpowers:statusline`** installs a conductor statusline: active capabilities, the last
