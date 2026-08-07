@@ -59,11 +59,21 @@ function spTmpDir() {
  * use (usage-, stop-, ctx-, conductor-, compress- plus their session-id/class
  * suffixes) is already outside this edge case, so this is a no-op for real
  * callers.
+ *
+ * Exported on its own so every site that needs to build or match a name
+ * from a raw session id (session-end-cleanup.js, tmp-reaper.js's isLive) goes
+ * through the same transform `spTmp()` applies — a private, differently-scoped
+ * filter at any of those sites would let a name that `spTmp()` sanitizes one
+ * way be built or matched another way.
  */
-function spTmp(name) {
+function spSafe(name) {
   let safe = String(name).replace(/[^A-Za-z0-9._-]/g, '_');
   if (safe === '' || safe === '.' || safe === '..') safe = `_${safe}`;
-  return path.join(spTmpDir(), safe);
+  return safe;
 }
 
-export { ROOT_NAME, spTmpDir, spTmp };
+function spTmp(name) {
+  return path.join(spTmpDir(), spSafe(name));
+}
+
+export { ROOT_NAME, spTmpDir, spTmp, spSafe };
