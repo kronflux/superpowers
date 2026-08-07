@@ -47,4 +47,28 @@ describe('sp-tmp', () => {
       path.join(os.tmpdir(), ROOT_NAME, 'conductor-abc-123.def_ghi')
     );
   });
+
+  // A sanitized name that is exactly '.', '..', or '' is a directory
+  // reference the char filter alone can't neutralize — path.join(root, '..')
+  // walks out one level even though '..' itself contains no path separator.
+  // Assert containment the same way as the traversal test: resolved path
+  // starts with the resolved root, not a string match on the output.
+  it('confines a name that sanitizes to ".."', () => {
+    const root = path.resolve(spTmpDir());
+    const result = path.resolve(spTmp('..'));
+    expect(result.startsWith(root + path.sep)).toBe(true);
+  });
+
+  it('confines a name that sanitizes to "."', () => {
+    const root = path.resolve(spTmpDir());
+    const result = path.resolve(spTmp('.'));
+    expect(result.startsWith(root + path.sep)).toBe(true);
+  });
+
+  it('confines an empty name strictly inside the root, not equal to it', () => {
+    const root = path.resolve(spTmpDir());
+    const result = path.resolve(spTmp(''));
+    expect(result.startsWith(root + path.sep)).toBe(true);
+    expect(result).not.toBe(root);
+  });
 });

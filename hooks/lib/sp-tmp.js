@@ -29,14 +29,21 @@ function spTmpDir() {
  *
  * `name` is sanitized here — not left to each caller — because callers build
  * it from session ids that ultimately trace back to hook stdin. Anything
- * outside [A-Za-z0-9._-] (notably `/`, `\`, and `..` segments) becomes `_`,
- * so a path-separator or traversal payload can no longer walk the result
- * outside spTmpDir(). Every name currently in use (usage-, stop-, ctx-,
- * conductor-, compress- plus their session-id/class suffixes) is already
- * within that set, so this is a no-op for real callers.
+ * outside [A-Za-z0-9._-] becomes `_`, which removes every path separator
+ * (`/`, `\`) from the input, so a multi-segment traversal payload (e.g.
+ * `../../evil`) collapses to a single literal filename rather than walking
+ * anywhere. That charset has to keep `.` for names like `stop-<sid>.lock`,
+ * which leaves one gap a plain character filter can't close: a sanitized
+ * result of exactly `.`, `..`, or `` (empty) is itself a directory reference
+ * and `path.join(root, '..')` walks out one level. Those three exact values
+ * are neutralized with a `_` prefix after sanitizing. Every name currently in
+ * use (usage-, stop-, ctx-, conductor-, compress- plus their session-id/class
+ * suffixes) is already outside this edge case, so this is a no-op for real
+ * callers.
  */
 function spTmp(name) {
-  const safe = String(name).replace(/[^A-Za-z0-9._-]/g, '_');
+  let safe = String(name).replace(/[^A-Za-z0-9._-]/g, '_');
+  if (safe === '' || safe === '.' || safe === '..') safe = `_${safe}`;
   return path.join(spTmpDir(), safe);
 }
 
