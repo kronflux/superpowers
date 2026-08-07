@@ -79,6 +79,20 @@ describe('patchSettings', () => {
     expect(patchSettings(cwd, 'node /x/launcher.mjs').changed).toBe(true);
     expect(patchSettings(cwd, 'node /x/launcher.mjs').changed).toBe(false);
   });
+
+  it('reports "unparseable" and leaves a malformed settings file byte-for-byte untouched', () => {
+    // Real settings files carry permissions, hooks, model, API keys. A single
+    // typo (trailing comma below) must never be treated as "no file" and
+    // silently replaced with a fresh {statusLine: ...} object.
+    const cwd = path.join(root, 'p4');
+    fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
+    const file = path.join(cwd, '.claude', 'settings.json');
+    const before = '{\n  "permissions": {"allow": ["Bash"]},\n  "model": "opus",\n  "hooks": {},\n}\n';
+    fs.writeFileSync(file, before);
+    const result = patchSettings(cwd, 'node /x/launcher.mjs');
+    expect(result).toEqual({ changed: false, state: 'unparseable' });
+    expect(fs.readFileSync(file, 'utf8')).toBe(before);
+  });
 });
 
 describe('ensureGitignored', () => {
@@ -117,5 +131,18 @@ describe('ensureGitignored', () => {
   it('treats a non-git directory as "added" rather than failing', () => {
     const cwd = path.join(root, 'g4'); fs.mkdirSync(cwd, { recursive: true });
     expect(ensureGitignored(cwd).state).toBe('added');
+  });
+
+  it('reports "unknown" and writes NO rule when the repo exists but the probe fails', () => {
+    // A .git directory that exists but is not a valid repository makes any
+    // git command inside it fail — standing in for lock contention,
+    // permission errors, or a timeout against a genuinely tracked repo. The
+    // probe cannot tell whether .claude/ is tracked here, so folding this
+    // into "added" would risk writing a no-op rule and reporting success
+    // against a repo that may have .claude/ tracked.
+    const cwd = path.join(root, 'g5');
+    fs.mkdirSync(path.join(cwd, '.git'), { recursive: true });
+    expect(ensureGitignored(cwd).state).toBe('unknown');
+    expect(fs.existsSync(path.join(cwd, '.gitignore'))).toBe(false);
   });
 });

@@ -19,7 +19,13 @@ function newestVersionDir(base) {
   let entries = [];
   try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { return null; }
   const versions = entries
-    .filter((e) => e.isDirectory() && /^\d+\.\d+\.\d+/.test(e.name))
+    // Anchored at both ends: an unanchored prefix match would admit a
+    // prerelease-suffixed dir like "7.10.0-beta", whose suffix Number()
+    // turns into NaN and (pa[i] || 0) silently degrades to 0 — making it
+    // compare equal to "7.10.0" with the winner decided by readdirSync
+    // order. Rejecting suffixed names outright is simpler than implementing
+    // prerelease precedence for a directory naming scheme we control.
+    .filter((e) => e.isDirectory() && /^\d+\.\d+\.\d+$/.test(e.name))
     .map((e) => e.name)
     .sort((a, b) => {
       const pa = a.split('.').map(Number); const pb = b.split('.').map(Number);
