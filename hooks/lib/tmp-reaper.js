@@ -12,7 +12,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { ROOT_NAME } from './sp-tmp.js';
+import { ROOT_NAME, spSafe } from './sp-tmp.js';
 
 const DEFAULT_RETENTION_DAYS = 7;
 const THROTTLE_MS = 24 * 60 * 60 * 1000;
@@ -72,7 +72,29 @@ function sweep(opts = {}) {
     const stale = (full) => {
       try { return now - fs.statSync(full).mtimeMs > ms; } catch { return false; }
     };
-    const isLive = (name) => sessionId && name.includes(sessionId);
+    // Exact-segment match against the sanitized id, not a raw substring test:
+    // spTmp() may have sanitized the live session's id differently than a
+    // caller's raw id would compare (e.g. a `.` in the id), so build the
+    // known name shapes from spSafe(sessionId) and require the whole
+    // session-id segment to match, not merely appear somewhere in the name.
+    // Checked against both the current `<name>` form and the pre-migration
+    // `sp-<name>` flat form, since isLive guards both passes below.
+    const sid = sessionId ? spSafe(sessionId) : '';
+    const liveShapes = sid ? [
+      `usage-${sid}`, `stop-${sid}.lock`, `ctx-${sid}.json`,
+      `conductor-${sid}`, `compress-${sid}.json`,
+    ] : [];
+    const isLive = (name) => {
+      if (!sid) return false;
+      if (liveShapes.includes(name) || liveShapes.some((s) => name === `sp-${s}`)) return true;
+      return name.startsWith(`conductor-${sid}-`) || name.startsWith(`sp-conductor-${sid}-`);
+    };
+
+    // Never enumerate through a symlinked root: fs.readdirSync follows a
+    // symlink, and the recursive rmSync below would then resolve through it
+    // too. A directory an attacker pre-created at this path (pointing at
+    // something the victim can write to) must be refused, not traversed.
+    try { if (fs.lstatSync(root).isSymbolicLink()) return result; } catch {}
 
     // --- our own root -----------------------------------------------------
     let entries = [];

@@ -99,6 +99,28 @@ describe('tmp-reaper sweep', () => {
     expect(fs.existsSync(target)).toBe(true);
   });
 
+  it.skipIf(!canSymlink)('refuses to enumerate through a symlinked root, not just a symlinked entry', () => {
+    // The per-entry isSymbolicLink() check above says nothing about the root
+    // itself. If an attacker pre-creates the root as a symlink to a directory
+    // the victim can write to, readdirSync follows it and the recursive
+    // rmSync would delete through it. Symlink the root — not an entry under
+    // it — and assert the sweep refuses to touch the target at all.
+    const victimDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-victim-'));
+    const victimFile = path.join(victimDir, 'precious.txt');
+    fs.writeFileSync(victimFile, 'precious');
+    const t = new Date(NOW - 99 * DAY);
+    fs.utimesSync(victimFile, t, t);
+    const root = path.join(fake, 'sp'); // not yet created by beforeEach/seed
+    fs.symlinkSync(victimDir, root, 'dir');
+    try {
+      const r = sweep({ tmpRoot: fake, now: NOW, env: {}, force: true });
+      expect(fs.existsSync(victimFile)).toBe(true);
+      expect(r.removed).toBe(0);
+    } finally {
+      fs.rmSync(victimDir, { recursive: true, force: true });
+    }
+  });
+
   it('cleans aged legacy flat entries by exact prefix only', () => {
     const aged = seed('sp-conductor-old', 10, NOW);
     const recent = seed('sp-conductor-new', 1, NOW);
