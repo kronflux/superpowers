@@ -52,7 +52,10 @@ function seedState(caps, spent = {}) {
 
 function run(payload, envOverride = {}) {
   const env = { ...process.env, HOME: home, USERPROFILE: home, ...envOverride };
-  delete env.CLAUDE_CONFIG_DIR;
+  // Strip the host's ambient CLAUDE_CONFIG_DIR so probe() doesn't leak the
+  // real dev environment's config root into a test - but keep one an
+  // envOverride sets explicitly (real-probe tests point it at a fake root).
+  if (!('CLAUDE_CONFIG_DIR' in envOverride)) delete env.CLAUDE_CONFIG_DIR;
   const out = execFileSync('node', [HOOK], {
     input: JSON.stringify({ session_id: sessionId, cwd: home, ...payload }),
     encoding: 'utf8', env,
@@ -221,13 +224,76 @@ describe('conductor-nudges', () => {
     }))).toMatch(/pyright-lsp/);
   });
 
+  // Mirrors installLspPlugin in tests/capability-registry.test.js: builds the
+  // installed_plugins.json + install-dir .lsp.json tree probe()'s lspExtensions()
+  // actually reads.
+  function installLspPlugin(prof, name, file, body) {
+    const inst = path.join(prof, 'plugins', 'cache', 'm', name, '1.0.0');
+    fs.mkdirSync(inst, { recursive: true });
+    fs.writeFileSync(path.join(inst, file), typeof body === 'string' ? body : JSON.stringify(body));
+    fs.mkdirSync(path.join(prof, 'plugins'), { recursive: true });
+    const idxPath = path.join(prof, 'plugins', 'installed_plugins.json');
+    const idx = fs.existsSync(idxPath)
+      ? JSON.parse(fs.readFileSync(idxPath, 'utf8'))
+      : { version: 1, plugins: {} };
+    idx.plugins[`${name}@m`] = [{ installPath: inst }];
+    fs.writeFileSync(idxPath, JSON.stringify(idx));
+    return inst;
+  }
+
+  it('offers an LSP plugin through the real probe, with extensions read from an installed server', () => {
+    // No seedState: this drives probe() for real, mirroring the codegraph-init
+    // real-probe test above. A rename of probe().lsp.{extensions,declined,
+    // declinedAll} would silently zero every LSP nudge with the rest of this
+    // suite still green.
+    const prof = path.join(home, 'prof');
+    // Covers .go - a different extension than the one edited below - so a
+    // non-empty extensions array from the real probe is what lets the
+    // typescript-lsp offer through, not an empty/defaulted one.
+    installLspPlugin(prof, 'gopls-lsp', '.lsp.json', {
+      go: { command: 'gopls', extensionToLanguage: { '.go': 'go' } },
+    });
+    const out = run(
+      {
+        hook_event_name: 'PostToolUse', tool_name: 'Edit',
+        tool_input: { file_path: 'src/index.ts' }, tool_response: {},
+      },
+      { PATH: SANDBOX_PATH, CLAUDE_CONFIG_DIR: prof }
+    );
+    expect(ctx(out)).toMatch(/typescript-lsp/);
+    const state = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `sp-conductor-${sessionId}`), 'utf8'));
+    expect(state.caps.lsp.extensions).toContain('.go');
+  });
+
   it('never mentions serena', () => {
-    seedState({ codegraph: true, 'codegraph-init': false, middleware: true });
-    const outs = [
-      run({ hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} }),
-      run({ hook_event_name: 'PostToolUse', tool_name: 'Bash',
-            tool_response: { stdout: 'FAIL x\n' + 'line\n'.repeat(200), stderr: '' } }),
-    ];
-    for (const o of outs) expect(JSON.stringify(o)).not.toMatch(/serena/i);
+    seedState({
+      codegraph: true, 'codegraph-init': false, middleware: true,
+      lsp: { extensions: [], declined: [], declinedAll: false },
+    });
+    const codegraphOut = run({ hook_event_name: 'PreToolUse', tool_name: 'Grep', tool_input: {} });
+    const lspOut = run({
+      hook_event_name: 'PostToolUse', tool_name: 'Edit',
+      tool_input: { file_path: 'src/index.ts' }, tool_response: {},
+    });
+    const middlewareOut = run({
+      hook_event_name: 'PostToolUse', tool_name: 'Bash',
+      tool_response: { stdout: 'FAIL tests/x.test.js\n' + 'assertion detail line\n'.repeat(200), stderr: '' },
+    });
+    // codegraph and codegraph-init share one dispatch branch that always
+    // prefers codegraph-init when both caps are true, so reaching the
+    // codegraph-init tip needs a second, separate seeded state.
+    seedState({ 'codegraph-init': true });
+    const codegraphInitOut = run({ hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: {} });
+
+    // Confirm each call actually fired its tip - a silently empty {} would
+    // make the serena check below meaningless.
+    expect(ctx(codegraphOut)).toMatch(/codegraph explore/);
+    expect(ctx(lspOut)).toMatch(/typescript-lsp/);
+    expect(ctx(middlewareOut)).toMatch(/summarize-test-failure/);
+    expect(ctx(codegraphInitOut)).toMatch(/codegraph init/);
+
+    for (const o of [codegraphOut, lspOut, middlewareOut, codegraphInitOut]) {
+      expect(JSON.stringify(o)).not.toMatch(/serena/i);
+    }
   });
 });
