@@ -61,7 +61,7 @@ Ordered chain, each self-gating:
 
 `hooks/stop-reminders.js` emits a session summary including the **hook-injected-context byte
 line** (`hook-injected context this session: <N>KB`). Guarded per-session by a
-`sp-stop-<sessionId>.lock` file so it fires once, never a global lock.
+`<tmpdir>/sp/stop-<sessionId>.lock` file so it fires once, never a global lock.
 
 ### SubagentStop
 
@@ -114,7 +114,7 @@ Superpowers and context-mode run side by side without collision:
 - **Yield rules:** `bash-compress-hook` yields when context-mode is active; context-mode owns
   Bash routing and WebFetch (WebFetch is hard-denied by context-mode).
 - **`sp-*` namespace:** every plugin tmpfile uses the `sp-` prefix; stop locks are per-session
-  (`sp-stop-<sessionId>.lock`), never a global lock.
+  (`<tmpdir>/sp/stop-<sessionId>.lock`), never a global lock.
 - **No `PreCompact`:** no hook registers the PreCompact event (asserted by
   `tests/coexistence.test.js`); compaction memory is context-mode's job.
 - **Evidence-in-transcript:** gate verification is asserted as
