@@ -23,12 +23,21 @@ const DAY_MS = 86400000;
 // wildcard: this is the only code that looks outside our own directory, and it
 // exists to clean up after ourselves once. Delete this list — and the pass that
 // uses it — once installs have rolled past the migration.
+//
+// 'sp-mw-' is the one exception: it is CURRENT, not legacy.
+// scripts/middleware-exec.mjs still creates its CLI-subprocess working
+// directory directly under the bare temp root (a deliberate, documented gap —
+// see docs/ARCHITECTURE.md), so this is its only aging backstop against a
+// SIGKILL or crash between mkdtemp and its own cleanup. Do not remove it when
+// the rest of this list is retired.
 const LEGACY_PREFIXES = [
   'sp-usage-', 'sp-stop-', 'sp-ctx-', 'sp-conductor-', 'sp-compress-', 'sp-safety-hooks-',
+  'sp-mw-',
 ];
 
 function retentionMs(env) {
-  const raw = env.SUPERPOWERS_TMP_RETENTION_DAYS;
+  let raw = env.SUPERPOWERS_TMP_RETENTION_DAYS;
+  if (typeof raw === 'string') raw = raw.trim();
   if (raw === undefined || raw === '') return DEFAULT_RETENTION_DAYS * DAY_MS;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return DEFAULT_RETENTION_DAYS * DAY_MS;
