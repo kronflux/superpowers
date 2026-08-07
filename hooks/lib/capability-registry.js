@@ -141,8 +141,8 @@ function probe(cwd = process.cwd(), opts = {}) {
 }
 
 // `lsp` is deliberately not in the "use first" list. It exposes no callable
-// tool — announcing it as something to reach for is the exact mistake that
-// made the Serena line noise.
+// tool — announcing it as something to reach for repeats the noisy-nudge
+// mistake this registry was rewritten to avoid.
 function summaryLine(caps) {
   const present = Object.entries(caps)
     .filter(([k, v]) => k !== 'lsp' && v.status !== STATUS.ABSENT).map(([k]) => k);
