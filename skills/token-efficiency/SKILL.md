@@ -20,7 +20,7 @@ The one rule specific to token cost rather than readability: prefer structured o
 ## Tool Execution Rules
 
 1. Batch independent tool calls in a single response — never serialize calls that can run in parallel.
-2. Use Glob instead of Bash `ls` or `find`.
+2. Never shell out to Bash `ls` or `find` to locate files — use Glob for a known name or pattern, and the Adapter Link chain when the question is about structure rather than a path.
 3. Match read scope to the task: a targeted search locates known content (a function, a config value, an error handler); a full read is needed when the task requires knowing what a file covers (scope assessment, gap analysis, systemic recommendations). Partial reads cannot prove absence.
 4. Read returns at most 2,000 lines per call. Above that, page with `offset` and `limit` — never assume a single read covered the file.
 

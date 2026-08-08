@@ -147,7 +147,7 @@ Entry type (`[saved]`), file-management rules (root location, 200-entry cap, sup
      - User confirms → run `git init --quiet` (native), then proceed with git hash.
      - User declines → use generation timestamp as the staleness marker.
 
-2. **Map the structure:** Glob the project, identify the top-level directories and their purpose. Do not enumerate every file — summarise by directory.
+2. **Map the structure:** a discovery job (see Adapter Link) — `codegraph_files` reports the project's file structure straight from the index when CodeGraph is present, context-mode next, native Glob last. Identify the top-level directories and their purpose. Do not enumerate every file — summarise by directory.
 
 3. **Document key files:** For each file that is load-bearing, non-obvious, or frequently referenced, write one line describing what it does and why it matters. Aim for 10–20 entries. Skip files whose purpose is obvious from their name.
 
