@@ -234,6 +234,18 @@ function formatStatsSummary(stats) {
 // reminder that fires constantly gets ignored. Errs toward silence: a false
 // nudge on a turn legitimately blocked on the operator ("I'll do X once you
 // answer") is worse than a missed one.
+//
+// Coverage was broadened (corpus-tested against real .superpowers/sdd
+// report prose — see tests/stop-reminders.test.js) with two patterns
+// deliberately NOT adopted, on purpose, so a future pass does not
+// "complete" the list by adding them back:
+//   - /\bhere (?:is|are|we go)(?: with)? the (?:code|script|implementation|
+//     updated|requested)\b/i — this *presents* work rather than promising
+//     it. "Here is the code" usually precedes delivered content; firing on
+//     it would block a turn that already delivered exactly what was asked.
+//   - /\bi can (?:certainly|definitely) (?:help|do|write|generate)\b/i —
+//     sycophancy, not a did-you-do-the-work signal. Belongs to the
+//     banned-vocabulary purity gate, not this guard.
 const FORWARD_COMMITMENT_PATTERNS = [
   /\bi'll now\b/i,
   /\bi will now\b/i,
@@ -242,6 +254,20 @@ const FORWARD_COMMITMENT_PATTERNS = [
   /\bstarting now\b/i,
   // "writing ... now" within a short, same-clause span (no sentence break).
   /\bwriting\b[^.\n]{0,40}\bnow\b/i,
+  /\bi(?:'ll| will) (?:now|go ahead|start|begin|generate|write|create|implement|update|proceed)\b/i,
+  /\blet me (?:start|now|go ahead|begin|write|generate|implement|create|handle)\b/i,
+  /\b(?:i'm|i am) going to (?:start|begin|generate|write|create|implement|update|proceed)\b/i,
+  /\blet's (?:get started|dive in|start|begin|implement|write|create)\b/i,
+  /\bproceeding (?:to|on|now|with)\b/i,
+  /\b(?:starting|beginning) now\b/i,
+  /\ballow me to (?:start|begin|write|generate|implement|create)\b/i,
+  // Tightened from the candidate form (verb ... now/for you anywhere in the
+  // message): that form matched past-tense reporting like "still working on
+  // the reaper now covered by tests". Require the verb to open the message
+  // or a sentence, or follow a first-person "I'm"/"I am", so it only catches
+  // an announcement, not a status update embedded mid-sentence.
+  /(?:^|(?<=[.!?\n]\s)|(?<=\bi(?:'m|m| am) ))(?:writing|generating|creating|implementing|updating|working on)\b[^.\n]{0,40}\b(?:now|for you)\b/i,
+  /\bmoving on to\b/i,
 ];
 
 const FILE_CHANGING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash']);
