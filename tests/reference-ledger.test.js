@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
-import { discover, load, save, scan, gap, ledgerPath, consume, parseFlags, today, git } from '../scripts/reference-ledger.mjs';
+import { discover, load, save, scan, gap, ledgerPath, consume, archive, parseFlags, today, git } from '../scripts/reference-ledger.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'reference-ledger.mjs');
@@ -524,5 +524,75 @@ describe('consume', () => {
     mkRepo(root, 'alpha');
     run(root, ['scan']);
     expect(runCli(root, ['consume', 'alpha']).status).not.toBe(0);
+  });
+});
+
+describe('archive', () => {
+  let root;
+  beforeEach(() => { root = newRoot(); });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it('moves the directory and marks the entry', () => {
+    mkRepo(root, 'alpha');
+    mkRepo(root, 'stale');
+    run(root, ['scan']);
+    run(root, ['archive', 'stale', '--reason', 'no commits in 5.4 months']);
+    expect(fs.existsSync(path.join(root, 'stale'))).toBe(false);
+    expect(fs.existsSync(path.join(root, '_archive', 'stale', '.git'))).toBe(true);
+    const e = ledger(root).repos.stale;
+    expect(e.status).toBe('archived');
+    expect(e.reason).toBe('no commits in 5.4 months');
+    expect(e.archivedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('stays archived across a later scan', () => {
+    mkRepo(root, 'alpha');
+    mkRepo(root, 'stale');
+    run(root, ['scan']);
+    run(root, ['archive', 'stale', '--reason', 'dormant']);
+    run(root, ['scan']);
+    expect(ledger(root).repos.stale.status).toBe('archived');
+    expect(fs.existsSync(path.join(root, 'stale'))).toBe(false);
+  });
+
+  it('refuses when the archive destination already exists', () => {
+    mkRepo(root, 'stale');
+    run(root, ['scan']);
+    mkRepo(path.join(root, '_archive'), 'stale');
+    expect(runCli(root, ['archive', 'stale', '--reason', 'dormant']).status).not.toBe(0);
+    // The source must survive a refused archive.
+    expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
+  });
+
+  it('refuses an unknown reference name', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    expect(runCli(root, ['archive', 'nosuch', '--reason', 'dormant']).status).not.toBe(0);
+  });
+
+  it('refuses a missing reason', () => {
+    mkRepo(root, 'stale');
+    run(root, ['scan']);
+    expect(runCli(root, ['archive', 'stale']).status).not.toBe(0);
+    expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
+  });
+
+  it('never deletes: the archived tree is intact', () => {
+    const repo = mkRepo(root, 'stale', 2);
+    const before = fs.readdirSync(repo).sort();
+    run(root, ['scan']);
+    run(root, ['archive', 'stale', '--reason', 'dormant']);
+    expect(fs.readdirSync(path.join(root, '_archive', 'stale')).sort()).toEqual(before);
+  });
+
+  it('rejects a missing reason in-process, not only through the CLI usage check', () => {
+    // archive() must validate reason itself: Task 5 calls this export
+    // directly, bypassing main()'s `!f.reason` usage check entirely. Deleting
+    // the in-function guard would only fail here, not in any CLI-level test.
+    mkRepo(root, 'stale');
+    scan(root);
+    expect(() => archive(root, 'stale', undefined))
+      .toThrow(/^reference-ledger: reason is required/);
+    expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
   });
 });

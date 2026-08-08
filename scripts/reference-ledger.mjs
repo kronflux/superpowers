@@ -164,7 +164,7 @@ function report(dir) {
   return [line(head), ...rows.map(line)].join('\n') + '\n';
 }
 
-const KNOWN_FLAGS = new Set(['ref', 'date', 'by']);
+const KNOWN_FLAGS = new Set(['ref', 'date', 'by', 'reason']);
 
 /**
  * Minimal flag parser: `--k v` pairs, the boolean `--no-ref`, positionals in
@@ -184,7 +184,7 @@ function parseFlags(argv) {
     if (a.startsWith('--')) {
       const key = a.slice(2);
       if (!KNOWN_FLAGS.has(key)) {
-        throw new Error(`reference-ledger: unknown flag '${a}' (expected --ref, --date, --by, or --no-ref)`);
+        throw new Error(`reference-ledger: unknown flag '${a}' (expected --ref, --date, --by, --reason, or --no-ref)`);
       }
       const value = argv[++i];
       if (value === undefined || value.startsWith('--')) {
@@ -233,6 +233,37 @@ function consume(dir, name, workstream, opts = {}) {
   return ledger.repos[name].consumed;
 }
 
+/**
+ * Retire a dormant mirror. Moves, never deletes: the operator asked to keep
+ * the bytes and remove them by hand later, and a move is reversible with
+ * `mv`. Refuses an occupied destination rather than merging two trees.
+ * Validated here, not only in the CLI dispatch below: Task 5 calls this
+ * export directly, bypassing main()'s usage check, and an unreasoned archive
+ * would silently drop the one field the operator asked this command to record.
+ */
+function archive(dir, name, reason) {
+  const src = path.join(dir, name);
+  const dest = path.join(dir, '_archive', name);
+  // Self-prefixing, matching load() and consume(): main()'s shared try/catch
+  // prints err.message verbatim. Both checks run before any mutation, so a
+  // refusal always leaves the source exactly where it was.
+  if (!fs.existsSync(src)) throw new Error(`reference-ledger: no such reference '${name}'`);
+  if (fs.existsSync(dest)) throw new Error(`reference-ledger: already archived: ${dest}`);
+  if (typeof reason !== 'string' || reason.length === 0) {
+    throw new Error('reference-ledger: reason is required and must be a non-empty string');
+  }
+  fs.mkdirSync(path.join(dir, '_archive'), { recursive: true });
+  fs.renameSync(src, dest);
+  const ledger = load(dir);
+  ledger.repos[name] = {
+    ...(ledger.repos[name] || {}),
+    status: 'archived',
+    archivedAt: today(),
+    reason,
+  };
+  save(dir, ledger);
+}
+
 function main(argv) {
   const dir = referenceDir();
   if (!fs.existsSync(dir)) {
@@ -269,6 +300,18 @@ function main(argv) {
       process.stdout.write(`${name}: consumed ${recorded.ref || recorded.date} for ${workstream}\n`);
       return;
     }
+    if (cmd === 'archive') {
+      const f = parseFlags(argv.slice(1));
+      const [name] = f._;
+      if (!name || !f.reason) {
+        process.stderr.write('usage: reference-ledger archive <repo> --reason "<text>"\n');
+        process.exit(2);
+      }
+      // No inner try/catch: the shared dispatch wrapper below handles it.
+      archive(dir, name, f.reason);
+      process.stdout.write(`${name}: archived to _archive/${name}\n`);
+      return;
+    }
   } catch (err) {
     // The 'reference-ledger: ' prefix is the contract that separates a known
     // operational failure (load(), and per plan consume()/archive()) from a
@@ -289,4 +332,7 @@ const isEntry = process.argv[1]
   && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 if (isEntry) main(process.argv.slice(2));
 
-export { referenceDir, ledgerPath, discover, load, save, scan, gap, report, consume, parseFlags, today, git };
+export {
+  referenceDir, ledgerPath, discover, load, save,
+  scan, gap, report, consume, archive, parseFlags, today, git,
+};
