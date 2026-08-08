@@ -93,6 +93,45 @@ manifests by the bump script.
   never throws past its top-level handler — any internal fault prints an empty line and exits 0,
   since this renders on every assistant message and a visible failure would put a stack trace
   across the prompt line.
+- **Comments:** state present-state behavior, inputs, outputs, and side effects only — version
+  control already holds the development history, and narration belongs in the commit message.
+  Two banned classes: development narration (`fixed X`, `added X`, `expanded X`, `adjusted X`,
+  `improved X`, `tested X`, `X happened`, `adding X for X reason`, `a later review found`,
+  `previously`, `used to`, `turned out`) and impermanence (`TODO`, `FIXME`, `WIP`, `temporary`,
+  `for now`, `hack`, `still adjusting`, `so we can test`).
+  ```
+  BAD:  // Fixed crash on empty payload
+  GOOD: // Returns null if the payload is empty
+
+  BAD:  # Added retry logic to handle unstable network
+  GOOD: # Executes network request with 3 exponential backoff retries
+
+  BAD:  # Mocking the auth payload here so we can test the frontend locally
+  GOOD: # Generates a static JWT payload for unauthenticated sessions
+  ```
+  Enforced two ways: `tests/lint-comments.mjs` scans this repo's own source, and a `PreToolUse`
+  gate denies writes introducing a violation in any project — disabled per-project by
+  `.superpowers-no-comment-gate`, matching the decline-marker convention above.
+- **Commit messages** carry what changed; they do not carry how you got there. A comment says
+  what the code does, a commit says what changed, neither says what you did to arrive at it.
+  "History belongs in the commit message" does not mean anything goes there. Banned: internal
+  counts (`23 patterns`, `11 categories`) which are stale within a week and describe the
+  implementation rather than the change; planning-document structure (`all eleven taxonomy
+  categories from the design spec`, `per the plan's task 3`) which the reader of `git log` in
+  two years cannot resolve; process verbs about yourself (`derive`, `adopt`, `grows`,
+  `iterate on`, `revisit`); and measurement as achievement (`with measured coverage`, `now
+  fully tested`) — testing is how a change was made trustworthy, not part of the change.
+  ```
+  BAD:  feat: derive full 11-category comment pattern set with measured coverage
+  GOOD: feat: detect temporal comparison, troubleshooting anecdote, and ticket references
+
+  BAD:  Grows NARRATION to 23 patterns across all eleven taxonomy categories.
+  GOOD: Comments naming a change and its cause are now detected. Bare sentence-initial
+        verbs stay undetected: they cannot be distinguished from present-state usage.
+  ```
+  The good version still gives the limitation and the reason — as properties of the software,
+  not as things you discovered. Reviewed, not gated: a commit-msg hook fires after the work is
+  done and is trivially bypassed.
 
 ## Releases
 

@@ -1,5 +1,25 @@
 # Superpowers Release Notes
 
+## 7.14.0 — comment and commit-message discipline
+
+- **Comments state present-state behavior.** What the code does now — inputs, outputs, side
+  effects, constraints the code cannot express. Not what was fixed, added, adjusted, or tried;
+  not what a review found; not what is temporary or awaiting rewrite. Version control holds the
+  history, and a comment describing a change is never updated, so it decays into a claim about a
+  past that no longer matches the code. The rule and its examples are in `CLAUDE.md`.
+- **Commit messages carry what changed, not how the author got there.** Internal counts and
+  planning-document structure do not survive the work that produced them: a reader of `git log`
+  in two years has no design document and cannot resolve "category 5" or "all eleven
+  categories". Process verbs about the author (`derive`, `adopt`, `grows`) and testing reported
+  as achievement (`with measured coverage`) describe activity rather than change.
+- `hooks/lib/comment-patterns.js` classifies a comment as present-state description or
+  development narration, and distinguishes ordinary vocabulary from violation: `Fixed entries
+  have strikethrough`, `Temporary files are written under the sp/ root`, and `Verifies the
+  SHA-256 digest` all pass. A bare sentence-initial verb — `Fixed crash on empty payload` — is
+  not detected, having no form that separates it from present-state usage.
+- The classifier has no caller yet. The `PreToolUse` gate that would deny writes introducing a
+  violation, in any project, is not in this release.
+
 ## 7.13.0 — SDD workspace defects and an anti-announcement guard
 
 - **The progress ledger is now plan-scoped.** `subagent-driven-development`'s resume
