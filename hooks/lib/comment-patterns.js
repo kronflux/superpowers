@@ -22,10 +22,25 @@ const NARRATION = [
 ];
 
 // A state its author intends to leave rather than a state the code holds.
+// TODO/FIXME/XXX/WIP are unambiguous markers with no adjectival reading and
+// stay bare. "temporary" and "hack" are ordinary vocabulary in present-state
+// prose ("Temporary files are written under sp/", "Parses the hack-day
+// export format"), so only the constructions that name an intended-to-leave
+// state are matched, not the bare words.
 const IMPERMANENCE = [
   /\b(?:TODO|FIXME|XXX|HACK)\b/,
   /\bWIP\b/,
-  /\b(?:temporary|temporarily|for now|for the demo|placeholder for)\b/i,
+  /\btemporary\s+(?:hack|fix|solution|workaround|measure|shim)\b/i,
+  /\bthis is temporary\b/i,
+  /\btemporarily\s+(?:disabled|commented|stubbed)\b/i,
+  // A hyphen immediately after "now" excludes compound adjectives such as
+  // "now-current" from this match.
+  /\bfor now\b(?!-)/i,
+  /\bfor the demo\b/i,
+  /\bplaceholder for\b/i,
+  /\bhacky\b/i,
+  /\bhack to\b/i,
+  /\bquick hack\b/i,
   /\bstill (?:adjusting|working on|need to)\b/i,
   /\bso we can test\b/i,
   /\bwill be (?:replaced|rewritten|removed)\b/i,

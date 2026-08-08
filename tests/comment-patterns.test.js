@@ -14,6 +14,11 @@ const MUST_FLAG = [
   'A later review found the broadened list misfired on ordinary prose',
   'moving on to shipped with zero corpus coverage and turned out to be an idiom',
   'it turned out to be a paragraph-transition idiom, not a commitment',
+  // Impermanence constructions: "temporary"/"hack" as an intended-to-leave
+  // state, not as ordinary vocabulary.
+  'Temporary hack until the API stabilises',
+  'this is temporary, remove after migration',
+  'hacky workaround for the date parser',
 ];
 
 // The spec's generic GOOD examples plus the two present-state comments a
@@ -41,6 +46,8 @@ const MUST_NOT_FLAG = [
 //   19-27  foreign, TypeScript (codegraph src)
 //   28-35  foreign, Python (claude-code hookify plugin)
 //   36-37  hand-written hard cases naming "test" and failure handling
+//   38-41  hand-written hard cases: "temporary"/"hack"/"for now" as
+//          ordinary vocabulary rather than an impermanence construction
 const NEGATIVE_CORPUS = [
   // hooks/lib/*.js, scripts/*.js — this repo
   'Advertised is not installed: a marketplace lists every plugin it offers',
@@ -88,6 +95,12 @@ const NEGATIVE_CORPUS = [
   // Hand-written hard cases: legitimate "test" usage and failure handling.
   'Returns a stub client for tests',
   'Returns null when parsing fails',
+  // Hand-written hard cases: "temporary"/"hack"/"for now" as ordinary
+  // vocabulary, not an impermanence construction.
+  'Temporary files are written under the sp/ root',
+  'Removes the temporary directory on exit',
+  'Parses the hack-day export format',
+  'Returns the cached value for now-current sessions',
 ];
 
 describe('classifyComment', () => {
