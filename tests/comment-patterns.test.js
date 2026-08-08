@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { classifyComment, extractComments } from '../hooks/lib/comment-patterns.js';
 
-// The spec's generic BAD examples plus the four real narration violations
-// this repo carried in hooks/stop-reminders.js and tests/stop-reminders.test.js.
+// Generic bad examples plus real narration violations found in
+// hooks/stop-reminders.js and tests/stop-reminders.test.js.
 const MUST_FLAG = [
   'Added retry logic to handle unstable network',
   'Refactored to support multi-tenant user IDs',
@@ -29,12 +29,11 @@ const MUST_FLAG = [
   'Fix later, tech debt',
 ];
 
-// Per-category derivation: 5+ MUST_FLAG and 3+ near-miss negatives for each
-// of the eleven taxonomy categories in the design spec. Categories 1, 4, 6,
-// 7, 9, and 10 draw some examples from MUST_FLAG/NEGATIVE_CORPUS above
-// where those already exercise the category; the remainder are new.
+// Grouped MUST_FLAG and near-miss examples, several per pattern group in
+// NARRATION/IMPERMANENCE. Some entries are reused from MUST_FLAG and
+// NEGATIVE_CORPUS above where those already exercise the group.
 
-// Category 1: passive change reports.
+// Passive change reports.
 const CAT1_MUST_FLAG = [
   'Coverage was broadened to include the Bash negative corpus.',
   'The retry wrapper was added after the SDK stopped retrying internally.',
@@ -49,7 +48,7 @@ const CAT1_NEAR_MISS = [
   'Adjusted gross income is read from field 7',
 ];
 
-// Category 2: review and discovery narration.
+// Review and discovery narration.
 const CAT2_MUST_FLAG = [
   'A later review found the broadened list misfired on ordinary prose.',
   'It turned out to be a paragraph-transition idiom, not a commitment.',
@@ -64,7 +63,7 @@ const CAT2_NEAR_MISS = [
   'Debugging output is written to stderr, not stdout.',
 ];
 
-// Category 3: temporal comparison.
+// Temporal comparison.
 const CAT3_MUST_FLAG = [
   'Previously, this returned null; it now throws.',
   'Originally, this used a linked list for the queue.',
@@ -82,7 +81,7 @@ const CAT3_NEAR_MISS = [
   'This value was used to compute the checksum.',
 ];
 
-// Category 4: change plus rationale.
+// Change plus rationale.
 const CAT4_MUST_FLAG = [
   'Added retry logic to handle unstable network',
   'Refactored to support multi-tenant user IDs',
@@ -97,16 +96,15 @@ const CAT4_NEAR_MISS = [
   'Improved-precision mode rounds to six decimals',
 ];
 
-// Category 5: active-voice development actions. Documented gap — see the
-// comment above NARRATION in comment-patterns.js. Covered only where a
-// rationale clause is present (category 4); a bare sentence-initial verb is
-// silent by design.
+// Active-voice development actions with no rationale clause: a bare
+// sentence-initial verb, which classifyComment does not match — see
+// NARRATION in comment-patterns.js.
 const CAT5_GAP_EXAMPLES = [
   'Fixed the null check.',
   'Added a new field.',
 ];
 
-// Category 6: present-participle development.
+// Present-participle development.
 const CAT6_MUST_FLAG = [
   'Adding a guard here because the API returns null',
   'Mocking the auth payload here so we can test the frontend locally.',
@@ -120,7 +118,7 @@ const CAT6_NEAR_MISS = [
   'Fixing the cursor position happens after every keystroke.',
 ];
 
-// Category 7: provisional state.
+// Provisional state.
 const CAT7_MUST_FLAG = [
   'WIP - still adjusting this function to handle negative integers.',
   'TODO: Rewrite this string matching later, it\'s a temporary hack for the demo.',
@@ -135,7 +133,7 @@ const CAT7_NEAR_MISS = [
   'Parses the hack-day export format',
 ];
 
-// Category 8: troubleshooting anecdote.
+// Troubleshooting anecdote.
 const CAT8_MUST_FLAG = [
   'The upstream keeps dropping mid-request under heavy load.',
   'The upstream kept crashing under load, so this adds a circuit breaker.',
@@ -149,7 +147,7 @@ const CAT8_NEAR_MISS = [
   'Retries when the upstream connection intermittently fails.',
 ];
 
-// Category 9: fallback rationale.
+// Fallback rationale.
 const CAT9_MUST_FLAG = [
   'Added a fallback because the primary DB keeps dropping connections during load tests.',
   'Workaround because the vendor SDK leaks handles',
@@ -163,7 +161,7 @@ const CAT9_NEAR_MISS = [
   'This workaround only applies to legacy clients.',
 ];
 
-// Category 10: deferment and debt.
+// Deferment and debt.
 const CAT10_MUST_FLAG = [
   'TODO: revisit after the migration',
   'Fix later, tech debt',
@@ -178,7 +176,7 @@ const CAT10_NEAR_MISS = [
   'Timestamps are stored as-is, without timezone conversion.',
 ];
 
-// Category 11: external references.
+// External references.
 const CAT11_MUST_FLAG = [
   'See ticket #4412 for the original report',
   'See issue #7 for the schema history.',
@@ -205,8 +203,8 @@ const CATEGORY_NEAR_MISS = [
   ...CAT10_NEAR_MISS, ...CAT11_NEAR_MISS,
 ];
 
-// The spec's generic GOOD examples plus the two present-state comments a
-// naive word list denies.
+// Generic good examples plus present-state comments a naive word list
+// would wrongly deny.
 const MUST_NOT_FLAG = [
   'Returns null if the payload is empty',
   'Executes network request with 3 exponential backoff retries',
@@ -218,41 +216,21 @@ const MUST_NOT_FLAG = [
   // Both describe present state; a bare "fixed" word match denies both.
   'Fixed entries have strikethrough: ## ~~...~~',
   'Fixed session key so the test client can authenticate',
-  // Category 5's documented gap: a bare sentence-initial verb with no
-  // rationale clause. classifyComment is silent on these by design — see
-  // the comment above NARRATION in comment-patterns.js.
+  // A bare sentence-initial verb with no rationale clause — not
+  // distinguishable from present state; see NARRATION in
+  // comment-patterns.js.
   ...CAT5_GAP_EXAMPLES,
 ];
 
 // Comments that must never be flagged, collected from real source rather
-// than written to fit the patterns. Sources and language, by index range:
-//   0-7    this repo, JavaScript (hooks/lib/*.js, scripts/*.js)
-//   8-9    this repo, JavaScript (hooks/skill-activator.js)
-//   10     this repo, JavaScript (tests/brainstorm-server/server.test.js)
-//   11-15  this repo, Bash (skills/brainstorming/scripts/start-server.sh)
-//   16-18  foreign, JavaScript (context-mode Cloudflare Worker router)
-//   19-27  foreign, TypeScript (codegraph src)
-//   28-35  foreign, Python (claude-code hookify plugin)
-//   36-37  hand-written hard cases naming "test" and failure handling
-//   38-41  hand-written hard cases: "temporary"/"hack"/"for now" as
-//          ordinary vocabulary rather than an impermanence construction
-//   42-47  hand-written hard cases: "mocking"/"revisit"/a bare number/
-//          sentence-initial past-tense verbs as ordinary vocabulary
-//   48-50  hand-written hard cases: category 2 near-misses ("review"/
-//          "discovery"/"debugging" as ordinary vocabulary)
-//   51-55  hand-written hard cases: category 3 near-misses ("previously"/
-//          "no longer"/"used to"/"originally" with an adjectival or
-//          purpose-clause reading)
-//   56-57  hand-written hard cases: category 6 near-misses ("adding"/
-//          "fixing" as ordinary present-tense description, no rationale)
-//   58-60  hand-written hard cases: category 8 near-misses ("flaky"/
-//          "keeps"/"intermittently" as a present-tense trigger condition)
-//   61-63  hand-written hard cases: category 9 near-misses ("guard"/
-//          "fallback"/"workaround" without a rationale clause)
-//   64-65  hand-written hard cases: category 10 near-misses ("as-is" without
-//          a deferment construction)
-//   66-69  hand-written hard cases: category 11 near-misses (technical
-//          identifiers shaped like a JIRA-style project key)
+// than written to fit the patterns: this repo's hooks/lib, scripts,
+// hooks/skill-activator.js, tests/brainstorm-server, and
+// skills/brainstorming/scripts/start-server.sh (JavaScript and Bash); the
+// context-mode Cloudflare Worker router and codegraph src (foreign
+// JavaScript/TypeScript); the claude-code hookify plugin (foreign Python);
+// and hand-written hard cases where a NARRATION or IMPERMANENCE keyword
+// appears as ordinary vocabulary rather than in the construction that
+// matches it.
 const NEGATIVE_CORPUS = [
   // hooks/lib/*.js, scripts/*.js — this repo
   'Advertised is not installed: a marketplace lists every plugin it offers',
@@ -300,8 +278,8 @@ const NEGATIVE_CORPUS = [
   // Hand-written hard cases: legitimate "test" usage and failure handling.
   'Returns a stub client for tests',
   'Returns null when parsing fails',
-  // Hand-written hard cases: "temporary"/"hack"/"for now" as ordinary
-  // vocabulary, not an impermanence construction.
+  // Hand-written hard cases: "temporary", "hack", and a temporal hedge word
+  // as ordinary vocabulary, not an impermanence construction.
   'Temporary files are written under the sp/ root',
   'Removes the temporary directory on exit',
   'Parses the hack-day export format',
@@ -314,31 +292,31 @@ const NEGATIVE_CORPUS = [
   'Updated timestamp is returned in ISO format',
   'Improved-precision mode rounds to six decimals',
   'Adjusted gross income is read from field 7',
-  // Hand-written hard cases: category 2 near-misses.
+  // Hand-written hard cases: review/discovery near-misses.
   'Reviews the request body against the JSON schema before dispatch.',
   'The discovery service resolves peers on the local subnet.',
   'Debugging output is written to stderr, not stdout.',
-  // Hand-written hard cases: category 3 near-misses.
+  // Hand-written hard cases: temporal-comparison near-misses.
   'Returns the previously cached value if present, otherwise fetches fresh.',
   'Emits an error once the session is no longer valid.',
   'This helper is used to normalize whitespace before comparison.',
   'The field holds the value originally submitted by the client.',
   'This value was used to compute the checksum.',
-  // Hand-written hard cases: category 6 near-misses.
+  // Hand-written hard cases: present-participle near-misses.
   'Adding two positive integers overflows past Number.MAX_SAFE_INTEGER.',
   'Fixing the cursor position happens after every keystroke.',
-  // Hand-written hard cases: category 8 near-misses.
+  // Hand-written hard cases: troubleshooting-anecdote near-misses.
   'Skips rows when the sensor reading is flaky.',
   'Circuit breaker opens after five consecutive failures.',
   'Retries when the upstream connection intermittently fails.',
-  // Hand-written hard cases: category 9 near-misses.
+  // Hand-written hard cases: fallback-rationale near-misses.
   'Guard clauses reject payloads over 1MB.',
   'Returns the fallback locale when the header is absent.',
   'This workaround only applies to legacy clients.',
-  // Hand-written hard cases: category 10 near-misses.
+  // Hand-written hard cases: deferment near-misses.
   'Values are left as-is when the locale is unset.',
   'Timestamps are stored as-is, without timezone conversion.',
-  // Hand-written hard cases: category 11 near-misses.
+  // Hand-written hard cases: external-reference near-misses.
   'Encodes the payload as UTF-8 before hashing.',
   'Uses SHA-256 for the integrity checksum.',
   'Parses timestamps per RFC-3339.',
