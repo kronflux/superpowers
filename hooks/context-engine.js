@@ -21,7 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { ensureGitignored } from './lib/gitignore.js';
 import { configDir } from './lib/config-dir.js';
-import { sweep } from './lib/tmp-reaper.js';
+import { sweep, sweepWorkspaces } from './lib/tmp-reaper.js';
 
 const MAX_FILES = 10;    // cap blast radius queries to avoid slowness on large diffs
 const MIN_NAME_LEN = 3;  // skip very short filenames to avoid false-positive grep hits
@@ -74,6 +74,14 @@ async function main() {
   if (!gitDir) {
     process.stdout.write('{}');
     return;
+  }
+
+  // Reap stale per-plan SDD workspaces under .superpowers/sdd/. Same fail-open
+  // contract as sweep() above; a workspace whose plan is still in flight is
+  // never touched regardless of age.
+  const repoRoot = run('git rev-parse --show-toplevel', cwd);
+  if (repoRoot) {
+    try { sweepWorkspaces(repoRoot); } catch {}
   }
 
   const gitHash = run('git rev-parse HEAD', cwd);

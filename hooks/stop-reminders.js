@@ -227,6 +227,160 @@ function formatStatsSummary(stats) {
   return `Session summary: ${duration}min, ${stats.totalSkillCalls} skill invocations [${skillNames}], hook-injected context this session: ${injectedKB}KB`;
 }
 
+// Forward-commitment guard (Task 4): catches a turn whose final message
+// promises action ("I'll now", "proceeding to", "writing X now", "let me
+// start") but that recorded no file-changing tool use. Kept short and
+// literal on purpose — a broad regex fires on ordinary prose, and a
+// reminder that fires constantly gets ignored. Errs toward silence: a false
+// nudge on a turn legitimately blocked on the operator ("I'll do X once you
+// answer") is worse than a missed one.
+//
+// Coverage was broadened (corpus-tested against real .superpowers/sdd
+// report prose — see tests/stop-reminders.test.js) with two patterns
+// deliberately NOT adopted, on purpose, so a future pass does not
+// "complete" the list by adding them back:
+//   - /\bhere (?:is|are|we go)(?: with)? the (?:code|script|implementation|
+//     updated|requested)\b/i — this *presents* work rather than promising
+//     it. "Here is the code" usually precedes delivered content; firing on
+//     it would block a turn that already delivered exactly what was asked.
+//   - /\bi can (?:certainly|definitely) (?:help|do|write|generate)\b/i —
+//     sycophancy, not a did-you-do-the-work signal. Belongs to the
+//     banned-vocabulary purity gate, not this guard.
+//
+// A later review found the broadened list, validated only against terse
+// past-tense report prose, misfired on ordinary conversational prose —
+// a genre the report corpus structurally cannot exercise. Fixed against a
+// second, negative corpus of realistic assistant turns that legitimately
+// end with no tool use (see the "report corpus stays silent" and
+// "innocent conversational prose stays silent" describe blocks):
+//   - /\bmoving on to\b/i shipped with zero corpus coverage and turned out
+//     to be a paragraph-transition idiom ("Moving on to the tradeoffs, the
+//     second approach..."), not a commitment marker. Dropped outright.
+//   - The bare "proceeding to/on/with" forms fired on topic transitions
+//     ("Proceeding to the next section, the article covers..."). Merged
+//     into a single pattern requiring "now" in the same clause, matching
+//     the writing/generating tightening below.
+//   - "let me start/now/begin", "let's dive in/start/begin", and "allow me
+//     to start/begin" fired on ordinary explanatory openers ("Let me start
+//     by explaining...", "Let's dive in: the reason this fails...",
+//     "Allow me to start with the constraints..."). Narrowed each list to
+//     verbs naming a concrete deliverable (write/generate/implement/
+//     create/handle/go ahead), which did not misfire on the negative
+//     corpus.
+const FORWARD_COMMITMENT_PATTERNS = [
+  /\bi'll now\b/i,
+  /\bi will now\b/i,
+  /\bstarting now\b/i,
+  // "writing ... now" within a short, same-clause span (no sentence break).
+  /\bwriting\b[^.\n]{0,40}\bnow\b/i,
+  /\bi(?:'ll| will) (?:now|go ahead|start|begin|generate|write|create|implement|update|proceed)\b/i,
+  /\blet me (?:go ahead|write|generate|implement|create|handle)\b/i,
+  /\b(?:i'm|i am) going to (?:start|begin|generate|write|create|implement|update|proceed)\b/i,
+  /\blet's (?:get started|implement|write|create)\b/i,
+  // Requires "now" in the same clause as "proceeding", mirroring the
+  // writing/generating tightening below, instead of matching bare
+  // "proceeding to/on/with" (fires on ordinary topic transitions).
+  /\bproceeding\b[^.\n]{0,40}\bnow\b/i,
+  /\b(?:starting|beginning) now\b/i,
+  /\ballow me to (?:write|generate|implement|create)\b/i,
+  // Tightened from the candidate form (verb ... now/for you anywhere in the
+  // message): that form matched past-tense reporting like "still working on
+  // the reaper now covered by tests". Require the verb to open the message
+  // or a sentence, or follow a first-person "I'm"/"I am", so it only catches
+  // an announcement, not a status update embedded mid-sentence.
+  /(?:^|(?<=[.!?\n]\s)|(?<=\bi(?:'m|m| am) ))(?:writing|generating|creating|implementing|updating|working on)\b[^.\n]{0,40}\b(?:now|for you)\b/i,
+];
+
+const FILE_CHANGING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash']);
+
+const UNFULFILLED_COMMITMENT_REMINDER =
+  'You announced work in this turn and the turn ended without doing it. ' +
+  'If you are blocked on the operator, say what you need. Otherwise, do it now.';
+
+/**
+ * Pure check: does finalMessage contain a forward commitment with no
+ * file-changing tool use recorded in toolUses? Returns the reminder string,
+ * or '' when there is nothing to flag. Never throws — any internal fault
+ * (bad shape, etc.) resolves to '' so the hook fails open.
+ */
+function checkForwardCommitment({ finalMessage, toolUses } = {}) {
+  try {
+    if (typeof finalMessage !== 'string' || !finalMessage) return '';
+    if (!FORWARD_COMMITMENT_PATTERNS.some((re) => re.test(finalMessage))) return '';
+    const uses = Array.isArray(toolUses) ? toolUses : [];
+    const changedFiles = uses.some((t) => t && FILE_CHANGING_TOOLS.has(t.name));
+    if (changedFiles) return '';
+    return UNFULFILLED_COMMITMENT_REMINDER;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Return true if a transcript entry is a real, human-authored user turn
+ * (as opposed to a tool_result, which the API also represents as a "user"
+ * role message). Used to find where the current turn began.
+ */
+function isRealUserMessage(entry) {
+  const content = entry?.message?.content;
+  if (typeof content === 'string') return true;
+  if (!Array.isArray(content)) return false;
+  return content.some((b) => b && b.type !== 'tool_result');
+}
+
+/**
+ * Scan the transcript backward from the end to collect the current turn's
+ * final assistant text and every tool_use recorded since the last real user
+ * message. Returns { finalMessage, toolUses } or null on any read/parse
+ * fault (missing file, malformed JSON, unexpected shape) — callers treat
+ * null the same as "nothing to flag".
+ */
+function getLastTurnData(transcriptPath) {
+  try {
+    const lines = fs.readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean);
+    let finalMessage = '';
+    let foundFinalText = false;
+    const toolUses = [];
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      let entry;
+      try {
+        entry = JSON.parse(lines[i]);
+      } catch {
+        continue; // one malformed line poisons only itself
+      }
+      if (!entry || typeof entry !== 'object') continue;
+
+      if (entry.type === 'user' && isRealUserMessage(entry)) break;
+      if (entry.type !== 'assistant') continue;
+
+      const content = entry.message?.content;
+      if (!Array.isArray(content)) continue;
+
+      for (const block of content) {
+        if (!block || typeof block !== 'object') continue;
+        if (block.type === 'tool_use' && typeof block.name === 'string') {
+          toolUses.push({ name: block.name });
+        }
+      }
+
+      if (!foundFinalText) {
+        const textParts = content
+          .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+          .map((b) => b.text);
+        if (textParts.length > 0) {
+          finalMessage = textParts.join('\n');
+          foundFinalText = true;
+        }
+      }
+    }
+
+    return { finalMessage, toolUses };
+  } catch {
+    return null;
+  }
+}
+
 function getUncommittedCount(cwd) {
   try {
     const result = spawnSync('git', ['status', '--porcelain'], {
@@ -393,6 +547,17 @@ function evaluatePayload(data) {
 
   const reminders = generateReminders(edits, cwd);
 
+  // Forward-commitment guard: the turn's final text promises action but no
+  // file-changing tool ran this turn. See checkForwardCommitment above.
+  const transcriptPath = data.transcript_path;
+  if (typeof transcriptPath === 'string' && transcriptPath) {
+    const turn = getLastTurnData(transcriptPath);
+    if (turn) {
+      const commitmentReminder = checkForwardCommitment(turn);
+      if (commitmentReminder) reminders.push(commitmentReminder);
+    }
+  }
+
   // Decision-log reminder: only when the memory workflow is actually in use
   // (session-log.md exists in cwd). Without it there is nowhere to save, so the
   // nudge would be noise every turn — the "start using memory" offer belongs to
@@ -458,14 +623,17 @@ if (isMain) {
 }
 
 export {
+  checkForwardCommitment,
   checkSessionLogSize,
   checkStateMdStaleness,
   evaluatePayload,
   generateReminders,
   getEditsAfter,
   getLastSavedEntryTime,
+  getLastTurnData,
   getRecentEdits,
   guardFile,
+  isRealUserMessage,
   isSourceFile,
   isTestFile,
   matchesSession,

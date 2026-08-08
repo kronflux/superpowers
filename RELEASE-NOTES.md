@@ -1,5 +1,41 @@
 # Superpowers Release Notes
 
+## 7.13.0 — SDD workspace defects and an anti-announcement guard
+
+- **The progress ledger is now plan-scoped.** `subagent-driven-development`'s resume
+  instruction read a literal `.superpowers/sdd/progress.md` — a file describing whichever plan
+  wrote it last. Briefs and review packages became plan-scoped months ago; the ledger was
+  missed, and six releases papered over the collision by inventing filename prefixes
+  (`v750-`, `v760-`, …) rather than fixing it. The documented command now resolves through
+  `sdd-workspace PLAN_FILE`.
+- **Stale plan workspaces are reaped by age.** 257 files had accumulated under
+  `.superpowers/sdd/`, 102 of them older than a week; nothing had ever removed one.
+  `hooks/lib/tmp-reaper.js` now sweeps `.superpowers/sdd/<plan>/` on the same 7-day window and
+  the same `SUPERPOWERS_TMP_RETENTION_DAYS` override as the tmpdir sweep, with one exception:
+  **a workspace whose plan still has a `pending` or `in_progress` task is never reaped**,
+  regardless of age. A plan that goes quiet for a fortnight keeps its ledger.
+  This is a deliberate deviation from the `2026-07-06-sdd-plan-scoped-workspace` design, which
+  specified deleting the workspace at finish. Deletion at finish destroys reports and review
+  packages at the moment they are most wanted — three reporting defects during this release
+  were caught only by re-reading reports after their tasks had closed.
+- **An unreadable task snapshot no longer means "safe to delete".** `isPlanInFlight` treated a
+  torn or malformed `.tasks.json` the same as an absent one. A crash mid-write, a quiet plan,
+  and a stale mtime together meant a live workspace was deleted. Absent now means reapable;
+  present-but-unreadable means assume live.
+- **`TaskUpdate` writes to the plan that owns the task.** `hooks/sync-plan-tasks.js` selected
+  the alphabetically-last snapshot rather than the plan being worked. With thirteen snapshots
+  present, every update went to one file. It had been correct only by accident, because
+  date-prefixed filenames make alphabetical order match chronological order. Selection is now
+  by task id; an id in no snapshot is a no-op, and an id in two writes to neither.
+- **A Stop hook now catches a turn that promises work and does none.** Announcing "I'll now
+  write X" and ending the turn without writing it is the same defect as a report narrating a
+  run that never happened. The rule existed in prose and was violated twice in three messages
+  while the problem was under discussion, so it is a mechanism now. Patterns are deliberately
+  narrow: an early draft blocked 8 of 16 ordinary conversational messages, and a guard that
+  fires on normal prose gets ignored, at which point it catches nothing.
+
+Suite: 45 files / 579 passed, up from 43 / 524.
+
 ## 7.12.0 — upstream v6.2.0 sync
 
 Resynced the kronflux fork onto the upstream obra/superpowers v6.2.0 base (`44c9b2d`).

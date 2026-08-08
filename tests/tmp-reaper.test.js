@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { sweep, LEGACY_PREFIXES } from '../hooks/lib/tmp-reaper.js';
+import { sweep, LEGACY_PREFIXES, sweepWorkspaces, isPlanInFlight } from '../hooks/lib/tmp-reaper.js';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const DAY = 86400000;
 let fake; // a fake temp root so tests never touch the real one
@@ -137,5 +138,136 @@ describe('tmp-reaper sweep', () => {
     let r;
     expect(() => { r = sweep({ tmpRoot: path.join(fake, 'nope'), now: NOW, env: {}, force: true }); }).not.toThrow();
     expect(r.removed).toBe(0);
+  });
+});
+
+describe('tmp-reaper sweepWorkspaces', () => {
+  const NOW2 = 1_800_000_000_000;
+  const DAY2 = 86400000;
+  const created = []; // fixture roots to remove after each test
+
+  afterEach(() => {
+    while (created.length) {
+      const p = created.pop();
+      fs.rmSync(p, { recursive: true, force: true });
+    }
+  });
+
+  function daysAgo(n) { return NOW2 - n * DAY2; }
+
+  // A fresh fake repo root with the .superpowers/{sdd,plans} dirs a real repo
+  // would have. Lives under spTmpDir(), never the bare os.tmpdir() root.
+  function mkRepo() {
+    const root = fs.mkdtempSync(path.join(spTmpDir(), 'reaper-repo-'));
+    fs.mkdirSync(path.join(root, '.superpowers', 'sdd'), { recursive: true });
+    fs.mkdirSync(path.join(root, '.superpowers', 'plans'), { recursive: true });
+    created.push(root);
+    return root;
+  }
+
+  function mkWorkspace(root, slug, mtime) {
+    const dir = path.join(root, '.superpowers', 'sdd', slug);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'progress.md'), 'x');
+    const t = new Date(mtime);
+    fs.utimesSync(dir, t, t);
+    return dir;
+  }
+
+  function mkPlanTasks(root, slug, task) {
+    const file = path.join(root, '.superpowers', 'plans', `${slug}.md.tasks.json`);
+    fs.writeFileSync(file, JSON.stringify({ tasks: [task] }));
+  }
+
+  // Writes whatever raw string is handed in, unparsed — for torn/truncated
+  // files and for valid-JSON-but-wrong-shape payloads alike.
+  function mkPlanTasksRaw(root, slug, raw) {
+    const file = path.join(root, '.superpowers', 'plans', `${slug}.md.tasks.json`);
+    fs.writeFileSync(file, raw);
+  }
+
+  function mkVictimDir() {
+    const dir = fs.mkdtempSync(path.join(spTmpDir(), 'reaper-victim-'));
+    fs.writeFileSync(path.join(dir, 'precious.txt'), 'precious');
+    created.push(dir);
+    return dir;
+  }
+
+  it('reaps a stale plan workspace', () => {
+    const root = mkRepo();
+    const old = mkWorkspace(root, 'old-plan', daysAgo(30));
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(old)).toBe(false);
+  });
+
+  it('keeps a fresh plan workspace', () => {
+    const root = mkRepo();
+    const fresh = mkWorkspace(root, 'fresh-plan', NOW2);
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(fresh)).toBe(true);
+  });
+
+  it('NEVER reaps a workspace whose plan is in flight', () => {
+    // A long-running plan that goes quiet for eight days would otherwise have
+    // its ledger deleted mid-execution. Liveness beats age.
+    const root = mkRepo();
+    const live = mkWorkspace(root, 'live-plan', daysAgo(30));
+    mkPlanTasks(root, 'live-plan', { status: 'in_progress' });
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(live)).toBe(true);
+  });
+
+  it('treats a torn/truncated snapshot as in-flight and survives, not deletes', () => {
+    // A crash or full disk mid-write (sync-plan-tasks.js's writeFileSync is not
+    // atomic) leaves exactly this shape: present, old, unreadable as JSON. We
+    // cannot tell whether the plan is live, so refusing to reap is the safe
+    // failure direction — the cost is a stale directory, not a lost ledger.
+    const root = mkRepo();
+    const torn = mkWorkspace(root, 'torn-plan', daysAgo(90));
+    mkPlanTasksRaw(root, 'torn-plan', '{"tasks": [{"status": "in_progress"'); // truncated
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(torn)).toBe(true);
+  });
+
+  it.each([
+    ['[]', '[]'],
+    ['null', 'null'],
+    ['a bare string', '"str"'],
+    ['a bare number', '42'],
+    ['an object with no tasks array', '{}'],
+  ])('treats valid JSON that is not a ledger shape (%s) as in-flight and survives', (_label, raw) => {
+    const root = mkRepo();
+    const slug = `bad-shape-${Math.random().toString(36).slice(2)}`;
+    const dir = mkWorkspace(root, slug, daysAgo(90));
+    mkPlanTasksRaw(root, slug, raw);
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(dir)).toBe(true);
+  });
+
+  it('still reaps when the snapshot file is genuinely absent (ENOENT) — guards against over-correction', () => {
+    // Absence must remain reapable: nothing claims the plan is live. If this
+    // regresses to "survive", the reaper never reaps anything again.
+    const root = mkRepo();
+    const old = mkWorkspace(root, 'no-snapshot-plan', daysAgo(90));
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(old)).toBe(false);
+  });
+
+  it('honours retention 0 as disabled', () => {
+    const root = mkRepo();
+    const old = mkWorkspace(root, 'old-plan', daysAgo(90));
+    sweepWorkspaces(root, { now: NOW2, env: { SUPERPOWERS_TMP_RETENTION_DAYS: '0' } });
+    expect(fs.existsSync(old)).toBe(true);
+  });
+
+  it('refuses a symlinked sdd root instead of following it', () => {
+    // The same hazard the tmpdir reaper already guards: readdirSync follows a
+    // symlinked root, so an attacker-placed link would aim deletion elsewhere.
+    const root = mkRepo();
+    const victim = mkVictimDir();
+    fs.rmSync(path.join(root, '.superpowers', 'sdd'), { recursive: true, force: true });
+    fs.symlinkSync(victim, path.join(root, '.superpowers', 'sdd'), 'junction');
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(path.join(victim, 'precious.txt'))).toBe(true);
   });
 });

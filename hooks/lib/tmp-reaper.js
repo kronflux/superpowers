@@ -146,4 +146,78 @@ function sweep(opts = {}) {
   return result;
 }
 
-export { sweep, retentionMs, LEGACY_PREFIXES, MARKER, DEFAULT_RETENTION_DAYS };
+/**
+ * Reap stale per-plan SDD workspaces under <repoRoot>/.superpowers/sdd/.
+ *
+ * Age alone is not sufficient: a long-running plan can go quiet for longer
+ * than the retention window, and deleting its ledger mid-execution would cost
+ * exactly the record a resume depends on. Liveness is checked first and wins.
+ *
+ * @param {string} repoRoot
+ * @param {object} [opts]
+ * @param {object} [opts.env]  environment (for SUPERPOWERS_TMP_RETENTION_DAYS)
+ * @param {number} [opts.now]  clock injection for tests
+ */
+function sweepWorkspaces(repoRoot, opts = {}) {
+  try {
+    const ms = retentionMs(opts.env ?? process.env);
+    if (ms === 0) return;                       // 0 disables, same contract as the tmpdir sweep
+    const base = path.join(repoRoot, '.superpowers', 'sdd');
+    // Never enumerate through a symlinked root — readdirSync follows it and the
+    // deletion would land wherever it points.
+    try {
+      if (fs.lstatSync(base).isSymbolicLink()) return;
+    } catch { return; }
+    const now = opts.now ?? Date.now();
+    let entries;
+    try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = path.join(base, e.name);
+      if (isPlanInFlight(repoRoot, e.name)) continue;
+      try {
+        if (now - fs.statSync(full).mtimeMs <= ms) continue;
+        fs.rmSync(full, { recursive: true, force: true });
+      } catch { /* best-effort; a failed reap must never break SessionStart */ }
+    }
+  } catch {
+    // Fail open. A cleanup routine must never be the reason a session fails to start.
+  }
+}
+
+/**
+ * A plan is in flight while its task snapshot still holds unfinished work.
+ *
+ * Absent (`ENOENT`) is the only case that means "not in flight" — nothing
+ * claims the plan is live. Anything else present-but-bad — unreadable,
+ * unparseable, or valid JSON that isn't a ledger shape — is treated as IN
+ * FLIGHT instead. sync-plan-tasks.js writes this file with a single
+ * non-atomic writeFileSync, so a crash or full disk mid-write leaves exactly
+ * a present-but-torn file. Reaping that guesses wrong deletes a live plan's
+ * only progress record; refusing to reap only costs a stale directory until
+ * someone looks. Mirrors scripts/reference-ledger.mjs's load().
+ */
+function isPlanInFlight(repoRoot, slug) {
+  const snapshot = path.join(repoRoot, '.superpowers', 'plans', `${slug}.md.tasks.json`);
+  let raw;
+  try {
+    raw = fs.readFileSync(snapshot, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;  // no snapshot: nothing claims it is live
+    return true;                              // unreadable: cannot tell, assume live
+  }
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return true;                              // torn/truncated JSON: cannot tell, assume live
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data.tasks)) {
+    return true;                              // not a ledger shape: cannot tell, assume live
+  }
+  return data.tasks.some((t) => t && (t.status === 'pending' || t.status === 'in_progress'));
+}
+
+export {
+  sweep, retentionMs, LEGACY_PREFIXES, MARKER, DEFAULT_RETENTION_DAYS,
+  sweepWorkspaces, isPlanInFlight,
+};

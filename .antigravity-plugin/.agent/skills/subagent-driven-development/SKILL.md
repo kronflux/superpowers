@@ -60,7 +60,7 @@ digraph process {
         "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
         "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [shape=box];
         "Task reviewer reports spec ✅ and quality approved?" [shape=diamond];
-        "Dispatch fix subagent for Critical/Important findings" [shape=box];
+        "Resume implementer with findings" [shape=box];
         "Mark task complete in todo list and progress ledger" [shape=box];
     }
 
@@ -76,8 +76,8 @@ digraph process {
     "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
     "Implementer subagent implements, tests, commits, self-reviews" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)";
     "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" -> "Task reviewer reports spec ✅ and quality approved?";
-    "Task reviewer reports spec ✅ and quality approved?" -> "Dispatch fix subagent for Critical/Important findings" [label="no"];
-    "Dispatch fix subagent for Critical/Important findings" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [label="re-review"];
+    "Task reviewer reports spec ✅ and quality approved?" -> "Resume implementer with findings" [label="no"];
+    "Resume implementer with findings" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [label="re-review"];
     "Task reviewer reports spec ✅ and quality approved?" -> "Mark task complete in todo list and progress ledger" [label="yes"];
     "Mark task complete in todo list and progress ledger" -> "More tasks remain?";
     "More tasks remain?" -> "Dispatch implementer subagent (./implementer-prompt.md)" [label="yes"];
