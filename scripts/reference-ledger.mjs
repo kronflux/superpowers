@@ -135,7 +135,7 @@ function gap(dir, name, entry) {
   try {
     if (c.ref) {
       const n = git(repo, ['rev-list', '--count', `${c.ref}..HEAD`]);
-      return { label: `${c.ref} (${c.date})`, count: Number(n) };
+      return { label: `${c.ref} (${c.date || 'no date'})`, count: Number(n) };
     }
     const n = git(repo, ['rev-list', '--count', `--since=${c.date}`, 'HEAD']);
     return { label: `${c.date} (date)`, count: Number(n) };
@@ -167,21 +167,24 @@ function main(argv) {
     process.exit(1);
   }
   const [cmd = 'scan'] = argv;
-  if (cmd === 'scan') {
-    let ledger;
-    try {
-      ledger = scan(dir);
-    } catch (err) {
-      process.stderr.write(`${err.message}\n`);
-      process.exit(1);
+  // One try/catch around every known command, not one per command: a thrown
+  // load() must never surface as a raw stack trace, and a wrapper here holds
+  // that for every subcommand this file gains later without relying on each
+  // one to remember its own catch block.
+  try {
+    if (cmd === 'scan') {
+      const ledger = scan(dir);
+      const n = Object.values(ledger.repos).filter((e) => e.status === 'active').length;
+      process.stdout.write(`scanned ${n} reference repositories\n`);
+      return;
     }
-    const n = Object.values(ledger.repos).filter((e) => e.status === 'active').length;
-    process.stdout.write(`scanned ${n} reference repositories\n`);
-    return;
-  }
-  if (cmd === 'report') {
-    process.stdout.write(report(dir));
-    return;
+    if (cmd === 'report') {
+      process.stdout.write(report(dir));
+      return;
+    }
+  } catch (err) {
+    process.stderr.write(`${err.message}\n`);
+    process.exit(1);
   }
   process.stderr.write(`reference-ledger: unknown command '${cmd}'\n`);
   process.exit(2);

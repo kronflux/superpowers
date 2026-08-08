@@ -10,26 +10,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'reference-ledger.mjs');
 
 /**
- * A real git repo with one commit, in 2 spawns instead of 5: `--allow-empty`
- * plus inline `-c` config skips separate `git config` calls, and no working-
- * tree content is needed here - only a commit that produces a sha and a date.
- * Subprocess spawns on this machine cost roughly 1s each (antivirus
- * scanning), so this file's runtime is dominated by spawn count, not by
- * anything vitest or Node itself does.
- *
- * A number for `msgOrCount` makes a linear history of that many commits, for
- * tests that need a real gap to count; a string (the default) still makes
- * exactly one, as every pre-existing caller expects.
+ * A real git repo with `count` commits, in `count + 1` spawns instead of
+ * `count * 3`: `--allow-empty` plus inline `-c` config skips separate `git
+ * config` calls, and no working-tree content is needed here - only commits
+ * that produce a sha and a date. Subprocess spawns on this machine cost
+ * roughly 1s each (antivirus scanning), so this file's runtime is dominated
+ * by spawn count, not by anything vitest or Node itself does.
  */
-function mkRepo(dir, name, msgOrCount = 'c0') {
+function mkRepo(dir, name, count = 1) {
   const repo = path.join(dir, name);
   fs.mkdirSync(repo, { recursive: true });
   execFileSync('git', ['-C', repo, 'init', '-q'], { stdio: 'pipe' });
-  if (typeof msgOrCount === 'number') {
-    for (let i = 0; i < msgOrCount; i++) addCommit(repo, `c${i}`);
-  } else {
-    addCommit(repo, msgOrCount);
-  }
+  for (let i = 0; i < count; i++) addCommit(repo, `c${i}`);
   return repo;
 }
 
@@ -318,6 +310,17 @@ describe('report', () => {
     fs.writeFileSync(path.join(root, '.sync-ledger.json'), JSON.stringify(l, null, 2) + '\n');
     expect(run(root, ['report'])).not.toMatch(/beta/);
   });
+
+  it('falls back to a readable label instead of "undefined" for a ref with no date', () => {
+    const repo = mkRepo(root, 'alpha', 2);
+    const first = execFileSync('git', ['-C', repo, 'rev-list', '--max-parents=0', 'HEAD'],
+      { encoding: 'utf8' }).trim();
+    run(root, ['scan']);
+    setConsumed(root, 'alpha', { ref: first, workstream: 'upstream-sync' });
+    const out = run(root, ['report']);
+    expect(out).not.toMatch(/undefined/);
+    expect(out).toMatch(new RegExp(`${first} \\(no date\\)`));
+  });
 });
 
 describe('CLI contract', () => {
@@ -332,6 +335,17 @@ describe('CLI contract', () => {
     const result = runCli(root, ['scan']);
     expect(result.status).not.toBe(0);
     expect(result.stderr.trim().split('\n')).toHaveLength(1);
+    expect(fs.readFileSync(p, 'utf8')).toBe(truncated);
+  });
+
+  it('a thrown load through report becomes a non-zero exit, a one-line stderr message, and no stack trace', () => {
+    const p = ledgerPath(root);
+    const truncated = '{"schema":1,"updated';
+    fs.writeFileSync(p, truncated);
+    const result = runCli(root, ['report']);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr.trim().split('\n')).toHaveLength(1);
+    expect(result.stderr).not.toMatch(/^\s*at /m);
     expect(fs.readFileSync(p, 'utf8')).toBe(truncated);
   });
 
