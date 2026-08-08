@@ -105,4 +105,65 @@ describe('scan', () => {
     expect(() => run(missing, ['scan'])).toThrow();
     expect(fs.existsSync(path.join(missing, '.sync-ledger.json'))).toBe(false);
   });
+
+  it('updates head on a subsequent scan while preserving a pre-existing consumed block', () => {
+    // Fails if the `{ ...prev, status, head, headDate }` spread order in scan()
+    // is ever reversed: stale prev.head would win and freeze head forever,
+    // while a "consumed never appears" style test would stay green regardless.
+    const repo = mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    const firstHead = ledger(root).repos.alpha.head;
+
+    const l = ledger(root);
+    l.repos.alpha.consumed = { ref: 'deadbee', date: '2026-01-01', workstream: 'upstream-sync' };
+    fs.writeFileSync(path.join(root, '.sync-ledger.json'), JSON.stringify(l, null, 2) + '\n');
+
+    const g = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', stdio: 'pipe' });
+    fs.writeFileSync(path.join(repo, 'f1.txt'), '1');
+    g('add', 'f1.txt');
+    g('commit', '-q', '-m', 'c1');
+
+    run(root, ['scan']);
+    const after = ledger(root).repos.alpha;
+    expect(after.head).not.toBe(firstHead);
+    expect(after.consumed)
+      .toEqual({ ref: 'deadbee', date: '2026-01-01', workstream: 'upstream-sync' });
+  });
+});
+
+describe('load — corrupt or invalid ledger file', () => {
+  it('scan exits non-zero and leaves a truncated ledger file byte-identical', () => {
+    mkRepo(root, 'alpha');
+    const p = path.join(root, '.sync-ledger.json');
+    const truncated = '{"schema":1,"updated';
+    fs.writeFileSync(p, truncated);
+    expect(() => run(root, ['scan'])).toThrow();
+    expect(fs.readFileSync(p, 'utf8')).toBe(truncated);
+  });
+
+  // Valid JSON that isn't a ledger shape is no more safely overwritable than
+  // truncated JSON - both must refuse rather than fall back to a fresh ledger.
+  const notALedger = {
+    'an array': '[]',
+    'null': 'null',
+    'a string': '"str"',
+    'a number': '42',
+    'a boolean': 'true',
+    'an object with no repos key': '{}',
+  };
+  for (const [label, content] of Object.entries(notALedger)) {
+    it(`scan exits non-zero and leaves ${label} untouched`, () => {
+      mkRepo(root, 'alpha');
+      const p = path.join(root, '.sync-ledger.json');
+      fs.writeFileSync(p, content);
+      expect(() => run(root, ['scan'])).toThrow();
+      expect(fs.readFileSync(p, 'utf8')).toBe(content);
+    });
+  }
+
+  it('an absent ledger still creates a fresh one and exits 0', () => {
+    mkRepo(root, 'alpha');
+    expect(() => run(root, ['scan'])).not.toThrow();
+    expect(fs.existsSync(path.join(root, '.sync-ledger.json'))).toBe(true);
+  });
 });

@@ -51,12 +51,36 @@ function discover(dir) {
     .sort();
 }
 
+/**
+ * Absent (`ENOENT`) is the only case that returns a fresh ledger. Anything
+ * else present-but-bad — unreadable, unparseable, or valid JSON that isn't a
+ * ledger shape — throws instead of being treated the same as absent. `scan`
+ * would otherwise happily `save()` an empty ledger over a truncated or
+ * malformed file, erasing every `consumed` block it recorded with exit code 0
+ * and a success message. A file that exists is either trustworthy or an
+ * error; it is never quietly replaced.
+ */
 function load(dir) {
+  const file = ledgerPath(dir);
+  let raw;
   try {
-    const parsed = JSON.parse(fs.readFileSync(ledgerPath(dir), 'utf8'));
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.repos) return parsed;
-  } catch { /* absent or unreadable: start fresh below */ }
-  return { schema: SCHEMA, updatedAt: null, repos: {} };
+    raw = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return { schema: SCHEMA, updatedAt: null, repos: {} };
+    throw new Error(`reference-ledger: cannot read ledger at ${file}: ${err.message}`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`reference-ledger: ledger at ${file} is not valid JSON: ${err.message}`);
+  }
+  const validShape = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    && parsed.repos && typeof parsed.repos === 'object' && !Array.isArray(parsed.repos);
+  if (!validShape) {
+    throw new Error(`reference-ledger: ledger at ${file} is not a valid ledger (expected an object with a 'repos' object)`);
+  }
+  return parsed;
 }
 
 function save(dir, ledger) {
@@ -80,12 +104,18 @@ function scan(dir) {
       head = git(path.join(dir, name), ['log', '-1', '--format=%h']);
       headDate = git(path.join(dir, name), ['log', '-1', '--format=%ad', '--date=short']);
     } catch {
-      // Empty or unreadable repo. Leaving the entry alone beats recording a
-      // half-entry that later reads as fact.
+      // Swallows an empty repo (no commits yet), a missing `git` binary, and
+      // permission errors reading the repo's object store alike. Leaving the
+      // entry alone beats recording a half-entry that later reads as fact.
       continue;
     }
-    // `prev` spreads FIRST so `consumed` survives. Assigning a fresh object
-    // here instead would silently drop it - see the NEVER-creates test.
+    // `prev` spreads FIRST, then `status`/`head`/`headDate` override it.
+    // Reversed, stale `prev.head`/`prev.headDate` would win over the values
+    // just observed above, freezing `head` at its first-ever value on every
+    // later scan - silent, and unrelated to whether `consumed` is dropped.
+    // Guarded by "updates head on a subsequent scan while preserving a
+    // pre-existing consumed block", which commits again between two scans
+    // and checks both facts at once.
     ledger.repos[name] = { ...prev, status: 'active', head, headDate };
   }
   save(dir, ledger);
@@ -100,7 +130,13 @@ function main(argv) {
   }
   const [cmd = 'scan'] = argv;
   if (cmd === 'scan') {
-    const ledger = scan(dir);
+    let ledger;
+    try {
+      ledger = scan(dir);
+    } catch (err) {
+      process.stderr.write(`${err.message}\n`);
+      process.exit(1);
+    }
     const n = Object.values(ledger.repos).filter((e) => e.status === 'active').length;
     process.stdout.write(`scanned ${n} reference repositories\n`);
     return;
