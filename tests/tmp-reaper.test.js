@@ -179,6 +179,13 @@ describe('tmp-reaper sweepWorkspaces', () => {
     fs.writeFileSync(file, JSON.stringify({ tasks: [task] }));
   }
 
+  // Writes whatever raw string is handed in, unparsed — for torn/truncated
+  // files and for valid-JSON-but-wrong-shape payloads alike.
+  function mkPlanTasksRaw(root, slug, raw) {
+    const file = path.join(root, '.superpowers', 'plans', `${slug}.md.tasks.json`);
+    fs.writeFileSync(file, raw);
+  }
+
   function mkVictimDir() {
     const dir = fs.mkdtempSync(path.join(spTmpDir(), 'reaper-victim-'));
     fs.writeFileSync(path.join(dir, 'precious.txt'), 'precious');
@@ -208,6 +215,42 @@ describe('tmp-reaper sweepWorkspaces', () => {
     mkPlanTasks(root, 'live-plan', { status: 'in_progress' });
     sweepWorkspaces(root, { now: NOW2 });
     expect(fs.existsSync(live)).toBe(true);
+  });
+
+  it('treats a torn/truncated snapshot as in-flight and survives, not deletes', () => {
+    // A crash or full disk mid-write (sync-plan-tasks.js's writeFileSync is not
+    // atomic) leaves exactly this shape: present, old, unreadable as JSON. We
+    // cannot tell whether the plan is live, so refusing to reap is the safe
+    // failure direction — the cost is a stale directory, not a lost ledger.
+    const root = mkRepo();
+    const torn = mkWorkspace(root, 'torn-plan', daysAgo(90));
+    mkPlanTasksRaw(root, 'torn-plan', '{"tasks": [{"status": "in_progress"'); // truncated
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(torn)).toBe(true);
+  });
+
+  it.each([
+    ['[]', '[]'],
+    ['null', 'null'],
+    ['a bare string', '"str"'],
+    ['a bare number', '42'],
+    ['an object with no tasks array', '{}'],
+  ])('treats valid JSON that is not a ledger shape (%s) as in-flight and survives', (_label, raw) => {
+    const root = mkRepo();
+    const slug = `bad-shape-${Math.random().toString(36).slice(2)}`;
+    const dir = mkWorkspace(root, slug, daysAgo(90));
+    mkPlanTasksRaw(root, slug, raw);
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(dir)).toBe(true);
+  });
+
+  it('still reaps when the snapshot file is genuinely absent (ENOENT) — guards against over-correction', () => {
+    // Absence must remain reapable: nothing claims the plan is live. If this
+    // regresses to "survive", the reaper never reaps anything again.
+    const root = mkRepo();
+    const old = mkWorkspace(root, 'no-snapshot-plan', daysAgo(90));
+    sweepWorkspaces(root, { now: NOW2 });
+    expect(fs.existsSync(old)).toBe(false);
   });
 
   it('honours retention 0 as disabled', () => {

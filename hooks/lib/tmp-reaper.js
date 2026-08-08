@@ -184,16 +184,37 @@ function sweepWorkspaces(repoRoot, opts = {}) {
   }
 }
 
-/** A plan is in flight while its task snapshot still holds unfinished work. */
+/**
+ * A plan is in flight while its task snapshot still holds unfinished work.
+ *
+ * Absent (`ENOENT`) is the only case that means "not in flight" — nothing
+ * claims the plan is live. Anything else present-but-bad — unreadable,
+ * unparseable, or valid JSON that isn't a ledger shape — is treated as IN
+ * FLIGHT instead. sync-plan-tasks.js writes this file with a single
+ * non-atomic writeFileSync, so a crash or full disk mid-write leaves exactly
+ * a present-but-torn file. Reaping that guesses wrong deletes a live plan's
+ * only progress record; refusing to reap only costs a stale directory until
+ * someone looks. Mirrors scripts/reference-ledger.mjs's load().
+ */
 function isPlanInFlight(repoRoot, slug) {
   const snapshot = path.join(repoRoot, '.superpowers', 'plans', `${slug}.md.tasks.json`);
+  let raw;
   try {
-    const data = JSON.parse(fs.readFileSync(snapshot, 'utf8'));
-    if (!Array.isArray(data.tasks)) return false;
-    return data.tasks.some((t) => t && (t.status === 'pending' || t.status === 'in_progress'));
-  } catch {
-    return false;                             // no snapshot: nothing claims it is live
+    raw = fs.readFileSync(snapshot, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;  // no snapshot: nothing claims it is live
+    return true;                              // unreadable: cannot tell, assume live
   }
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return true;                              // torn/truncated JSON: cannot tell, assume live
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data.tasks)) {
+    return true;                              // not a ledger shape: cannot tell, assume live
+  }
+  return data.tasks.some((t) => t && (t.status === 'pending' || t.status === 'in_progress'));
 }
 
 export {
