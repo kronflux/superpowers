@@ -398,6 +398,24 @@ describe('parseFlags', () => {
     expect(f.noRef).toBe(true);
     expect(f.date).toBe('2026-07-26');
   });
+
+  it('rejects an unrecognized flag instead of swallowing the next token as its value', () => {
+    // Without this, --evil would consume '--by' as its own value, then 'x'
+    // would fall through as the workstream positional - a recorded review
+    // attributed to something the operator never typed.
+    expect(() => parseFlags(['alpha', '--evil', '--by', 'x']))
+      .toThrow(/^reference-ledger: unknown flag '--evil'/);
+  });
+
+  it('rejects --ref combined with --no-ref rather than letting one silently win', () => {
+    expect(() => parseFlags(['alpha', '--ref', 'abc1234', '--no-ref']))
+      .toThrow(/^reference-ledger: --ref and --no-ref are mutually exclusive/);
+  });
+
+  it('rejects a trailing flag with no value instead of resolving it to undefined', () => {
+    expect(() => parseFlags(['alpha', '--by']))
+      .toThrow(/^reference-ledger: flag '--by' requires a value/);
+  });
 });
 
 describe('consume', () => {
@@ -455,19 +473,50 @@ describe('consume', () => {
     expect(recorded.date).toBe(today());
   });
 
-  it('refuses an unknown repo and leaves the ledger byte-identical', () => {
+  it('refuses an unknown repo with a prefixed message and leaves the ledger byte-identical', () => {
+    // Asserting the message shape, not just `.toThrow()`, is what pins the
+    // guard: delete it and `ledger.repos['typo'].consumed = ...` still throws
+    // a bare, unprefixed TypeError before any write - non-zero exit and an
+    // untouched file would survive by accident, not because the guard works.
     mkRepo(root, 'alpha');
     scan(root);
     const before = fs.readFileSync(ledgerPath(root), 'utf8');
-    expect(() => consume(root, 'typo', 'upstream-sync')).toThrow();
+    expect(() => consume(root, 'typo', 'upstream-sync'))
+      .toThrow(/^reference-ledger: unknown repository 'typo'/);
     expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
   });
 
-  it('CLI: an unknown repo exits non-zero and leaves the ledger byte-identical', () => {
+  it('rejects a missing workstream and leaves the ledger untouched', () => {
+    // consume() must validate this itself, not rely on main()'s CLI-only
+    // usage check: Task 5 and other in-process callers bypass main() entirely,
+    // and JSON.stringify would otherwise silently drop an undefined workstream,
+    // persisting a consumed entry that doesn't say which review consumed it.
+    mkRepo(root, 'alpha');
+    scan(root);
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    expect(() => consume(root, 'alpha', undefined))
+      .toThrow(/^reference-ledger: workstream is required/);
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('rejects an empty-string workstream and leaves the ledger untouched', () => {
+    mkRepo(root, 'alpha');
+    scan(root);
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    expect(() => consume(root, 'alpha', ''))
+      .toThrow(/^reference-ledger: workstream is required/);
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('CLI: an unknown repo exits non-zero with a one-line prefixed message, no stack trace, and leaves the ledger byte-identical', () => {
     mkRepo(root, 'alpha');
     run(root, ['scan']);
     const before = fs.readFileSync(ledgerPath(root), 'utf8');
-    expect(runCli(root, ['consume', 'typo', 'upstream-sync']).status).not.toBe(0);
+    const result = runCli(root, ['consume', 'typo', 'upstream-sync']);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr.trim().split('\n')).toHaveLength(1);
+    expect(result.stderr).toMatch(/^reference-ledger: /);
+    expect(result.stderr).not.toMatch(/^\s*at /m);
     expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
   });
 

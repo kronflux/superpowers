@@ -164,14 +164,39 @@ function report(dir) {
   return [line(head), ...rows.map(line)].join('\n') + '\n';
 }
 
-/** Minimal flag parser: `--k v` pairs, the boolean `--no-ref`, positionals in `_`. */
+const KNOWN_FLAGS = new Set(['ref', 'date', 'by']);
+
+/**
+ * Minimal flag parser: `--k v` pairs, the boolean `--no-ref`, positionals in
+ * `_`. Rejects anything it can't confidently attribute rather than guessing:
+ * an unrecognized `--flag` would otherwise swallow the next token as its
+ * value and silently misassign it (e.g. to `workstream`), recording a review
+ * attributed to something the operator never typed.
+ */
 function parseFlags(argv) {
   const out = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--no-ref') out.noRef = true;
-    else if (a.startsWith('--')) out[a.slice(2)] = argv[++i];
-    else out._.push(a);
+    if (a === '--no-ref') {
+      out.noRef = true;
+      continue;
+    }
+    if (a.startsWith('--')) {
+      const key = a.slice(2);
+      if (!KNOWN_FLAGS.has(key)) {
+        throw new Error(`reference-ledger: unknown flag '${a}' (expected --ref, --date, --by, or --no-ref)`);
+      }
+      const value = argv[++i];
+      if (value === undefined || value.startsWith('--')) {
+        throw new Error(`reference-ledger: flag '${a}' requires a value`);
+      }
+      out[key] = value;
+      continue;
+    }
+    out._.push(a);
+  }
+  if (out.ref !== undefined && out.noRef) {
+    throw new Error('reference-ledger: --ref and --no-ref are mutually exclusive');
   }
   return out;
 }
@@ -179,6 +204,9 @@ function parseFlags(argv) {
 /**
  * The ONLY writer of `consumed`. Refuses an unknown repo rather than creating
  * one, so a typo cannot invent a consumed repository that no one ever reviewed.
+ * Validated here, not only in the CLI: Task 5 and other in-process callers
+ * bypass main()'s usage check entirely, and an entry with no `workstream`
+ * asserts a review happened without saying which one.
  */
 function consume(dir, name, workstream, opts = {}) {
   const ledger = load(dir);
@@ -186,6 +214,9 @@ function consume(dir, name, workstream, opts = {}) {
     // Self-prefixing, matching load()'s thrown messages: main()'s shared
     // try/catch prints err.message verbatim and adds nothing.
     throw new Error(`reference-ledger: unknown repository '${name}' - run scan first`);
+  }
+  if (typeof workstream !== 'string' || workstream.length === 0) {
+    throw new Error('reference-ledger: workstream is required and must be a non-empty string');
   }
   const ref = opts.noRef
     ? null
