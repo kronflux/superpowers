@@ -131,15 +131,20 @@ Subagent (general-purpose):
 - `[BASE_SHA]` — starting commit
 - `[HEAD_SHA]` — ending commit
 
-**Reviewer returns:** Strengths, Issues (Critical / Important / Minor), Recommendations, Assessment
+**Reviewer returns:** Assessment (verdict + fix first), Issues (Critical / Important / Minor), Recommendations, Strengths
+
+Ordering follows `skills/shared/output-contract.md`: the verdict and the single most important finding lead, because a reader who stops after the first two lines must still know whether this merges and what to fix. Findings are never truncated — every issue is reported, ranked by severity.
 
 ## Example Output
 
 ```
-### Strengths
-- Clean database schema with proper migrations (db.ts:15-42)
-- Comprehensive test coverage (18 tests, all edge cases)
-- Good error handling with fallbacks (summarizer.ts:85-92)
+### Assessment
+
+**Ready to merge: With fixes**
+
+**Fix first:** Missing help text in CLI wrapper (index-conversations:1-31)
+
+**Reasoning:** Core implementation is solid with good architecture and tests. Important issues (help text, date validation) are easily fixed and don't affect core functionality.
 
 ### Issues
 
@@ -158,15 +163,14 @@ Subagent (general-purpose):
 1. **Progress indicators**
    - File: indexer.ts:130
    - Issue: No "X of Y" counter for long operations
-   - Impact: Users don't know how long to wait
+   - Impact: Callers cannot tell whether a long run is progressing or stalled
 
 ### Recommendations
 - Add progress reporting for user experience
 - Consider config file for excluded projects (portability)
 
-### Assessment
-
-**Ready to merge: With fixes**
-
-**Reasoning:** Core implementation is solid with good architecture and tests. Important issues (help text, date validation) are easily fixed and don't affect core functionality.
+### Strengths
+- Clean database schema with proper migrations (db.ts:15-42)
+- Comprehensive test coverage (18 tests, all edge cases)
+- Good error handling with fallbacks (summarizer.ts:85-92)
 ```

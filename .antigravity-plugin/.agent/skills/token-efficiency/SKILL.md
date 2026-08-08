@@ -13,12 +13,15 @@ Tool selection is governed by `skills/shared/conductor/routing.md` — declare t
 
 ## Response Rules
 
-1. Lead with the answer — no preambles, no restating the question
-2. Use bullet points and code over prose narration
-3. Never explain what you are about to do — just do it
-4. Omit filler phrases ("Certainly!", "Great question!", "Now let me...", "As you can see...")
-5. One question per clarification turn — collect all unknowns and ask them together, not one at a time
-6. Prefer structured output (JSON/YAML) when the result feeds a downstream step
+Response shape — ordering, ranking, questions, forbidden language, and the pre-send check — is
+governed by `skills/shared/output-contract.md` and is not restated here. That contract exists
+because density and decidability are different objectives: output can be dense, filler-free, and
+still impossible for the reader to act on.
+
+The one rule specific to token cost rather than readability:
+
+1. Prefer structured output (JSON/YAML) when the result feeds a downstream step rather than a
+   human reader. Where a human reads it, the output contract governs.
 
 ## Tool Execution Rules
 

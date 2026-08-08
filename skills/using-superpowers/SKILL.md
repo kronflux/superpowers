@@ -21,7 +21,7 @@ This is not negotiable. You cannot rationalize your way out of this.
 
 **Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
 
-Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+Then follow the skill exactly. If it has a checklist, create a todo per item. Do not open with "I'm using X" — the harness already shows which skill is active, and `skills/shared/output-contract.md` governs what the first line carries instead.
 
 ## Complexity Tiers
 

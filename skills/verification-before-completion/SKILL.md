@@ -35,7 +35,7 @@ BEFORE claiming any status or expressing satisfaction:
 Skip any step = lying, not verifying
 ```
 
-If context-mode is active, run verification commands via `ctx_execute` per the output-handling job in `skills/shared/conductor/routing.md`, and ECHO the fresh output (exit code, failure count) in-transcript — the completion claim's evidence must be visible in the conversation, not only in a ctx sandbox (§8 gate-evidence rule).
+If context-mode is active, run verification commands via `ctx_execute` per the output-handling job in `skills/shared/conductor/routing.md` and echo the fresh output (exit code, failure count) per `skills/shared/evidence.md`.
 
 ## Common Failures
 

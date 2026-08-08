@@ -39,6 +39,8 @@ When context-mode is active, analyze diffs/files via `ctx_execute_file`; use nat
 
 ## Output format
 
+Ordering per `skills/shared/output-contract.md`: verdict and fix-first lead. Findings are ranked by severity and never truncated — an exhaustive result is the answer.
+
 ### Findings (highest severity first)
 
 For each finding:

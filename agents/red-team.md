@@ -93,6 +93,8 @@ The dominant production failure class: correct code that breaks because the prod
 
 ## Output format
 
+Ordering per `skills/shared/output-contract.md`: lead with the most severe break and what it costs. Never truncate findings.
+
 ````
 ## Breakage Report
 

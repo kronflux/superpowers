@@ -14,6 +14,33 @@ bulk-staging permission prompt in `hooks/safety/block-dangerous-commands.js`.
 - Before every commit: `git status` and confirm the staged set is exactly your files.
   If something unexpected is staged, unstage it - do not commit and apologize later.
 
+## Commit messages
+
+A comment says what the code **does**. A commit says what **changed**. Neither says what you did to
+arrive at either. "History belongs in the commit message" does not mean anything goes there — a
+commit describes the change in terms of the software's behavior, not your activity producing it.
+
+| Banned | Instances | Why |
+|---|---|---|
+| Internal counts | `23 patterns`, `11 categories` | Stale within a week, and describes the implementation rather than the change |
+| Planning structure | `per the plan's task 3`, `all eleven categories from the design spec` | Unresolvable to anyone reading `git log` later; scaffolding does not outlive the work |
+| Process verbs about yourself | `derive`, `adopt`, `grows`, `iterate on`, `revisit` | Records your motion, not the software's |
+| Measurement as achievement | `with measured coverage`, `now fully tested` | Testing is how a change was made trustworthy, not part of the change |
+
+```
+BAD:  feat: derive 11-category pattern set with measured coverage
+GOOD: feat: detect temporal comparison, troubleshooting anecdote, and ticket references
+
+BAD:  Grows NARRATION to 23 patterns across all eleven taxonomy categories.
+GOOD: Comments naming a change and its cause are now detected. Bare sentence-initial verbs stay
+      undetected: they cannot be distinguished from present-state usage.
+```
+
+State limitations and reasons as properties of the software, not as things you discovered. Imperative
+subject line. No attribution trailers (`Co-Authored-By`, `Generated-with`) unless the user asks.
+
+Reviewed, not gated: a commit-msg hook fires after the work is done and is trivially bypassed.
+
 ## History repair
 
 - A mistaken commit that is LOCAL and UNPUSHED is repaired in place:

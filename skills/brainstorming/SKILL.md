@@ -15,7 +15,7 @@ Do NOT invoke any implementation skill, write any code, scaffold any project, or
 
 ## Tool Selection
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery → `codegraph.md`; external docs → `context7.md`). Echo `PROVEN BY` evidence in-transcript when computed via ctx tools.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery → `codegraph.md`; external docs → `context7.md`). Evidence handling per `skills/shared/evidence.md`.
 
 ## Anti-Pattern: "This Is Too Simple To Need A Design"
 

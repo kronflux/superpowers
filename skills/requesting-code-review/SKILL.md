@@ -11,7 +11,7 @@ Dispatch a code reviewer subagent to catch issues before they cascade. The revie
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. The review scope is derived from `git diff`, which stays native. When context-mode is active and the reviewer or red team computes findings via `ctx` tools, the `PROVEN BY` evidence and severity findings MUST be echoed in-transcript — compressed agent results would otherwise drop the supporting evidence, blocking false-positive triage.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. The review scope is derived from `git diff`, which stays native. Evidence handling per `skills/shared/evidence.md`.
 
 ## When to Request Review
 
@@ -67,7 +67,7 @@ Dispatch review subagents via the Task tool. **Never set the subagent type to Ba
 
 **Detecting presence:** the named agents are resolvable when `agents/code-reviewer.md` and `agents/red-team.md` ship with this plugin and the harness registers them. If a dispatch to a named agent returns an "unknown agent" / unresolved error, treat it as absent and re-dispatch via the `general-purpose` fallback.
 
-**Evidence in-transcript:** when context-mode is active, computed verification output may land in the ctx sandbox rather than the conversation. Each review must still surface its `AC: <criterion> — PROVEN BY <evidence>` and merge-readiness verdict as text in this conversation, not only inside a ctx sandbox.
+**Evidence:** per `skills/shared/evidence.md`. Each review surfaces its `AC: ... PROVEN BY ...` lines and merge-readiness verdict as text in this conversation.
 
 ## Security Review (Built-In)
 

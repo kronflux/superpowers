@@ -23,7 +23,6 @@ Any one of:
 
 If none of these apply, return to `.agent/skills/executing-plans/SKILL.md` without running this skill.
 
-**Announce at start:** "I'm using the checking-gates skill to verify Task N's acceptance criteria."
 
 ## The three-step process
 
@@ -84,7 +83,7 @@ If any of the three is missing for any criterion, HOW is NOT clear → Path A.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Gate evidence: the `Gate:` / `AC: <criterion> — PROVEN BY <evidence>` lines MUST be echoed IN THE TRANSCRIPT (the conversation), not left only in a ctx sandbox — evidence trapped in a sandbox triggers a false-positive gate block.
+Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Gate evidence per `skills/shared/evidence.md`: `Gate:` and `AC: ... PROVEN BY ...` lines are scanned in the transcript, and evidence left in a sandbox triggers a false-positive block.
 
 ## Integration
 

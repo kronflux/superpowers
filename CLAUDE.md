@@ -112,26 +112,17 @@ manifests by the bump script.
   Enforced two ways: `tests/lint-comments.test.js` scans this repo's own source, and a `PreToolUse`
   gate denies writes introducing a violation in any project — disabled per-project by
   `.superpowers-no-comment-gate`, matching the decline-marker convention above.
-- **Commit messages** carry what changed; they do not carry how you got there. A comment says
-  what the code does, a commit says what changed, neither says what you did to arrive at it.
-  "History belongs in the commit message" does not mean anything goes there. Banned: internal
-  counts (`23 patterns`, `11 categories`) which are stale within a week and describe the
-  implementation rather than the change; planning-document structure (`all eleven taxonomy
-  categories from the design spec`, `per the plan's task 3`) which the reader of `git log` in
-  two years cannot resolve; process verbs about yourself (`derive`, `adopt`, `grows`,
-  `iterate on`, `revisit`); and measurement as achievement (`with measured coverage`, `now
-  fully tested`) — testing is how a change was made trustworthy, not part of the change.
-  ```
-  BAD:  feat: derive full 11-category comment pattern set with measured coverage
-  GOOD: feat: detect temporal comparison, troubleshooting anecdote, and ticket references
-
-  BAD:  Grows NARRATION to 23 patterns across all eleven taxonomy categories.
-  GOOD: Comments naming a change and its cause are now detected. Bare sentence-initial
-        verbs stay undetected: they cannot be distinguished from present-state usage.
-  ```
-  The good version still gives the limitation and the reason — as properties of the software,
-  not as things you discovered. Reviewed, not gated: a commit-msg hook fires after the work is
-  done and is trivially bypassed.
+- **Commit messages** are owned by `skills/shared/git-hygiene.md`, alongside staging and history
+  repair — banned classes, examples, and the reason each is banned. Stated there rather than here
+  so it reaches every project using the plugin, not only this fork.
+- **Output shape** is owned by `skills/shared/output-contract.md`: the first-line/last-line
+  acceptance test, ranking, the never-invoke-time rule, questions, forbidden language, and the
+  pre-send check. `skills/token-efficiency/` keeps tool and context economics and defers response
+  shape to it — density and decidability are different objectives, and conflating them is what let
+  a compliant response be unusable.
+- **Evidence** is owned by `skills/shared/evidence.md`: evidence before claims, reading-versus-
+  running, verifying against the surface that actually runs, and the rule that evidence computed in
+  a subagent or sandbox must be echoed into the transcript to exist at all.
 
 ## Releases
 

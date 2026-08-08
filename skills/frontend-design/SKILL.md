@@ -66,7 +66,7 @@ Before writing code, output a brief design system summary:
 **Avoid**: [Named anti-patterns]
 ```
 
-This takes 30 seconds and prevents hours of rework from misaligned visual direction.
+Confirming direction before building prevents rework from a misaligned visual premise.
 
 ---
 
