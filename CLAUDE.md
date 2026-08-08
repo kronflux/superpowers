@@ -93,6 +93,25 @@ manifests by the bump script.
   never throws past its top-level handler — any internal fault prints an empty line and exits 0,
   since this renders on every assistant message and a visible failure would put a stack trace
   across the prompt line.
+- **Comments:** state present-state behavior, inputs, outputs, and side effects only — version
+  control already holds the development history, and narration belongs in the commit message.
+  Two banned classes: development narration (`fixed X`, `added X`, `expanded X`, `adjusted X`,
+  `improved X`, `tested X`, `X happened`, `adding X for X reason`, `a later review found`,
+  `previously`, `used to`, `turned out`) and impermanence (`TODO`, `FIXME`, `WIP`, `temporary`,
+  `for now`, `hack`, `still adjusting`, `so we can test`).
+  ```
+  BAD:  // Fixed crash on empty payload
+  GOOD: // Returns null if the payload is empty
+
+  BAD:  # Added retry logic to handle unstable network
+  GOOD: # Executes network request with 3 exponential backoff retries
+
+  BAD:  # Mocking the auth payload here so we can test the frontend locally
+  GOOD: # Generates a static JWT payload for unauthenticated sessions
+  ```
+  Enforced two ways: `tests/lint-comments.mjs` scans this repo's own source, and a `PreToolUse`
+  gate denies writes introducing a violation in any project — disabled per-project by
+  `.superpowers-no-comment-gate`, matching the decline-marker convention above.
 
 ## Releases
 
