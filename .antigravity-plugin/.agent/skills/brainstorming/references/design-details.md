@@ -1,6 +1,6 @@
 # Brainstorming — Design Details
 
-Extended guidance moved out of `SKILL.md` to keep it concise. Referenced from the Process and Key Principles sections of `skills/brainstorming/SKILL.md`.
+Extended guidance moved out of `SKILL.md` to keep it concise. Referenced from the Process section of `skills/brainstorming/SKILL.md`, which folded its former Key Principles list into the points where each principle applies.
 
 ## Design Quality
 
