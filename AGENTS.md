@@ -109,7 +109,7 @@ manifests by the bump script.
   BAD:  # Mocking the auth payload here so we can test the frontend locally
   GOOD: # Generates a static JWT payload for unauthenticated sessions
   ```
-  Enforced two ways: `tests/lint-comments.mjs` scans this repo's own source, and a `PreToolUse`
+  Enforced two ways: `tests/lint-comments.test.js` scans this repo's own source, and a `PreToolUse`
   gate denies writes introducing a violation in any project — disabled per-project by
   `.superpowers-no-comment-gate`, matching the decline-marker convention above.
 - **Commit messages** carry what changed; they do not carry how you got there. A comment says
