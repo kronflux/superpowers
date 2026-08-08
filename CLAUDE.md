@@ -63,7 +63,16 @@ manifests by the bump script.
   accurate. Enforced by `tests/tmp-namespace.test.js`, scoped to `hooks/` and `tests/` —
   `scripts/middleware-exec.mjs` creates its CLI-subprocess working directory directly under the
   bare temp root and is a deliberate, documented gap outside that scan. No hook uses
-  `PreCompact`; WebFetch is owned by context-mode.
+  `PreCompact`; WebFetch is owned by context-mode. The same reaper also sweeps
+  `.superpowers/sdd/<plan>/` plan workspaces on that same retention window (also overridable via
+  `SUPERPOWERS_TMP_RETENTION_DAYS`), with one exception: a workspace whose plan still has a
+  `pending` or `in_progress` task in `<plan>.md.tasks.json` is never reaped, regardless of age.
+  This is a deliberate deviation from upstream's `2026-07-06-sdd-plan-scoped-workspace` design
+  (mirrored only in `../_reference/`, not this fork's `docs/superpowers/`), which specified
+  deleting the workspace at finish: deletion at finish destroys reports and review packages at
+  the moment they are most wanted, and three reporting defects on 2026-08-08 were caught only by
+  re-reading reports after their tasks had already closed — evidence delete-at-finish would have
+  erased.
 - **Decline markers:** `.superpowers-no-<capability>` files at the project root record a user's
   "no" for a capability offer and are gitignored — they are a local choice, never committed.
   `.superpowers-no-lsp` is newline-delimited plugin names; empty means decline all.
