@@ -1,6 +1,8 @@
 # Brainstorming — Design Details
 
-Extended guidance moved out of `SKILL.md` to keep it concise. Referenced from the Process section of `skills/brainstorming/SKILL.md`, which folded its former Key Principles list into the points where each principle applies.
+Extended guidance moved out of `SKILL.md` to keep it concise, and referenced from its Process section.
+
+`SKILL.md` no longer carries a Key Principles list; it states each principle where the principle applies. Five of the six below appear there in substance — one question at a time, multiple choice preferred, YAGNI, explore alternatives, incremental validation. **"Be flexible" appears only here**, so this section is where that one lives rather than a duplicate of the skill.
 
 ## Design Quality
 
