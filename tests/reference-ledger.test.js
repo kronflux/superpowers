@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
-import { discover, load, save, scan, ledgerPath } from '../scripts/reference-ledger.mjs';
+import { discover, load, save, scan, gap, ledgerPath } from '../scripts/reference-ledger.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'reference-ledger.mjs');
@@ -321,6 +321,17 @@ describe('report', () => {
     expect(out).not.toMatch(/undefined/);
     expect(out).toMatch(new RegExp(`${first} \\(no date\\)`));
   });
+
+  it('gap() treats a consumed entry with neither ref nor date as malformed, never as a 0 gap', () => {
+    // Direct against gap(), not through report(): with neither field, the
+    // date-only branch would otherwise run `git rev-list --since=undefined`,
+    // which git accepts and answers with a real, misleading 0 - the exact
+    // lie the function's own doc comment says count must never tell.
+    mkRepo(root, 'alpha');
+    const result = gap(root, 'alpha', { consumed: { workstream: 'upstream-sync' } });
+    expect(result.count).toBeNull();
+    expect(result.label).not.toMatch(/undefined/);
+  });
 });
 
 describe('CLI contract', () => {
@@ -347,6 +358,19 @@ describe('CLI contract', () => {
     expect(result.stderr.trim().split('\n')).toHaveLength(1);
     expect(result.stderr).not.toMatch(/^\s*at /m);
     expect(fs.readFileSync(p, 'utf8')).toBe(truncated);
+  });
+
+  it('an unprefixed error (a real bug, not a known operational failure) propagates with its full stack instead of being flattened', () => {
+    // A shape-valid ledger load() happily accepts (repos is an object) but
+    // with a null repo entry, which report()'s own status filter dereferences
+    // without a null check - a stand-in for the future consume()/archive()
+    // bug the discriminating catch exists to not swallow.
+    const p = ledgerPath(root);
+    fs.writeFileSync(p, JSON.stringify({ schema: 1, updatedAt: null, repos: { alpha: null } }));
+    const result = runCli(root, ['report']);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/^\s*at /m);
+    expect(result.stderr.trim().split('\n').length).toBeGreaterThan(1);
   });
 
   it('an absent reference directory exits non-zero and creates no file', () => {

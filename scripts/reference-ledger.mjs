@@ -132,6 +132,10 @@ function gap(dir, name, entry) {
   const repo = path.join(dir, name);
   const c = entry.consumed;
   if (!c) return { label: 'never', count: null };
+  // Neither field set is malformed, not a zero-commit gap. Left to the branches
+  // below, a date-only lookup with `c.date` undefined runs `--since=undefined`,
+  // which git accepts and answers with a real, misleading 0.
+  if (!c.ref && !c.date) return { label: 'malformed (no ref or date)', count: null };
   try {
     if (c.ref) {
       const n = git(repo, ['rev-list', '--count', `${c.ref}..HEAD`]);
@@ -183,6 +187,14 @@ function main(argv) {
       return;
     }
   } catch (err) {
+    // The 'reference-ledger: ' prefix is the contract that separates a known
+    // operational failure (load(), and per plan consume()/archive()) from a
+    // genuine bug - nothing enforces it mechanically. An unprefixed error is
+    // rethrown with its full stack rather than flattened to one line, because
+    // a bare `Cannot read properties of undefined` is indistinguishable from
+    // a known-bad ledger otherwise, which is exactly the ambiguity this whole
+    // file exists to eliminate.
+    if (!err.message?.startsWith('reference-ledger: ')) throw err;
     process.stderr.write(`${err.message}\n`);
     process.exit(1);
   }
