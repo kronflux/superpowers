@@ -136,9 +136,8 @@ describe('stop-reminders: forward-commitment guard — expanded patterns', () =>
     expect(
       run({ finalMessage: 'I can certainly help with that.', toolUses: [] })
     ).toBe('');
-    // "moving on to" was dropped: zero corpus coverage at adoption time, and
-    // it turned out to be a paragraph-transition idiom, not a commitment
-    // marker — see the negative corpus below.
+    // "moving on to" must not fire: it is a paragraph-transition idiom, not
+    // a commitment marker — see the negative corpus below.
     expect(
       run({ finalMessage: 'Moving on to the next task now.', toolUses: [] })
     ).toBe('');

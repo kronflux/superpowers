@@ -235,9 +235,7 @@ function formatStatsSummary(stats) {
 // nudge on a turn legitimately blocked on the operator ("I'll do X once you
 // answer") is worse than a missed one.
 //
-// Coverage was broadened (corpus-tested against real .superpowers/sdd
-// report prose — see tests/stop-reminders.test.js) with two patterns
-// deliberately NOT adopted, on purpose, so a future pass does not
+// Two patterns are deliberately excluded, so a future pass does not
 // "complete" the list by adding them back:
 //   - /\bhere (?:is|are|we go)(?: with)? the (?:code|script|implementation|
 //     updated|requested)\b/i — this *presents* work rather than promising
@@ -247,26 +245,23 @@ function formatStatsSummary(stats) {
 //     sycophancy, not a did-you-do-the-work signal. Belongs to the
 //     banned-vocabulary purity gate, not this guard.
 //
-// A later review found the broadened list, validated only against terse
-// past-tense report prose, misfired on ordinary conversational prose —
-// a genre the report corpus structurally cannot exercise. Fixed against a
-// second, negative corpus of realistic assistant turns that legitimately
-// end with no tool use (see the "report corpus stays silent" and
-// "innocent conversational prose stays silent" describe blocks):
-//   - /\bmoving on to\b/i shipped with zero corpus coverage and turned out
-//     to be a paragraph-transition idiom ("Moving on to the tradeoffs, the
-//     second approach..."), not a commitment marker. Dropped outright.
-//   - The bare "proceeding to/on/with" forms fired on topic transitions
-//     ("Proceeding to the next section, the article covers..."). Merged
-//     into a single pattern requiring "now" in the same clause, matching
-//     the writing/generating tightening below.
+// Patterns require a same-clause "now" or a narrow, deliverable-naming verb
+// rather than a bare topic-transition or opener phrasing (see the "report
+// corpus stays silent" and "innocent conversational prose stays silent"
+// describe blocks):
+//   - "moving on to" is not matched: it is a paragraph-transition idiom
+//     ("Moving on to the tradeoffs, the second approach..."), not a
+//     commitment marker.
+//   - Bare "proceeding to/on/with" is not matched; only "proceeding ...
+//     now" in the same clause is, mirroring the writing/generating pattern
+//     below — the bare form occurs on ordinary topic transitions
+//     ("Proceeding to the next section, the article covers...").
 //   - "let me start/now/begin", "let's dive in/start/begin", and "allow me
-//     to start/begin" fired on ordinary explanatory openers ("Let me start
-//     by explaining...", "Let's dive in: the reason this fails...",
-//     "Allow me to start with the constraints..."). Narrowed each list to
-//     verbs naming a concrete deliverable (write/generate/implement/
-//     create/handle/go ahead), which did not misfire on the negative
-//     corpus.
+//     to start/begin" are not matched; only verbs naming a concrete
+//     deliverable (write/generate/implement/create/handle/go ahead) are —
+//     the broader forms occur in ordinary explanatory openers ("Let me
+//     start by explaining...", "Let's dive in: the reason this fails...",
+//     "Allow me to start with the constraints...").
 const FORWARD_COMMITMENT_PATTERNS = [
   /\bi'll now\b/i,
   /\bi will now\b/i,
@@ -283,11 +278,12 @@ const FORWARD_COMMITMENT_PATTERNS = [
   /\bproceeding\b[^.\n]{0,40}\bnow\b/i,
   /\b(?:starting|beginning) now\b/i,
   /\ballow me to (?:write|generate|implement|create)\b/i,
-  // Tightened from the candidate form (verb ... now/for you anywhere in the
-  // message): that form matched past-tense reporting like "still working on
-  // the reaper now covered by tests". Require the verb to open the message
-  // or a sentence, or follow a first-person "I'm"/"I am", so it only catches
-  // an announcement, not a status update embedded mid-sentence.
+  // A verb matched anywhere in the message, with "now"/"for you" anywhere
+  // after it, is indistinguishable from mid-sentence past-tense status
+  // reporting (see the mid-sentence past-tense reporting test below). The
+  // verb must open the message or a sentence, or follow a first-person
+  // "I'm"/"I am", so only an announcement is caught, not a status update
+  // embedded mid-sentence.
   /(?:^|(?<=[.!?\n]\s)|(?<=\bi(?:'m|m| am) ))(?:writing|generating|creating|implementing|updating|working on)\b[^.\n]{0,40}\b(?:now|for you)\b/i,
 ];
 
