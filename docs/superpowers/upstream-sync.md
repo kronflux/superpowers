@@ -153,6 +153,31 @@ section with their `archivedAt` and `reason`. That is deliberate: archiving remo
 review, and a retirement whose justification had disappeared from the one command an operator reads
 would be an escape hatch from this tool's whole purpose.
 
+## What the ledger does not catch
+
+Found by adversarially attacking the tool, kept here because a gate you trust blindly is worse
+than one you know the edges of. None occur on the straight-line path; each needs an unusual
+action or a race.
+
+- **A directory replaced by a different repository keeps the old gate.** Entries are keyed by
+  directory name; nothing fingerprints repository identity. Re-cloning something else under a
+  consumed name — or reviving an archived name with a different mirror — inherits the previous
+  `consumed`. With a ref-based gate this degrades honestly to `(unresolvable)`; with a date-only
+  gate it reports a number that means nothing. Prefer ref-based gates.
+- **`scan` running concurrently with `consume` can drop the `consume`.** Whole-file
+  read-modify-write, no lock, and both commands report success. The loss is conservative — the
+  gap reappears rather than shrinking — but re-run `consume` if you ran the two together.
+- **`archive` does not check dormancy.** It accepts any free-text reason and retires a repo with
+  an open gap. The trailing `archived:` section in `report` shows the retirement and its stated
+  reason, not the gap that was abandoned. Check the gap before archiving.
+- **`report` only shows repositories the ledger already knows.** A mirror cloned since the last
+  `scan` is absent entirely rather than listed as new. Run `scan` before trusting the table.
+- **Dates are stamped in UTC and compared locally.** A `consume` late in the evening at a
+  negative UTC offset records tomorrow's date and excludes that evening's commits from a
+  date-only gap. Pass `--date` explicitly if the boundary matters.
+- **Directory names are case-sensitive in the ledger and case-insensitive on Windows.** A
+  case-only rename produces two rows for one repository with contradictory gates.
+
 ## Worked example
 
 A snapshot taken 2026-07-26, kept for its three classification cases rather than its numbers. The
