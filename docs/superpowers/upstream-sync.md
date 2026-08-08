@@ -21,27 +21,50 @@ proposed change to a fork-owned router/adapter/hook. Nothing is rebased or cherr
 
 ## Procedure
 
-### 1. Refresh the upstream mirror
+### 1. Read the ledger
+
+```bash
+node scripts/reference-ledger.mjs report
+```
+
+The `consumed` column is this run's gate — the ref a previous review actually
+finished through, not merely looked at. A repo reading `never` has no recorded
+review; choose and record the scope yourself rather than assuming a window, and
+see step 3 for where to recover a gate that predates the ledger.
+
+The ledger lives at `../_reference/.sync-ledger.json`, outside this repository,
+and is written only by `scripts/reference-ledger.mjs`. `scan` refreshes observed
+HEADs and is forbidden from touching `consumed`; only step 7 writes that.
+
+### 2. Refresh the upstream mirror
 
 ```bash
 cd ../_reference/0_obra_superpowers
 git pull --ff-only
-git log -1 --format='%H %s'      # this becomes the new "upstream tip" for this sync
+git log -1 --format='%H %s'
+cd -
+node scripts/reference-ledger.mjs scan
 ```
 
 `--ff-only` is deliberate: the mirror is a plain clone of `obra/superpowers`, never modified
 locally. A non-fast-forward result means the mirror was hand-edited or the remote force-pushed —
-stop and investigate before continuing.
+stop and investigate before continuing. The `scan` afterwards makes `head` reflect the tip you
+just pulled.
 
-### 2. Find the last-synced ref
+### 3. Fallback when a repo has no ledger entry
 
 Read the most recent fork release entry in `RELEASE-NOTES.md` for a line of the form
 `Resynced the kronflux fork onto the upstream obra/superpowers <version> base (`<sha>`)` — that
-`<sha>` is the last-synced ref. (7.0.0's is `d884ae0`, upstream tag `v6.1.1`.) If no resync line
-exists yet (first sync after this playbook lands), use the commit `RELEASE-NOTES.md` cites as the
-fork's original upstream base.
+`<sha>` is the last-synced ref. (7.0.0's is `d884ae0`, upstream tag `v6.1.1`.) `RELEASE-NOTES.md`
+remains the durable historical record and is where the ledger's obra entry was seeded from; the
+ledger is the operational index that saves you this lookup on every subsequent run.
 
-### 3. Enumerate upstream changes since that ref
+If no resync line exists — a mirror added since the ledger landed, or the first sync of a brand-new
+reference — there is no ref to recover. Do not invent one. Pick the scope deliberately, say so in
+the findings doc, and record the result with `consume` in step 7; from then on the ledger carries
+the gate and this fallback is never needed for that repo again.
+
+### 4. Enumerate upstream changes since that ref
 
 ```bash
 cd ../_reference/0_obra_superpowers
@@ -51,7 +74,7 @@ git diff <last-synced-sha>..HEAD --stat                    # size, to spot whole
 git diff <last-synced-sha>..HEAD -- <path>                  # per-file hunks, once you're ready to classify one
 ```
 
-### 4. Classify every changed file against the divergence map
+### 5. Classify every changed file against the divergence map
 
 For each path in the `--name-only` list, look it up in
 [fork-divergence-map.md](fork-divergence-map.md) (Table 1, then Table 2):
@@ -64,7 +87,7 @@ For each path in the `--name-only` list, look it up in
 | **Path is an `overlay` row** (`.antigravity-plugin/`) | Never diff this path directly — it's regenerated. If the *source* skill changed, that's already the router-pointer/net-new row for the source path; after resolving that, rerun `scripts/sync-to-antigravity.sh` once at the end. |
 | **Upstream touches a path this fork has deleted** (e.g. `skills/using-superpowers/references/gemini-tools.md`, removed post-Gemini-EOL) | Read the upstream change for informational value only; there is nothing to apply. Note it in the sync's summary so the next person doesn't re-discover the same dead end. |
 
-### 5. Full suite gate
+### 6. Full suite gate
 
 Every applied or proposed change — even a one-line direct apply — gets validated before commit:
 
@@ -77,7 +100,7 @@ Both must exit 0. A proposed router/adapter change that fails a fork-owned test 
 `tests/session-start-payload.test.js` budget, `tests/lint-skills.mjs` dangling-link check) means
 the proposal needs rework, not that the test gets loosened.
 
-### 6. Update RELEASE-NOTES and record the new synced ref
+### 7. Update RELEASE-NOTES and record the new synced ref
 
 Add a dated entry to `RELEASE-NOTES.md` under the next fork version, following the 7.0.0 entry's
 shape:
@@ -88,13 +111,79 @@ Resynced the kronflux fork onto the upstream obra/superpowers <new-version> base
 
 List what was applied directly, what was turned into a router/adapter proposal (and whether that
 proposal was accepted or rejected), and what was noted-but-skipped (deleted paths, fork-only
-skills with no upstream equivalent). That line is what step 2 of the *next* sync reads.
+skills with no upstream equivalent). That line is what step 3 of the *next* sync reads as a
+fallback, if the ledger entry is ever missing.
+
+Then, and only then, record the consumption:
+
+```bash
+node scripts/reference-ledger.mjs consume 0_obra_superpowers upstream-sync \
+  --ref <new-sha> --by <fork-commit-sha>
+```
+
+`consume` is last on purpose. A sync that stops early — for any reason — leaves `consumed`
+untouched, so the next run reads a truthful gate instead of inheriting an optimistic one. This
+is the failure the ledger exists to prevent: on 2026-07-26 this playbook itself shipped while
+documenting a 51-commit gap in its own worked example, and nothing recorded that the gap was
+still open.
+
+Where a review demonstrably completed but the mirror's sha at that moment is unrecoverable,
+record the date alone with `--no-ref --date <YYYY-MM-DD>`. Do not substitute a plausible sha.
+
+## Archiving dormant references
+
+A mirror with no upstream commits for five to six months has stopped being a source of new
+material; its useful content has already been absorbed. Retire it rather than re-reviewing it
+every run:
+
+```bash
+node scripts/reference-ledger.mjs archive <name> --reason "no commits in N months"
+```
+
+This moves `_reference/<name>` into `_reference/_archive/<name>` and marks the ledger entry
+`archived`. Nothing is deleted, and deleting the bytes is a separate manual decision.
+
+Archiving is genuinely reversible: `mv _reference/_archive/<name> _reference/<name>`, then `scan`.
+The entry revives — `archivedAt` and `reason` are cleared, `head` is refreshed, and any recorded
+`consumed` survives untouched, so a revived mirror resumes with its real gate rather than starting
+over at `never`. An archived entry whose directory is still absent stays archived.
+
+Archived repositories are dropped from the main `report` table but listed in a trailing `archived:`
+section with their `archivedAt` and `reason`. That is deliberate: archiving removes a repo from
+review, and a retirement whose justification had disappeared from the one command an operator reads
+would be an escape hatch from this tool's whole purpose.
+
+## What the ledger does not catch
+
+Found by adversarially attacking the tool, kept here because a gate you trust blindly is worse
+than one you know the edges of. None occur on the straight-line path; each needs an unusual
+action or a race.
+
+- **A directory replaced by a different repository keeps the old gate.** Entries are keyed by
+  directory name; nothing fingerprints repository identity. Re-cloning something else under a
+  consumed name — or reviving an archived name with a different mirror — inherits the previous
+  `consumed`. With a ref-based gate this degrades honestly to `(unresolvable)`; with a date-only
+  gate it reports a number that means nothing. Prefer ref-based gates.
+- **`scan` running concurrently with `consume` can drop the `consume`.** Whole-file
+  read-modify-write, no lock, and both commands report success. The loss is conservative — the
+  gap reappears rather than shrinking — but re-run `consume` if you ran the two together.
+- **`archive` does not check dormancy.** It accepts any free-text reason and retires a repo with
+  an open gap. The trailing `archived:` section in `report` shows the retirement and its stated
+  reason, not the gap that was abandoned. Check the gap before archiving.
+- **`report` only shows repositories the ledger already knows.** A mirror cloned since the last
+  `scan` is absent entirely rather than listed as new. Run `scan` before trusting the table.
+- **Dates are stamped in UTC and compared locally.** A `consume` late in the evening at a
+  negative UTC offset records tomorrow's date and excludes that evening's commits from a
+  date-only gap. Pass `--date` explicitly if the boundary matters.
+- **Directory names are case-sensitive in the ledger and case-insensitive on Windows.** A
+  case-only rename produces two rows for one repository with contradictory gates.
 
 ## Worked example
 
-Grounded in the fork's actual current gap: last synced ref `d884ae0` (upstream `v6.1.1`); upstream
-mirror is currently at `3dcbd5c` (`v6.2.0`), 51 commits ahead. One hunk of each class, as it would
-be classified today:
+A snapshot taken 2026-07-26, kept for its three classification cases rather than its numbers. The
+gate and the gap it cites are frozen at that date — run step 1 for the current figures, which is
+the whole reason the ledger exists. As written then: last synced ref `d884ae0` (upstream `v6.1.1`),
+mirror at `3dcbd5c` (`v6.2.0`), 51 commits ahead. One hunk of each class:
 
 **Class 1 — path not in the map.** Upstream's
 `skills/systematic-debugging/find-polluter.sh` gained `./`-prefix and `**/`-collapse edge-case
