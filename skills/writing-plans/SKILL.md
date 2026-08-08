@@ -163,16 +163,11 @@ git commit -m "feat: add specific feature"
 ```
 ````
 
+Commit steps stage explicit paths only — `skills/shared/git-hygiene.md` is the contract; never write `git add -A` or `git add .` into a plan step.
+
 ## No Placeholders
 
 Every step must contain the actual content an engineer needs; placeholder or hand-wave content is a **plan failure**. Full banned-patterns list (TBD/TODO, vague "add error handling", "write tests for the above" without code, "similar to Task N", describe-without-show, undefined-symbol references): `references/plan-authoring.md` → "No Placeholders".
-
-## Remember
-- Exact file paths always
-- Complete code in every step — if a step changes code, show the code
-- Exact commands with expected output
-- DRY, YAGNI, TDD, frequent commits
-- Commit steps stage explicit paths only — `skills/shared/git-hygiene.md` is the contract; never write `git add -A` or `git add .` into a plan step
 
 ## Self-Review
 

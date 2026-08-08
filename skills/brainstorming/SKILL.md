@@ -84,6 +84,7 @@ digraph brainstorming {
 - Propose 2-3 different approaches with trade-offs
 - Present options conversationally with your recommendation and reasoning
 - Lead with your recommended option and explain why
+- YAGNI ruthlessly - remove unnecessary features from every approach and design
 
 **Presenting the design:**
 
@@ -133,10 +134,6 @@ Wait for the response next turn. If changes are requested, re-run the review loo
 
 - Invoke the writing-plans skill to create a detailed implementation plan
 - Do NOT invoke any other skill. writing-plans is the next step.
-
-## Key Principles
-
-The core dialogue principles (one question at a time, multiple choice preferred, YAGNI ruthlessly, explore alternatives, incremental validation, be flexible) are in `skills/brainstorming/references/design-details.md`.
 
 ## Visual Companion
 
