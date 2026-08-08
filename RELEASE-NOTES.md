@@ -1,5 +1,80 @@
 # Superpowers Release Notes
 
+## 7.12.0 — upstream v6.2.0 sync
+
+Resynced the kronflux fork onto the upstream obra/superpowers v6.2.0 base (`44c9b2d`).
+
+- **Windows SessionStart could fail before the polyglot wrapper ever ran.** The generated
+  hook command opens with a quoted path — `"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd"
+  session-start` — which PowerShell parses as a leading expression and dies on the next
+  bareword, and which cmd.exe's quote-stripping can truncate at a metacharacter such as a
+  `(` in a profile directory. Both failures happen before `run-hook.cmd`'s polyglot header is
+  reached, so it could not catch either. Fixed upstream in `5151e7a` by declaring
+  `shell: "bash"` on the hook entry; the fix here required two changes together, since
+  `scripts/compile-hooks.mjs`'s `emitClaudeStyle()` copied only `type`/`command`/`async` and
+  would have silently dropped a `shell` field added to `plugin.universal.mjs` alone. Recent
+  Claude Code (≥2.1.81) auto-detects Git Bash, which is why this was latent rather than
+  constant.
+- **`scripts/package-codex-plugin.sh` was broken on this machine.** Verified live: `tar -cf -
+  --format ustar --uid 0 --gid 0 ...` against GNU tar 1.35 fails with `tar: unrecognized
+  option '--uid'` — those are bsdtar-only flags. Now detects GNU tar vs bsdtar and switches
+  flag spelling (`--owner=:0 --group=:0 --numeric-owner` vs `--uid 0 --gid 0 --uname ''
+  --gname ''`) accordingly.
+- **`find-polluter` matched neither `./`-prefixed nor top-level test patterns.** Adopted
+  upstream's fix and its regression test (`tests/systematic-debugging/test-find-polluter.sh`);
+  the test failed 4 of 5 assertions against the pre-fix script, confirming the bug before the
+  fix landed.
+- **Plan-scoped SDD workspace: one directory per plan.** `.superpowers/sdd/` used to be flat,
+  so two plans' `task-N-report.md` could be the same file. That collided in practice: five
+  implementers across two plans opened their report path and found a stale report from an
+  unrelated plan, and it happened again while generating briefs for this very sync. Workspaces
+  now live under `.superpowers/sdd/<plan-basename>/`, and `review-package` gains a required
+  first argument (`review-package PLAN_FILE BASE HEAD [OUTFILE]`) so its output is scoped the
+  same way; all seven call sites across five docs were updated to the new signature.
+- **`writing-good-tests` replaces `testing-anti-patterns`.** Upstream's rewrite builds on two
+  principles — a test must be able to fail for a real production change, and mocks earn no
+  assertions — and catches four of the five falsifiability defects this fork actually shipped
+  and caught in workstream 1. Two gaps were added as fork content to close the remaining
+  cases: a named heuristic for fixture inputs collapsing to a single path (input-diversity
+  collapse), and a check for a comment that claims a guarantee the test cannot observe
+  (comment-versus-behavior drift).
+- **Router-pointer skill compression sweep.** Adopted upstream's compression across eleven
+  `SKILL.md` files plus a hand-merge of `finishing-a-development-branch/SKILL.md` around its
+  fork-owned pointer sentences and `Hard Rules` section. `subagent-driven-development/SKILL.md`
+  was deliberately excluded (see Not taken).
+- **Harness-reference refresh.** `skills/using-superpowers/references/gemini-tools.md` now
+  documents `invoke_agent`/`generalist` dispatch (replacing the stale `@agent-name` mapping),
+  the `GEMINI.md` instructions-file hierarchy, and the expanded tracker tool list;
+  `skills/brainstorming/visual-companion.md` gained the Gemini CLI foreground-server snippet.
+  `tests/pi/test-pi-extension.mjs` now asserts mapping-table rows instead of matching literal
+  tokens anywhere in the file, closing a gap where deleting the table but leaving the prose
+  would still have passed.
+- **Two corrections to our own sync documentation.** `docs/superpowers/upstream-sync.md` cited
+  `skills/using-superpowers/references/gemini-tools.md` as a worked example of "upstream
+  touches a path this fork has deleted" — that file is live, imported by `GEMINI.md`, and was
+  deliberately ported back during the 7.0.0 resync; the false example is replaced with a
+  statement that no such deleted-path example currently exists in this fork.
+  `docs/superpowers/fork-divergence-map.md` gained an entry for
+  `skills/using-superpowers/references/antigravity-tools.md`, which had diverged into an
+  independently written, materially richer document with no map entry flagging that — a future
+  sync would otherwise have applied upstream hunks directly and destroyed fork content. A
+  related false claim (that upstream's harness-reference siblings were fork-deleted) was found
+  and corrected in the same area.
+
+**Not taken.** Six items from the upstream range were deliberately left out:
+- `skills/subagent-driven-development/SKILL.md` — upstream's 541-line lifecycle restructure
+  collides with fork-owned `Parallel Waves (guarded)` and `Task Persistence Sync` sections and
+  needs its own spec, not a sync hunk.
+- `re-review-prompt.md` — reverses a decision this fork's own
+  `specs/2026-06-09-sdd-task-scoped-review-dispatch-design.md` rejected with cited evidence.
+- `implementer-prompt.md` — its "will be resumed with the findings" wording describes a
+  mechanism this fork's documented controller does not have.
+- `codex-tools.md` — describes the resume-based fix loop this fork has not adopted.
+- `tests/antigravity/test-antigravity-tools.sh` — upstream deletes assertions that are still
+  true for this fork's richer `antigravity-tools.md`; applying it would delete valid coverage.
+- `tests/codex/test-package-codex-plugin.sh` — upstream's version needs `python3`, which this
+  machine lacks only a non-functional Microsoft Store stub of.
+
 ## 7.11.0 — plan task snapshots that tell the truth
 
 - **`hooks/sync-plan-tasks.js` keeps `<plan>.md.tasks.json` in sync.**

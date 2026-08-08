@@ -298,12 +298,20 @@ case "$FORMAT" in
     )
     ;;
   tar.gz)
-    # Match the prior official archive's deterministic tar entry metadata.
+    # Match the prior official archive's deterministic tar entry metadata:
+    # ustar entries with uid/gid 0 and empty uname/gname. GNU tar and bsdtar
+    # spell those flags differently, and GNU tar (Git Bash) rejects the bsdtar
+    # spelling outright rather than ignoring it.
+    if tar --version 2>/dev/null | grep -q 'GNU tar'; then
+      TAR_METADATA_FLAGS=(--owner=:0 --group=:0 --numeric-owner)
+    else
+      TAR_METADATA_FLAGS=(--uid 0 --gid 0 --uname '' --gname '')
+    fi
     TZ=UTC find "$STAGE" -exec touch -t 197001010000 {} +
     (
       cd "$STAGE"
       rm -f "$OUTPUT"
-      COPYFILE_DISABLE=1 tar -cf - --no-recursion --format ustar --uid 0 --gid 0 --uname '' --gname '' -T "$ARCHIVE_LIST" |
+      COPYFILE_DISABLE=1 tar -cf - --no-recursion --format ustar "${TAR_METADATA_FLAGS[@]}" -T "$ARCHIVE_LIST" |
         gzip -9n >"$OUTPUT"
     )
     ;;

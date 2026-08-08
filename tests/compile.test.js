@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { validate } from '../scripts/compile-hooks.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -66,5 +67,46 @@ describe('generated manifests (validity)', () => {
   it('does not register PreCompact (ceded to context-mode)', () => {
     const hj = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks/hooks.json'), 'utf8'));
     expect(hj.hooks.PreCompact).toBeUndefined();
+  });
+
+  it('declares shell:bash on the SessionStart run-hook.cmd entry', () => {
+    // The command opens with a quoted path. PowerShell parses that leading
+    // quoted string as an expression and dies on the next bareword; cmd.exe's
+    // /c quote-stripping truncates at any metacharacter in the path. Both
+    // failures happen BEFORE run-hook.cmd is reached, so its polyglot header
+    // cannot help. Declaring the shell is what keeps a Windows session from
+    // failing to bootstrap.
+    const hooks = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
+    const groups = hooks.hooks.SessionStart || [];
+    const cmdEntry = groups
+      .flatMap((g) => g.hooks || [])
+      .find((h) => h.command.includes('run-hook.cmd'));
+    expect(cmdEntry, 'SessionStart run-hook.cmd entry').toBeTruthy();
+    expect(cmdEntry.shell).toBe('bash');
+  });
+
+  it('does not put shell on hooks that did not ask for it', () => {
+    // Guards the compiler change: a blanket default would be a different bug.
+    const hooks = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
+    const withShell = Object.values(hooks.hooks)
+      .flat()
+      .flatMap((g) => g.hooks || [])
+      .filter((h) => 'shell' in h);
+    expect(withShell).toHaveLength(1);
+  });
+
+  it('validate() rejects a hook entry whose shell is not "bash"', () => {
+    // "zsh" is a plausible typo/attempt; 123 covers the non-string case;
+    // "" covers an empty-string field. All three must be rejected the same
+    // way "matcher" and "async" already are when malformed.
+    const base = { event: 'SessionStart', command: 'echo test', platforms: ['claude-code'] };
+    for (const badShell of ['zsh', 123, '']) {
+      expect(() => validate([{ ...base, shell: badShell }]), `shell: ${JSON.stringify(badShell)}`).toThrow(/shell/);
+    }
+  });
+
+  it('validate() accepts shell: "bash"', () => {
+    const entry = { event: 'SessionStart', command: 'echo test', shell: 'bash', platforms: ['claude-code'] };
+    expect(() => validate([entry])).not.toThrow();
   });
 });

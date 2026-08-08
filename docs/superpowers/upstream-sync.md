@@ -85,7 +85,7 @@ For each path in the `--name-only` list, look it up in
 | **Path in the map, hunk falls outside every listed fork-owned section** | Apply directly — the touched prose is upstream-shared content the fork has not diverged. |
 | **Path in the map, hunk falls inside a listed fork-owned section** (`router-pointer`, `hook-point`, `moved`, `identity`) | Do **not** apply the hunk as-is. Write it up as a proposed change to the corresponding router/adapter/hook file and evaluate it on its own terms — does the underlying behavior change belong in `skills/shared/conductor/*.md`, in a hook script, or does it not apply because the fork's mechanism already solves the same problem differently? |
 | **Path is an `overlay` row** (`.antigravity-plugin/`) | Never diff this path directly — it's regenerated. If the *source* skill changed, that's already the router-pointer/net-new row for the source path; after resolving that, rerun `scripts/sync-to-antigravity.sh` once at the end. |
-| **Upstream touches a path this fork has deleted** (e.g. `skills/using-superpowers/references/gemini-tools.md`, removed post-Gemini-EOL) | Read the upstream change for informational value only; there is nothing to apply. Note it in the sync's summary so the next person doesn't re-discover the same dead end. |
+| **Upstream touches a path this fork has deleted** | Read the upstream change for informational value only; there is nothing to apply. Note it in the sync's summary so the next person doesn't re-discover the same dead end. As of the 2026-08-08 sync this fork has no such paths — the previously cited example (`gemini-tools.md`) turned out to be live and imported by `GEMINI.md`, which cost that sync a wasted investigation. |
 
 ### 6. Full suite gate
 

@@ -50,6 +50,13 @@ export function validate(entries) {
     if ('async' in entry && typeof entry.async !== 'boolean') {
       throw new Error(`${at}: async must be a boolean when present`);
     }
+    // Only 'bash' is a known-good value: it's the one shell every dispatch
+    // path in this repo (run-hook.cmd's polyglot header, docs/windows/polyglot-hooks.md)
+    // is written to run under. Widen this only with evidence Claude Code
+    // honours another shell name.
+    if ('shell' in entry && entry.shell !== 'bash') {
+      throw new Error(`${at}: shell must be "bash" when present`);
+    }
   });
 }
 
@@ -65,6 +72,7 @@ function emitClaudeStyle(entries) {
     const group = {};
     if ('matcher' in e) group.matcher = e.matcher;
     const hook = { type: 'command', command: e.command };
+    if ('shell' in e) hook.shell = e.shell;
     if ('async' in e) hook.async = e.async;
     group.hooks = [hook];
     (events[e.event] ??= []).push(group);
