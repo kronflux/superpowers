@@ -17,6 +17,15 @@ fail() {
     FAILURES=$((FAILURES + 1))
 }
 
+# On Windows Git Bash the same directory prints in two different notations:
+# `git rev-parse --show-toplevel` returns Windows form (C:/Users/...), while
+# `cd DIR && pwd` — what sdd-workspace uses internally to print its result —
+# returns MSYS form (/tmp/...). Route any already-existing directory through
+# the same `cd && pwd` transform before string-comparing it against a
+# script's output, so the comparison holds on both notations instead of
+# failing on notation alone.
+canon() { ( cd "$1" && pwd ); }
+
 cleanup() {
     if [[ -n "$TEST_ROOT" && -d "$TEST_ROOT" ]]; then
         rm -rf "$TEST_ROOT"
@@ -75,7 +84,7 @@ PLAN
     dir_a="$(cd "$repo" && "$SDD_SCRIPTS/sdd-workspace" plan-a.md)"
     dir_b="$(cd "$repo" && "$SDD_SCRIPTS/sdd-workspace" plan-b.md)"
 
-    if [[ "$dir_a" == "$repo/.superpowers/sdd/plan-a" ]]; then
+    if [[ "$dir_a" == "$(canon "$repo")/.superpowers/sdd/plan-a" ]]; then
         pass "prints <repo-root>/.superpowers/sdd/<plan-basename>"
     else
         fail "prints <repo-root>/.superpowers/sdd/<plan-basename>"
@@ -122,7 +131,7 @@ PLAN
     local brief_out brief_path
     brief_out="$(cd "$repo" && "$SDD_SCRIPTS/task-brief" plan-a.md 1)"
     brief_path="$(printf '%s\n' "$brief_out" | sed -n 's/^wrote \(.*\): [0-9][0-9]* lines$/\1/p')"
-    if [[ "$brief_path" == "$repo/.superpowers/sdd/plan-a/task-1-brief.md" ]]; then
+    if [[ "$brief_path" == "$(canon "$repo")/.superpowers/sdd/plan-a/task-1-brief.md" ]]; then
         pass "task-brief writes its brief under the plan's workspace"
     else
         fail "task-brief writes its brief under the plan's workspace"
@@ -139,7 +148,7 @@ PLAN
     rp_out="$(cd "$repo" && "$SDD_SCRIPTS/review-package" plan-a.md HEAD~1 HEAD)"
     rp_path="$(printf '%s\n' "$rp_out" | sed -n 's/^wrote \(.*\): [0-9].*$/\1/p')"
     case "$rp_path" in
-        "$repo/.superpowers/sdd/plan-a/review-"*.diff)
+        "$(canon "$repo")/.superpowers/sdd/plan-a/review-"*.diff)
             pass "review-package writes its diff under the plan's workspace" ;;
         *)
             fail "review-package writes its diff under the plan's workspace"
@@ -171,7 +180,7 @@ PLAN
     local wt_root wt_dir
     wt_root="$(cd "$wt" && git rev-parse --show-toplevel)"
     wt_dir="$(cd "$wt" && "$SDD_SCRIPTS/sdd-workspace" plan-a.md)"
-    if [[ "$wt_dir" == "$wt_root/.superpowers/sdd/plan-a" && "$wt_dir" != "$dir_a" ]]; then
+    if [[ "$wt_dir" == "$(canon "$wt_root")/.superpowers/sdd/plan-a" && "$wt_dir" != "$dir_a" ]]; then
         pass "linked worktree resolves its own distinct workspace"
     else
         fail "linked worktree resolves its own distinct workspace"
