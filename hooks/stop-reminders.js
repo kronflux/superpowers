@@ -227,6 +227,113 @@ function formatStatsSummary(stats) {
   return `Session summary: ${duration}min, ${stats.totalSkillCalls} skill invocations [${skillNames}], hook-injected context this session: ${injectedKB}KB`;
 }
 
+// Forward-commitment guard (Task 4): catches a turn whose final message
+// promises action ("I'll now", "proceeding to", "writing X now", "let me
+// start") but that recorded no file-changing tool use. Kept short and
+// literal on purpose — a broad regex fires on ordinary prose, and a
+// reminder that fires constantly gets ignored. Errs toward silence: a false
+// nudge on a turn legitimately blocked on the operator ("I'll do X once you
+// answer") is worse than a missed one.
+const FORWARD_COMMITMENT_PATTERNS = [
+  /\bi'll now\b/i,
+  /\bi will now\b/i,
+  /\bproceeding (to|on|now)\b/i,
+  /\blet me (start|now)\b/i,
+  /\bstarting now\b/i,
+  // "writing ... now" within a short, same-clause span (no sentence break).
+  /\bwriting\b[^.\n]{0,40}\bnow\b/i,
+];
+
+const FILE_CHANGING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash']);
+
+const UNFULFILLED_COMMITMENT_REMINDER =
+  'You announced work in this turn and the turn ended without doing it. ' +
+  'If you are blocked on the operator, say what you need. Otherwise, do it now.';
+
+/**
+ * Pure check: does finalMessage contain a forward commitment with no
+ * file-changing tool use recorded in toolUses? Returns the reminder string,
+ * or '' when there is nothing to flag. Never throws — any internal fault
+ * (bad shape, etc.) resolves to '' so the hook fails open.
+ */
+function checkForwardCommitment({ finalMessage, toolUses } = {}) {
+  try {
+    if (typeof finalMessage !== 'string' || !finalMessage) return '';
+    if (!FORWARD_COMMITMENT_PATTERNS.some((re) => re.test(finalMessage))) return '';
+    const uses = Array.isArray(toolUses) ? toolUses : [];
+    const changedFiles = uses.some((t) => t && FILE_CHANGING_TOOLS.has(t.name));
+    if (changedFiles) return '';
+    return UNFULFILLED_COMMITMENT_REMINDER;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Return true if a transcript entry is a real, human-authored user turn
+ * (as opposed to a tool_result, which the API also represents as a "user"
+ * role message). Used to find where the current turn began.
+ */
+function isRealUserMessage(entry) {
+  const content = entry?.message?.content;
+  if (typeof content === 'string') return true;
+  if (!Array.isArray(content)) return false;
+  return content.some((b) => b && b.type !== 'tool_result');
+}
+
+/**
+ * Scan the transcript backward from the end to collect the current turn's
+ * final assistant text and every tool_use recorded since the last real user
+ * message. Returns { finalMessage, toolUses } or null on any read/parse
+ * fault (missing file, malformed JSON, unexpected shape) — callers treat
+ * null the same as "nothing to flag".
+ */
+function getLastTurnData(transcriptPath) {
+  try {
+    const lines = fs.readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean);
+    let finalMessage = '';
+    let foundFinalText = false;
+    const toolUses = [];
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      let entry;
+      try {
+        entry = JSON.parse(lines[i]);
+      } catch {
+        continue; // one malformed line poisons only itself
+      }
+      if (!entry || typeof entry !== 'object') continue;
+
+      if (entry.type === 'user' && isRealUserMessage(entry)) break;
+      if (entry.type !== 'assistant') continue;
+
+      const content = entry.message?.content;
+      if (!Array.isArray(content)) continue;
+
+      for (const block of content) {
+        if (!block || typeof block !== 'object') continue;
+        if (block.type === 'tool_use' && typeof block.name === 'string') {
+          toolUses.push({ name: block.name });
+        }
+      }
+
+      if (!foundFinalText) {
+        const textParts = content
+          .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+          .map((b) => b.text);
+        if (textParts.length > 0) {
+          finalMessage = textParts.join('\n');
+          foundFinalText = true;
+        }
+      }
+    }
+
+    return { finalMessage, toolUses };
+  } catch {
+    return null;
+  }
+}
+
 function getUncommittedCount(cwd) {
   try {
     const result = spawnSync('git', ['status', '--porcelain'], {
@@ -393,6 +500,17 @@ function evaluatePayload(data) {
 
   const reminders = generateReminders(edits, cwd);
 
+  // Forward-commitment guard: the turn's final text promises action but no
+  // file-changing tool ran this turn. See checkForwardCommitment above.
+  const transcriptPath = data.transcript_path;
+  if (typeof transcriptPath === 'string' && transcriptPath) {
+    const turn = getLastTurnData(transcriptPath);
+    if (turn) {
+      const commitmentReminder = checkForwardCommitment(turn);
+      if (commitmentReminder) reminders.push(commitmentReminder);
+    }
+  }
+
   // Decision-log reminder: only when the memory workflow is actually in use
   // (session-log.md exists in cwd). Without it there is nowhere to save, so the
   // nudge would be noise every turn — the "start using memory" offer belongs to
@@ -458,14 +576,17 @@ if (isMain) {
 }
 
 export {
+  checkForwardCommitment,
   checkSessionLogSize,
   checkStateMdStaleness,
   evaluatePayload,
   generateReminders,
   getEditsAfter,
   getLastSavedEntryTime,
+  getLastTurnData,
   getRecentEdits,
   guardFile,
+  isRealUserMessage,
   isSourceFile,
   isTestFile,
   matchesSession,
