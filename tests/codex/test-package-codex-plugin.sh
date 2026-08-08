@@ -5,6 +5,27 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SCRIPT_UNDER_TEST="$REPO_ROOT/scripts/package-codex-plugin.sh"
 
+# This suite drives package-codex-plugin.sh and inspects the resulting
+# archives with Python (json/zipfile/tarfile), which is more portable than
+# parsing `tar -tv` column output. Resolve a working interpreter the same
+# way the gate hooks do — `command -v python3` alone is not a reliable
+# liveness check on Windows (see hooks/examples/lib-python.sh) — and skip
+# cleanly rather than fail if none is found.
+source "$REPO_ROOT/hooks/examples/lib-python.sh"
+if ! sp_resolve_python; then
+  echo "[SKIP] no working Python interpreter found (python3/python/py -3) - skipping Codex package archive tests"
+  exit 0
+fi
+
+# The resolved interpreter may be a native Windows python.exe (as opposed to
+# an MSYS build), which cannot resolve Git Bash's POSIX-style paths
+# (/c/Users/...). Convert paths passed to python to Windows mixed-form via
+# cygpath, matching the convention in tests/claude-code/test-user-gate-hooks.sh.
+pypath() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi
+}
+REPO_ROOT_PY="$(pypath "$REPO_ROOT")"
+
 FAILURES=0
 TEST_ROOT="$(mktemp -d)"
 
@@ -140,7 +161,7 @@ extracted="$TEST_ROOT/extracted"
 tar_extracted="$TEST_ROOT/tar-extracted"
 write_metadata_fixture "$metadata_source"
 
-source_hooks="$(python3 -c 'import json; print(json.load(open("'"$REPO_ROOT"'/.codex-plugin/plugin.json")).get("hooks"))')"
+source_hooks="$("${SP_PYTHON[@]}" -c 'import json; print(json.load(open("'"$REPO_ROOT_PY"'/.codex-plugin/plugin.json")).get("hooks"))')"
 assert_equals "$source_hooks" "{}" "source Codex manifest suppresses local hook auto-discovery"
 
 if output="$("$SCRIPT_UNDER_TEST" --allow-dirty --metadata-source "$metadata_source" --output "$archive" 2>&1)"; then
@@ -171,8 +192,8 @@ assert_contains "$archive_paths" "skills/brainstorming/agents/openai.yaml" "arch
 assert_contains "$archive_paths" "assets/app-icon.png" "archive includes app icon"
 assert_contains "$archive_paths" "assets/superpowers-small.svg" "archive includes composer icon"
 
-manifest_summary="$(read_archive_file "$archive" .codex-plugin/plugin.json | python3 -c 'import json,sys; data=json.load(sys.stdin); print("\t".join([data["name"], data["version"], data["skills"], str(data.get("hooks"))]))')"
-expected_version="$(python3 -c 'import json; print(json.load(open("'"$REPO_ROOT"'/.codex-plugin/plugin.json"))["version"])')"
+manifest_summary="$(read_archive_file "$archive" .codex-plugin/plugin.json | "${SP_PYTHON[@]}" -c 'import json,sys; data=json.load(sys.stdin); print("\t".join([data["name"], data["version"], data["skills"], str(data.get("hooks"))]))')"
+expected_version="$("${SP_PYTHON[@]}" -c 'import json; print(json.load(open("'"$REPO_ROOT_PY"'/.codex-plugin/plugin.json"))["version"])')"
 assert_equals "$manifest_summary" "superpowers	$expected_version	./skills/	$source_hooks" "archive manifest preserves source hooks"
 
 skill_count="$(find "$extracted/skills" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
@@ -185,7 +206,7 @@ else
   fail "archive preserves executable script mode"
 fi
 
-zip_times="$(python3 - "$archive" <<'PY'
+zip_times="$("${SP_PYTHON[@]}" - "$(pypath "$archive")" <<'PY'
 import sys
 import zipfile
 
@@ -210,8 +231,13 @@ assert_equals "$tar_archive_paths" "$archive_paths" "zip and tar.gz archives con
 tar_task_brief_mode="$(tar -tzvf "$tar_archive" skills/subagent-driven-development/scripts/task-brief | awk '{print $1}')"
 assert_equals "$tar_task_brief_mode" "-rwxr-xr-x" "tar.gz archive preserves executable script mode"
 
-tar_metadata_times="$(tar -tzvf "$tar_archive" | awk '{print $6, $7, $8}' | sort -u)"
-assert_equals "$tar_metadata_times" "Dec 31 1969" "tar.gz archive normalizes entry timestamps"
+tar_metadata_times="$("${SP_PYTHON[@]}" - "$(pypath "$tar_archive")" <<'PY'
+import sys, tarfile
+with tarfile.open(sys.argv[1]) as archive:
+    print(sorted({member.mtime for member in archive.getmembers()}))
+PY
+)"
+assert_equals "$tar_metadata_times" "[0]" "tar.gz archive normalizes entry timestamps"
 
 metadata_archive="$TEST_ROOT/metadata-source.tar.gz"
 metadata_zip="$TEST_ROOT/metadata-source.zip"
