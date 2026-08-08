@@ -564,10 +564,89 @@ describe('archive', () => {
     expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
   });
 
-  it('refuses an unknown reference name', () => {
+  it('refuses an unknown reference name, with a prefixed one-line message and no stack trace', () => {
+    // Message-shape assertion, not just a non-zero exit: a bare `.toThrow()`
+    // or `.status !== 0` check would still pass if the ledger-membership
+    // guard were deleted entirely, because renameSync's raw ENOENT on a
+    // nonexistent source also exits non-zero.
     mkRepo(root, 'alpha');
     run(root, ['scan']);
-    expect(runCli(root, ['archive', 'nosuch', '--reason', 'dormant']).status).not.toBe(0);
+    const result = runCli(root, ['archive', 'nosuch', '--reason', 'dormant']);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr.trim().split('\n')).toHaveLength(1);
+    expect(result.stderr).toMatch(/^reference-ledger: unknown repository 'nosuch'/);
+    expect(result.stderr).not.toMatch(/^\s*at /m);
+  });
+
+  it('refuses a name the ledger never scanned even though a same-named stray directory exists on disk', () => {
+    // Distinct failure from the ledger-has-it-but-disk-doesn't case below:
+    // this is disk-has-it-but-the-ledger-never-scanned-it. Without the
+    // ledger-membership check, archiving 'stray' would invent a fresh
+    // 'archived' entry for something no scan ever observed.
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    fs.mkdirSync(path.join(root, 'stray'), { recursive: true });
+    expect(() => archive(root, 'stray', 'dormant'))
+      .toThrow(/^reference-ledger: unknown repository 'stray'/);
+    expect(fs.existsSync(path.join(root, 'stray'))).toBe(true);
+  });
+
+  it('refuses when the ledger has the entry but the source directory is already gone from disk', () => {
+    // The other half of the pair above: ledger says yes, disk says no.
+    mkRepo(root, 'stale');
+    run(root, ['scan']);
+    fs.rmSync(path.join(root, 'stale'), { recursive: true, force: true });
+    expect(() => archive(root, 'stale', 'dormant'))
+      .toThrow(/^reference-ledger: no such reference 'stale'/);
+  });
+
+  it('refuses a name that escapes dir via path traversal, leaving the outside directory untouched', () => {
+    // path.join(dir, '_archive', '..', name) for name === '../<outside>'
+    // collapses back to a path outside _reference/ entirely - the
+    // destination-exists check alone guards nothing against this.
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    const outsideName = `evil-${path.basename(root)}`;
+    const outside = path.join(path.dirname(root), outsideName);
+    fs.mkdirSync(outside, { recursive: true });
+    fs.writeFileSync(path.join(outside, 'marker.txt'), 'do-not-move');
+    try {
+      expect(() => archive(root, `../${outsideName}`, 'dormant'))
+        .toThrow(/^reference-ledger: invalid reference name/);
+      expect(fs.existsSync(path.join(outside, 'marker.txt'))).toBe(true);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a name containing a path separator outright', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    expect(() => archive(root, 'sub/evil', 'dormant'))
+      .toThrow(/^reference-ledger: invalid reference name/);
+  });
+
+  it('refuses to archive the _archive directory itself, with a prefixed message and no stack trace', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    fs.mkdirSync(path.join(root, '_archive'), { recursive: true });
+    const result = runCli(root, ['archive', '_archive', '--reason', 'dormant']);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr.trim().split('\n')).toHaveLength(1);
+    expect(result.stderr).toMatch(/^reference-ledger: '_archive' is not a reference/);
+    expect(result.stderr).not.toMatch(/^\s*at /m);
+  });
+
+  it('refuses via a corrupt ledger without moving the directory first', () => {
+    // The move must never happen before the ledger is confirmed readable and
+    // writable: otherwise a load() failure strands a relocated directory
+    // that nothing records as archived.
+    mkRepo(root, 'stale');
+    run(root, ['scan']);
+    fs.writeFileSync(ledgerPath(root), '{"schema":1,"updated');
+    expect(() => archive(root, 'stale', 'dormant')).toThrow();
+    expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
+    expect(fs.existsSync(path.join(root, '_archive', 'stale'))).toBe(false);
   });
 
   it('refuses a missing reason', () => {

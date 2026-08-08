@@ -240,27 +240,64 @@ function consume(dir, name, workstream, opts = {}) {
  * Validated here, not only in the CLI dispatch below: Task 5 calls this
  * export directly, bypassing main()'s usage check, and an unreasoned archive
  * would silently drop the one field the operator asked this command to record.
+ *
+ * Every check below - name shape, `_archive` itself, `reason`, ledger
+ * membership, source presence, destination absence - runs before the single
+ * `renameSync`. This is the one command that mutates the filesystem, so a
+ * refusal must always leave the source exactly where it was; reading the
+ * ledger only after the move would strand a relocated directory the ledger
+ * never learns about if `load()` then throws.
  */
 function archive(dir, name, reason) {
-  const src = path.join(dir, name);
-  const dest = path.join(dir, '_archive', name);
-  // Self-prefixing, matching load() and consume(): main()'s shared try/catch
-  // prints err.message verbatim. Both checks run before any mutation, so a
-  // refusal always leaves the source exactly where it was.
-  if (!fs.existsSync(src)) throw new Error(`reference-ledger: no such reference '${name}'`);
-  if (fs.existsSync(dest)) throw new Error(`reference-ledger: already archived: ${dest}`);
+  // Reject any name that can escape `dir`. `path.join(dir, '_archive', '..',
+  // name)` for name === '../evilName' collapses back to `dir/evilName`
+  // outside `_reference/` entirely, so the destination-exists check below
+  // would be guarding the wrong path - it never sees the real target.
+  const resolved = path.resolve(dir, name);
+  if (name.includes('/') || name.includes(path.sep)
+    || !resolved.startsWith(`${path.resolve(dir)}${path.sep}`)) {
+    throw new Error(`reference-ledger: invalid reference name '${name}'`);
+  }
+  // `_archive` is the destination directory itself, not a reference (discover()
+  // already excludes it). Archiving it renames it into itself
+  // (`_archive/_archive`), which Node reports as a raw, unprefixed EINVAL -
+  // a stack trace for what should be an ordinary refusal.
+  if (name === '_archive') {
+    throw new Error(`reference-ledger: '_archive' is not a reference`);
+  }
   if (typeof reason !== 'string' || reason.length === 0) {
     throw new Error('reference-ledger: reason is required and must be a non-empty string');
   }
-  fs.mkdirSync(path.join(dir, '_archive'), { recursive: true });
-  fs.renameSync(src, dest);
   const ledger = load(dir);
+  // Matches consume()'s guard: a name the ledger has never heard of (never
+  // scanned) is refused even if a same-named, never-tracked directory
+  // happens to sit on disk - archiving it would invent a fresh ledger entry
+  // for something no scan ever observed.
+  if (!ledger.repos[name]) {
+    throw new Error(`reference-ledger: unknown repository '${name}' - run scan first`);
+  }
+  const src = path.join(dir, name);
+  const dest = path.join(dir, '_archive', name);
+  // Distinct from the ledger check above: this covers the opposite mismatch,
+  // where the ledger still lists the entry but the directory is already gone
+  // from disk (removed by hand, moved manually, etc).
+  if (!fs.existsSync(src)) throw new Error(`reference-ledger: no such reference '${name}'`);
+  if (fs.existsSync(dest)) throw new Error(`reference-ledger: already archived: ${dest}`);
+  fs.mkdirSync(path.join(dir, '_archive'), { recursive: true });
+  // `_archive` always lives inside `dir`, so this never crosses a filesystem
+  // boundary in normal use. If `_reference/` were ever mounted across
+  // volumes, renameSync would throw an unprefixed EXDEV instead of a
+  // `reference-ledger: ` message - a considered, not missed, gap.
+  fs.renameSync(src, dest);
   ledger.repos[name] = {
-    ...(ledger.repos[name] || {}),
+    ...ledger.repos[name],
     status: 'archived',
     archivedAt: today(),
     reason,
   };
+  // A save() failure here (e.g. disk full) leaves the move done but
+  // unrecorded. The bytes are still never deleted, only the same residual
+  // window every rename-then-record command has; not worth a journal here.
   save(dir, ledger);
 }
 
