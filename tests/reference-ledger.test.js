@@ -177,6 +177,21 @@ describe('load — corrupt or invalid ledger file', () => {
     expect(fs.readFileSync(p, 'utf8')).toBe(truncated);
   });
 
+  it('scan() refuses a shape-invalid ledger through the same load-then-save pipeline proven above for a parse failure', () => {
+    // load() rejecting a bad shape is necessary but not sufficient: the actual
+    // hazard lives in scan()'s load() -> save() pipeline, and only the CLI
+    // truncated-JSON test proves that path is safe - and only for a
+    // JSON.parse SyntaxError. A later `try/catch` inside scan() that treats a
+    // parse failure as fatal but falls back to a fresh ledger for a *shape*
+    // failure would pass every load()-only test below while reintroducing the
+    // original bug for six of seven corrupt shapes, undetected.
+    const p = ledgerPath(root);
+    const noRepos = '{}';
+    fs.writeFileSync(p, noRepos);
+    expect(() => scan(root)).toThrow();
+    expect(fs.readFileSync(p, 'utf8')).toBe(noRepos);
+  });
+
   // Valid JSON that isn't a ledger shape is no more safely overwritable than
   // truncated JSON - both must refuse rather than fall back to a fresh ledger.
   const notALedger = {
@@ -186,6 +201,10 @@ describe('load — corrupt or invalid ledger file', () => {
     'a number': '42',
     'a boolean': 'true',
     'an object with no repos key': '{}',
+    // More realistic than the synthetic shapes above: what a bad merge or a
+    // hand-edit produces when schema/updatedAt survive but repos gets clobbered.
+    'repos as an array': '{"schema":1,"updatedAt":null,"repos":[]}',
+    'repos as a string': '{"schema":1,"updatedAt":null,"repos":"notanobject"}',
   };
   for (const [label, content] of Object.entries(notALedger)) {
     it(`throws on ${label} and leaves the file untouched`, () => {
