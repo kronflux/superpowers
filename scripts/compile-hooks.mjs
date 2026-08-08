@@ -65,6 +65,7 @@ function emitClaudeStyle(entries) {
     const group = {};
     if ('matcher' in e) group.matcher = e.matcher;
     const hook = { type: 'command', command: e.command };
+    if ('shell' in e) hook.shell = e.shell;
     if ('async' in e) hook.async = e.async;
     group.hooks = [hook];
     (events[e.event] ??= []).push(group);

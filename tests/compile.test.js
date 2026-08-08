@@ -67,4 +67,30 @@ describe('generated manifests (validity)', () => {
     const hj = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks/hooks.json'), 'utf8'));
     expect(hj.hooks.PreCompact).toBeUndefined();
   });
+
+  it('declares shell:bash on the SessionStart run-hook.cmd entry', () => {
+    // The command opens with a quoted path. PowerShell parses that leading
+    // quoted string as an expression and dies on the next bareword; cmd.exe's
+    // /c quote-stripping truncates at any metacharacter in the path. Both
+    // failures happen BEFORE run-hook.cmd is reached, so its polyglot header
+    // cannot help. Declaring the shell is what keeps a Windows session from
+    // failing to bootstrap.
+    const hooks = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
+    const groups = hooks.hooks.SessionStart || [];
+    const cmdEntry = groups
+      .flatMap((g) => g.hooks || [])
+      .find((h) => h.command.includes('run-hook.cmd'));
+    expect(cmdEntry, 'SessionStart run-hook.cmd entry').toBeTruthy();
+    expect(cmdEntry.shell).toBe('bash');
+  });
+
+  it('does not put shell on hooks that did not ask for it', () => {
+    // Guards the compiler change: a blanket default would be a different bug.
+    const hooks = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
+    const withShell = Object.values(hooks.hooks)
+      .flat()
+      .flatMap((g) => g.hooks || [])
+      .filter((h) => 'shell' in h);
+    expect(withShell).toHaveLength(1);
+  });
 });

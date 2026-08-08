@@ -42,6 +42,7 @@ hooks/
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start",
+            "shell": "bash",
             "async": false
           }
         ]
@@ -52,6 +53,32 @@ hooks/
 ```
 
 The path is quoted because `${CLAUDE_PLUGIN_ROOT}` may contain spaces.
+
+## Why the SessionStart entry declares `shell: "bash"`
+
+The command above opens with a quoted path (`"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd"`).
+Without an explicit `shell` declaration, Claude Code dispatches the command through
+whatever shell it falls back to on the host platform, and on Windows both fallbacks
+break on this shape before the polyglot dispatcher ever runs:
+
+- **PowerShell** parses the leading quoted string as an expression, then fails on the
+  bareword argument (`session-start`) that follows it.
+- **cmd.exe**'s `/c` quote-stripping truncates the command at the first metacharacter
+  in the path — for example a profile directory containing `(`.
+
+Because both failures happen before `run-hook.cmd` is invoked, its polyglot header
+(the CMD/bash dual-mode block described below) cannot rescue the hook — a broken
+shell never reaches the script that would otherwise dispatch correctly. Declaring
+`shell: "bash"` on the manifest entry forces Claude Code to invoke the command through
+bash (Git for Windows), bypassing both failure modes.
+
+`hooks/hooks.json` is generated: the `shell` field originates on the SessionStart entry
+in `plugin.universal.mjs` and is carried into the compiled output by `emitClaudeStyle`
+in `scripts/compile-hooks.mjs`. Adding `shell` to a manifest entry without also
+propagating it in the compiler is a silent no-op — the compiler only copies fields it
+explicitly knows about, so an unpropagated field is dropped at compile time with no
+error. `tests/compile.test.js` asserts both that the field survives into
+`hooks/hooks.json` and that it is not applied to any other hook.
 
 ## How `run-hook.cmd` Works at a High Level
 

@@ -14,6 +14,10 @@ export default {
       event: 'SessionStart',
       matcher: 'startup|clear|compact',
       command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" session-start',
+      // The command opens with a quoted path, which PowerShell parses as an
+      // expression and cmd.exe truncates at a metacharacter. Both fail before
+      // run-hook.cmd runs, so the polyglot header cannot rescue it.
+      shell: 'bash',
       async: false,
       platforms: ['claude-code'],
     },
