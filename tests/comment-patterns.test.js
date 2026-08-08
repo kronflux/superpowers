@@ -19,6 +19,14 @@ const MUST_FLAG = [
   'Temporary hack until the API stabilises',
   'this is temporary, remove after migration',
   'hacky workaround for the date parser',
+  // Narration constructions: a change explained by its cause, not a
+  // behavior. Impermanence constructions: deferred work and ticket refs.
+  'Adding a guard here because the API returns null',
+  'Added a fallback because the primary DB keeps dropping connections',
+  'Workaround because the vendor SDK leaks handles',
+  'See ticket #4412 for the original report',
+  'TODO: revisit after the migration',
+  'Fix later, tech debt',
 ];
 
 // The spec's generic GOOD examples plus the two present-state comments a
@@ -48,6 +56,8 @@ const MUST_NOT_FLAG = [
 //   36-37  hand-written hard cases naming "test" and failure handling
 //   38-41  hand-written hard cases: "temporary"/"hack"/"for now" as
 //          ordinary vocabulary rather than an impermanence construction
+//   42-47  hand-written hard cases: "mocking"/"revisit"/a bare number/
+//          sentence-initial past-tense verbs as ordinary vocabulary
 const NEGATIVE_CORPUS = [
   // hooks/lib/*.js, scripts/*.js — this repo
   'Advertised is not installed: a marketplace lists every plugin it offers',
@@ -101,6 +111,14 @@ const NEGATIVE_CORPUS = [
   'Removes the temporary directory on exit',
   'Parses the hack-day export format',
   'Returns the cached value for now-current sessions',
+  // Hand-written hard cases: "mocking"/"revisit"/a bare number/
+  // sentence-initial past-tense verbs as ordinary vocabulary.
+  'Mocking is handled by the test harness',
+  'Revisit the cache on every poll',
+  'Returns the issue 404 page when absent',
+  'Updated timestamp is returned in ISO format',
+  'Improved-precision mode rounds to six decimals',
+  'Adjusted gross income is read from field 7',
 ];
 
 describe('classifyComment', () => {
