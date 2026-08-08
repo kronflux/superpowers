@@ -148,6 +148,7 @@ that `feat/config-dir-isolation` did not touch again (folded in per the snapshot
 | `skills/token-efficiency/SKILL.md` | Entire file | `net-new` | Fork-only skill. |
 | `skills/using-git-worktrees/SKILL.md` | Tool Selection pointer paragraph | `router-pointer` | Shared skill; upstream also edits this path. |
 | `skills/using-superpowers/SKILL.md` | The context-mode/conductor routing paragraph (this is the SessionStart payload body) | `router-pointer` | Shared skill; also budget-gated — see `tests/session-start-payload.test.js` row below. |
+| `skills/using-superpowers/references/antigravity-tools.md` | Entire file | `identity` | Independently rewritten for this fork — own "Skill loading" and "Subagent support" sections with static/dynamic prompt and workspace-isolation detail. Upstream hunks must be evaluated, never applied directly; upstream removes an anchor that is not dangling here. Its test (`tests/antigravity/test-antigravity-tools.sh`) asserts fork-only content. |
 | `skills/using-superpowers/references/routing-guide.md` | Complexity-Tiers section + pointer path | `router-pointer` | Shared reference; upstream also edits sibling files in this directory (those specific files are fork-deleted, see `upstream-sync.md` note on deleted-but-upstream-live files). |
 | `skills/verification-before-completion/SKILL.md` | Tool Selection pointer paragraph | `router-pointer` | Shared skill; upstream also edits this path. |
 | `skills/writing-plans/SKILL.md` | Tool Selection pointer paragraph | `router-pointer` | Shared skill; upstream also edits this path (see upstream-sync.md worked example). |
@@ -167,6 +168,9 @@ that `feat/config-dir-isolation` did not touch again (folded in per the snapshot
   touched and this one did not. These are additive coverage, not part of the 30-file diff count
   above — they exist so the playbook has somewhere to look up a file upstream touches that neither
   recent branch went near.
+- Table 2 carries a 66th row added out-of-band after this snapshot (2026-08-08): a corrective entry
+  for `skills/using-superpowers/references/antigravity-tools.md`, missing from the original
+  generation and added directly rather than by a full table regeneration (see `upstream-sync.md`).
 
 ## Spot-check (3 files picked from `sed -n '3p;16p;28p'` on the diff list)
 
