@@ -2,7 +2,7 @@
   "name": "superpowers",
   "displayName": "Superpowers",
   "description": "Core skills library: TDD, debugging, collaboration patterns, and proven techniques",
-  "version": "7.12.0",
+  "version": "7.13.0",
   "author": {
     "name": "Richard M",
     "email": "richard@rmoser.ca"
