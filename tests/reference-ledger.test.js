@@ -321,7 +321,11 @@ describe('report', () => {
   it('prints unresolvable instead of throwing on a bad ref', () => {
     mkRepo(root, 'alpha');
     expect(runCli(root, ['scan']).status).toBe(0);
-    setConsumed(root, 'alpha', { ref: 'nosuchref', date: '2026-01-01', workstream: 'x' });
+    // Hex-shaped so it passes gap()'s resolved-ref check and reaches git,
+    // which is the path this test exercises; a non-hex string like the
+    // literal 'nosuchref' is now refused earlier, before ever calling git
+    // (see 'gap — defensive validation of a hand-edited ledger').
+    setConsumed(root, 'alpha', { ref: 'deadbeef', date: '2026-01-01', workstream: 'x' });
     expect(runCli(root, ['report']).stdout).toMatch(/unresolvable/);
   });
 
@@ -652,11 +656,12 @@ describe('consume', () => {
   });
 });
 
-describe('gap — defensive date validation', () => {
-  // consume() rejects an invalid --date at write time, but gap() reads
-  // straight from load(), which accepts anything shape-valid enough to parse
-  // as JSON. A hand-edited ledger (or a future writer that forgets the
-  // guard) must not reach `--since=<garbage>` regardless.
+describe('gap — defensive validation of a hand-edited ledger', () => {
+  // consume() rejects an invalid --date or a symbolic --ref at write time,
+  // but gap() reads straight from load(), which accepts anything shape-valid
+  // enough to parse as JSON, and the ledger is operator-editable JSON by
+  // design. Neither guard may be reachable only through consume(); a
+  // hand-edit must trip the same defenses.
   it('treats a hand-edited invalid consumed date as unresolvable, never as a git-approxidate guess', () => {
     const root = newRoot();
     try {
@@ -666,6 +671,70 @@ describe('gap — defensive date validation', () => {
       expect(result.label).toMatch(/invalid date/);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a hand-edited consumed.ref of a symbolic ref like HEAD instead of re-resolving it fresh, which would report a permanent 0 gap', () => {
+    // Reproduced against the unfixed code: consume() already resolves --ref
+    // to a sha at write time, but nothing stopped a hand-edited
+    // `ref: 'HEAD'` from reaching gap() unchecked. `HEAD..HEAD` is always 0,
+    // no matter how many commits land, and the row looks completely healthy
+    // - the exact symptom the write-side fix was supposed to eliminate,
+    // reachable through the other door.
+    const root = newRoot();
+    try {
+      const repo = mkRepo(root, 'alpha', 3);
+      expect(runCli(root, ['scan']).status).toBe(0);
+      const l = readLedger(root);
+      l.repos.alpha.consumed = { ref: 'HEAD', date: '2026-08-01', workstream: 'upstream-sync' };
+      writeLedger(root, l);
+      addCommit(repo, 'c3');
+      addCommit(repo, 'c4');
+      expect(runCli(root, ['scan']).status).toBe(0);
+      const result = gap(root, 'alpha', readLedger(root).repos.alpha);
+      expect(result.count).toBeNull();
+      expect(result.label).toMatch(/invalid ref/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('discover — junction mirrors (Windows)', () => {
+  // A directory junction is the standard no-admin way to park a large clone
+  // on another drive. Node reports it as isDirectory()=false,
+  // isSymbolicLink()=true, so a plain isDirectory() filter drops it with no
+  // warning and no "skipped" count. Feature-detected once at collection
+  // time so a machine without junction-creation rights skips cleanly
+  // instead of failing the suite.
+  const junctionsSupported = (() => {
+    const probeTarget = fs.mkdtempSync(path.join(spTmpDir(), 'refledger-junction-probe-'));
+    const probeLink = `${probeTarget}-link`;
+    try {
+      fs.symlinkSync(probeTarget, probeLink, 'junction');
+      return true;
+    } catch {
+      return false;
+    } finally {
+      fs.rmSync(probeLink, { recursive: true, force: true });
+      fs.rmSync(probeTarget, { recursive: true, force: true });
+    }
+  })();
+  const itIfJunctions = junctionsSupported ? it : it.skip;
+
+  itIfJunctions('discovers, scans, and reports a mirror parked behind a directory junction', () => {
+    const root = newRoot();
+    const targetParent = fs.mkdtempSync(path.join(spTmpDir(), 'refledger-target-'));
+    try {
+      const target = mkRepo(targetParent, 'realrepo');
+      fs.symlinkSync(target, path.join(root, 'linked'), 'junction');
+      expect(discover(root)).toEqual(['linked']);
+      expect(runCli(root, ['scan']).status).toBe(0);
+      expect(readLedger(root).repos.linked.head).toMatch(/^[0-9a-f]{7,}$/);
+      expect(runCli(root, ['report']).stdout).toMatch(/linked/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(targetParent, { recursive: true, force: true });
     }
   });
 });

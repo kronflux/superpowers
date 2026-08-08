@@ -42,10 +42,26 @@ function git(repo, args) {
   }).trim();
 }
 
-/** Immediate subdirectories that are git repos. `_archive` is not a reference. */
+/**
+ * Immediate subdirectories that are git repos. `_archive` is not a reference.
+ *
+ * A directory JUNCTION (`mklink /J`, the standard no-admin way on Windows to
+ * park a large clone on another drive) reports `isDirectory()=false,
+ * isSymbolicLink()=true` from Node's perspective. A plain `isDirectory()`
+ * filter drops it silently - no warning, no "skipped" count - so a
+ * junctioned mirror with a real open gap never appears in `report` at all.
+ * The `.git` existence check below already follows the link either way, so
+ * widening the candidate filter costs nothing on an ordinary directory.
+ *
+ * `archive()` is unaware of this: it `renameSync`s whatever is at `dir/name`,
+ * which for a junction moves the link itself, not the target it points to.
+ * That is the correct, intended behavior for a link (the target directory on
+ * the other drive is untouched, exactly as a real `mv` of a symlink would
+ * behave) - noted here so the next reader doesn't mistake it for a gap.
+ */
 function discover(dir) {
   return fs.readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && e.name !== '_archive')
+    .filter((e) => (e.isDirectory() || e.isSymbolicLink()) && e.name !== '_archive')
     .filter((e) => fs.existsSync(path.join(dir, e.name, '.git')))
     .map((e) => e.name)
     .sort();
@@ -109,6 +125,19 @@ function isValidDate(d) {
   } catch {
     return false;
   }
+}
+
+/**
+ * True only for something that already looks like a resolved commit object
+ * name - hex, 7-40 characters. Deliberately does not attempt to resolve it:
+ * a symbolic ref (`HEAD`, `main`, a moving tag) also "looks like" a ref right
+ * up until git resolves it fresh on every call, which is the vulnerability
+ * this exists to avoid, not something a resolve-and-catch could paper over.
+ * `consume()` never writes `consumed.ref` as anything but a resolved sha, so
+ * this can never reject the tool's own output - only a hand-edit.
+ */
+function isResolvedRef(r) {
+  return typeof r === 'string' && /^[0-9a-f]{7,40}$/i.test(r);
 }
 
 /**
@@ -176,6 +205,16 @@ function gap(dir, name, entry) {
   if (!c.ref && !c.date) return { label: 'malformed (no ref or date)', count: null };
   try {
     if (c.ref) {
+      // The read-path sibling of consume()'s write-path fix: consume()
+      // already refuses to store anything but a resolved sha, but the
+      // ledger is operator-editable JSON by design, and a hand-edited
+      // `ref: 'HEAD'` (or 'main', or any moving ref) would otherwise resolve
+      // successfully on every call - `HEAD..HEAD` is always 0, forever, no
+      // matter how many commits land, and the row looks completely healthy.
+      // Refusing before ever calling git is the point: a symbolic ref that
+      // *does* resolve is precisely the lie, so trying and catching cannot
+      // catch it.
+      if (!isResolvedRef(c.ref)) return { label: `${c.ref} (invalid ref)`, count: null };
       const n = git(repo, ['rev-list', '--count', `${c.ref}..HEAD`]);
       return { label: `${c.ref} (${c.date || 'no date'})`, count: Number(n) };
     }
