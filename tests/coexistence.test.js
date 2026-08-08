@@ -70,6 +70,13 @@ describe('coexistence with context-mode', () => {
 
     // Setting the guard for s1 must create exactly that session's lock,
     // never a shared/global one.
+    // Clear any stray default lock first. guardFile() falls back to
+    // stop-default.lock when no session id is supplied, so invoking the hook by
+    // hand — which is what anyone testing it does — leaves that file in the
+    // shared sp/ root and fails this assertion from then on. The property under
+    // test is what setGuard(s1) creates, not what the world happens to hold.
+    fs.rmSync(path.join(spTmpDir(), 'stop-default.lock'), { force: true });
+
     setGuard(s1);
     try {
       expect(fs.existsSync(gf1)).toBe(true);
