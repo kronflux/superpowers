@@ -122,6 +122,44 @@ function scan(dir) {
   return ledger;
 }
 
+/**
+ * Commits between what we consumed and where the mirror now is.
+ * `count: null` means there is nothing honest to count - never consumed, or a
+ * ref that no longer resolves. It is never rendered as 0, which would read as
+ * "up to date".
+ */
+function gap(dir, name, entry) {
+  const repo = path.join(dir, name);
+  const c = entry.consumed;
+  if (!c) return { label: 'never', count: null };
+  try {
+    if (c.ref) {
+      const n = git(repo, ['rev-list', '--count', `${c.ref}..HEAD`]);
+      return { label: `${c.ref} (${c.date})`, count: Number(n) };
+    }
+    const n = git(repo, ['rev-list', '--count', `--since=${c.date}`, 'HEAD']);
+    return { label: `${c.date} (date)`, count: Number(n) };
+  } catch {
+    return { label: `${c.ref || c.date} (unresolvable)`, count: null };
+  }
+}
+
+function report(dir) {
+  const ledger = load(dir);
+  const names = Object.keys(ledger.repos)
+    .filter((n) => ledger.repos[n].status !== 'archived')
+    .sort();
+  const rows = names.map((name) => {
+    const entry = ledger.repos[name];
+    const g = gap(dir, name, entry);
+    return [name, entry.head || '-', g.label, g.count === null ? '-' : `${g.count} commits`];
+  });
+  const head = ['repo', 'head', 'consumed', 'gap'];
+  const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
+  const line = (r) => r.map((cell, i) => cell.padEnd(widths[i])).join('  ').trimEnd();
+  return [line(head), ...rows.map(line)].join('\n') + '\n';
+}
+
 function main(argv) {
   const dir = referenceDir();
   if (!fs.existsSync(dir)) {
@@ -141,6 +179,10 @@ function main(argv) {
     process.stdout.write(`scanned ${n} reference repositories\n`);
     return;
   }
+  if (cmd === 'report') {
+    process.stdout.write(report(dir));
+    return;
+  }
   process.stderr.write(`reference-ledger: unknown command '${cmd}'\n`);
   process.exit(2);
 }
@@ -149,4 +191,4 @@ const isEntry = process.argv[1]
   && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 if (isEntry) main(process.argv.slice(2));
 
-export { referenceDir, ledgerPath, discover, load, save, scan, today, git };
+export { referenceDir, ledgerPath, discover, load, save, scan, gap, report, today, git };

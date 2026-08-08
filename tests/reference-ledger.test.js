@@ -16,12 +16,20 @@ const SCRIPT = path.join(__dirname, '..', 'scripts', 'reference-ledger.mjs');
  * Subprocess spawns on this machine cost roughly 1s each (antivirus
  * scanning), so this file's runtime is dominated by spawn count, not by
  * anything vitest or Node itself does.
+ *
+ * A number for `msgOrCount` makes a linear history of that many commits, for
+ * tests that need a real gap to count; a string (the default) still makes
+ * exactly one, as every pre-existing caller expects.
  */
-function mkRepo(dir, name, msg = 'c0') {
+function mkRepo(dir, name, msgOrCount = 'c0') {
   const repo = path.join(dir, name);
   fs.mkdirSync(repo, { recursive: true });
   execFileSync('git', ['-C', repo, 'init', '-q'], { stdio: 'pipe' });
-  addCommit(repo, msg);
+  if (typeof msgOrCount === 'number') {
+    for (let i = 0; i < msgOrCount; i++) addCommit(repo, `c${i}`);
+  } else {
+    addCommit(repo, msgOrCount);
+  }
   return repo;
 }
 
@@ -242,6 +250,75 @@ function runCli(refDir, args) {
     return { status: err.status, stdout: err.stdout ?? '', stderr: err.stderr ?? '' };
   }
 }
+
+/** Aliases matching report tests' call shape: parsed ledger object, stdout-only CLI result. */
+function ledger(refDir) {
+  return readLedger(refDir);
+}
+function run(refDir, args) {
+  return runCli(refDir, args).stdout;
+}
+
+function setConsumed(refDir, name, consumed) {
+  const l = ledger(refDir);
+  l.repos[name].consumed = consumed;
+  fs.writeFileSync(path.join(refDir, '.sync-ledger.json'), JSON.stringify(l, null, 2) + '\n');
+}
+
+describe('report', () => {
+  let root;
+  beforeEach(() => { root = newRoot(); });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it('counts commits from a consumed ref to HEAD', () => {
+    const repo = mkRepo(root, 'alpha', 3);
+    const first = execFileSync('git', ['-C', repo, 'rev-list', '--max-parents=0', 'HEAD'],
+      { encoding: 'utf8' }).trim();
+    run(root, ['scan']);
+    setConsumed(root, 'alpha', { ref: first, date: '2026-01-01', workstream: 'upstream-sync' });
+    expect(run(root, ['report'])).toMatch(/alpha.*2 commits/);
+  });
+
+  it('counts commits since a date-only consumed entry', () => {
+    mkRepo(root, 'alpha', 2);
+    run(root, ['scan']);
+    setConsumed(root, 'alpha', { date: '2000-01-01', workstream: 'upstream-sync' });
+    const out = run(root, ['report']);
+    expect(out).toMatch(/2000-01-01 \(date\)/);
+    expect(out).toMatch(/2 commits/);
+  });
+
+  it('prints never for a repo that has not been consumed', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    expect(run(root, ['report'])).toMatch(/alpha\s+\S+\s+never/);
+  });
+
+  it('prints unresolvable instead of throwing on a bad ref', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    setConsumed(root, 'alpha', { ref: 'nosuchref', date: '2026-01-01', workstream: 'x' });
+    expect(run(root, ['report'])).toMatch(/unresolvable/);
+  });
+
+  it('writes nothing', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    const before = fs.readFileSync(path.join(root, '.sync-ledger.json'), 'utf8');
+    run(root, ['report']);
+    expect(fs.readFileSync(path.join(root, '.sync-ledger.json'), 'utf8')).toBe(before);
+  });
+
+  it('omits archived repos', () => {
+    mkRepo(root, 'alpha');
+    mkRepo(root, 'beta');
+    run(root, ['scan']);
+    const l = ledger(root);
+    l.repos.beta = { status: 'archived', archivedAt: '2026-01-01', reason: 'dormant' };
+    fs.writeFileSync(path.join(root, '.sync-ledger.json'), JSON.stringify(l, null, 2) + '\n');
+    expect(run(root, ['report'])).not.toMatch(/beta/);
+  });
+});
 
 describe('CLI contract', () => {
   let root;
