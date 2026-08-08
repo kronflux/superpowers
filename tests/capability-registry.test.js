@@ -38,10 +38,41 @@ describe('capability-registry', () => {
 
   it('detects codegraph index dir and decline marker', () => {
     fs.mkdirSync(path.join(tmp, '.codegraph'));
+    fs.writeFileSync(path.join(tmp, '.codegraph', 'codegraph.db'), '');
     fs.writeFileSync(path.join(tmp, '.superpowers-no-codegraph'), '');
     const cg = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } }).codegraph;
     expect(cg.indexed).toBe(true);
     expect(cg.declined).toBe(true);
+  });
+
+  it('detects an index at the enclosing repository root', () => {
+    const repo = path.join(tmp, 'repo');
+    const nested = path.join(repo, 'src', 'deep');
+    fs.mkdirSync(nested, { recursive: true });
+    fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    fs.mkdirSync(path.join(repo, '.codegraph'));
+    fs.writeFileSync(path.join(repo, '.codegraph', 'codegraph.db'), '');
+    expect(probe(nested, { home: tmp, env: { PATH: '', HOME: tmp } }).codegraph.indexed).toBe(true);
+  });
+
+  it('never claims an index belonging to an unrelated project above the repo', () => {
+    // A sibling workspace index must not make this repo look indexed.
+    fs.mkdirSync(path.join(tmp, '.codegraph'));
+    fs.writeFileSync(path.join(tmp, '.codegraph', 'codegraph.db'), '');
+    const repo = path.join(tmp, 'repo');
+    fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    expect(probe(repo, { home: tmp, env: { PATH: '', HOME: tmp } }).codegraph.indexed).toBe(false);
+  });
+
+  it('does not mistake the global settings directory for an index', () => {
+    // ~/.codegraph holds telemetry.json / update-check.json for every codegraph user.
+    // Only a directory containing codegraph.db is an actual index.
+    const settings = path.join(tmp, '.codegraph');
+    fs.mkdirSync(settings);
+    fs.writeFileSync(path.join(settings, 'telemetry.json'), '{}');
+    const nested = path.join(tmp, 'ws', 'repo');
+    fs.mkdirSync(nested, { recursive: true });
+    expect(probe(nested, { home: tmp, env: { PATH: '', HOME: tmp } }).codegraph.indexed).toBe(false);
   });
 
   it('detects middleware config in project .claude dir', () => {

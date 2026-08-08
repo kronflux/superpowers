@@ -7,6 +7,28 @@ import { configDir } from './config-dir.js';
 const STATUS = { ABSENT: 'absent', CONFIGURED: 'configured', VERIFIED: 'verified' };
 
 function exists(p) { try { return fs.existsSync(p); } catch { return false; } }
+
+// An index is a directory holding codegraph.db. The directory alone is not the marker:
+// ~/.codegraph is codegraph's global settings directory (telemetry, update checks) and
+// exists for every user of the tool, so testing for it reports every project as indexed.
+//
+// Searched in the working directory and the enclosing repository root only — codegraph is
+// invoked from one of those, and scanning further up finds indexes belonging to unrelated
+// projects.
+function repoRoot(from) {
+  let dir = path.resolve(from);
+  for (;;) {
+    if (exists(path.join(dir, '.git'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function indexedAt(cwd) {
+  const seen = [path.resolve(cwd), repoRoot(cwd)].filter(Boolean);
+  return seen.some((d) => exists(path.join(d, '.codegraph', 'codegraph.db')));
+}
 function readJson(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
 
 function onPath(bin, env) {
@@ -165,7 +187,7 @@ function probe(cwd = process.cwd(), opts = {}) {
   return {
     codegraph: {
       status: st(onPath('codegraph', env) || mcpConfigured('codegraph', cwd, home, env)),
-      indexed: exists(path.join(cwd, '.codegraph')),
+      indexed: indexedAt(cwd),
       declined: exists(path.join(cwd, '.superpowers-no-codegraph')),
     },
     lsp: { status: st(extensions.length > 0), extensions, ...lspDeclines(cwd) },
