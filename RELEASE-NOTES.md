@@ -1,5 +1,42 @@
 # Superpowers Release Notes
 
+## 7.15.0 — output and evidence contracts
+
+- **`skills/shared/output-contract.md` governs what a human reads.** Its acceptance test is the
+  first and last line: read alone, they must answer what just happened and what needs the reader.
+  It carries ranking (without truncating an exhaustive result such as review findings), question
+  batching, forbidden language, the pre-send check, and the rule that duration, time of day, and
+  suggestions about when the reader should rest or resume never appear — a schedule is the
+  reader's to manage, and inferring one simulates an understanding the model does not have.
+- **`skills/token-efficiency` no longer defines response shape.** Its rules optimised token cost;
+  none addressed whether the reader could act on the result. A response can be dense, filler-free,
+  and still impossible to answer. Tool batching, re-read avoidance, and compaction stay; shape
+  defers to the output contract.
+- **`skills/shared/evidence.md` states what makes a claim about system state admissible.** Reading
+  code proves what it says and running it proves what it does; a claim about behavior needs the
+  second, against the surface that actually runs, because a test exercising a helper does not
+  prove the entry point works. Evidence computed in a subagent or a sandbox exists only once it is
+  echoed into the transcript. Seven skills restated that rule in their own words and now link to
+  it.
+- **Code review leads with the verdict and the finding to fix first.** Strengths follow the issues.
+  The two review formats this plugin ships disagreed: one ordered by severity and named a single
+  most-important finding, the other opened with praise and placed merge readiness last, where a
+  reader who stops early never reaches it.
+- **Commit-message rules moved to `skills/shared/git-hygiene.md`**, alongside staging and history
+  repair, so they apply in every project rather than only in this fork.
+- **Skills no longer open with "I'm using the X skill".** The harness surfaces the active skill, so
+  the first line carries the outcome instead.
+- **A CodeGraph index is identified by `codegraph.db`, not by a `.codegraph` directory.**
+  `~/.codegraph` is codegraph's global settings directory and exists for every user of the tool, so
+  the directory alone marked every project as indexed. Detection covers the working directory and
+  the enclosing repository root and goes no further: an index found by scanning upward can belong
+  to an unrelated project, and answering discovery from another project's graph is worse than
+  falling back to grep.
+- **Structure discovery and file lookup follow the conductor chain.** `context-management` mapped
+  the project with a bare Glob while its neighbouring steps already deferred to the routing chain;
+  it now reaches for `codegraph_files` first. `claude-md-creator` declared a `tools:` frontmatter
+  allowlist that omitted the ctx and codegraph tools the chain requires.
+
 ## 7.14.0 — comment and commit-message discipline
 
 - **Comments state present-state behavior.** What the code does now — inputs, outputs, side
