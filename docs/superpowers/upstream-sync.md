@@ -141,15 +141,24 @@ node scripts/reference-ledger.mjs archive <name> --reason "no commits in N month
 ```
 
 This moves `_reference/<name>` into `_reference/_archive/<name>` and marks the ledger entry
-`archived`. Nothing is deleted — the move is reversible with `mv`, and deleting the bytes is a
-separate manual decision. `scan` and `report` skip archived entries; the entry itself is kept so
-the reason survives.
+`archived`. Nothing is deleted, and deleting the bytes is a separate manual decision.
+
+Archiving is genuinely reversible: `mv _reference/_archive/<name> _reference/<name>`, then `scan`.
+The entry revives — `archivedAt` and `reason` are cleared, `head` is refreshed, and any recorded
+`consumed` survives untouched, so a revived mirror resumes with its real gate rather than starting
+over at `never`. An archived entry whose directory is still absent stays archived.
+
+Archived repositories are dropped from the main `report` table but listed in a trailing `archived:`
+section with their `archivedAt` and `reason`. That is deliberate: archiving removes a repo from
+review, and a retirement whose justification had disappeared from the one command an operator reads
+would be an escape hatch from this tool's whole purpose.
 
 ## Worked example
 
-Grounded in the fork's actual current gap: last synced ref `d884ae0` (upstream `v6.1.1`); upstream
-mirror is currently at `3dcbd5c` (`v6.2.0`), 51 commits ahead. One hunk of each class, as it would
-be classified today:
+A snapshot taken 2026-07-26, kept for its three classification cases rather than its numbers. The
+gate and the gap it cites are frozen at that date — run step 1 for the current figures, which is
+the whole reason the ledger exists. As written then: last synced ref `d884ae0` (upstream `v6.1.1`),
+mirror at `3dcbd5c` (`v6.2.0`), 51 commits ahead. One hunk of each class:
 
 **Class 1 — path not in the map.** Upstream's
 `skills/systematic-debugging/find-polluter.sh` gained `./`-prefix and `**/`-collapse edge-case
