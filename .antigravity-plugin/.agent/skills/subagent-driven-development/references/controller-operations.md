@@ -92,10 +92,13 @@ controllers that lost their place have re-dispatched entire completed task
 sequences — the single most expensive failure observed. Track progress in
 a ledger file, not only in todos.
 
-- At skill start, check for a ledger:
-  `cat "$(git rev-parse --show-toplevel)/.superpowers/sdd/progress.md"`. Tasks listed there
-  as complete are DONE — do not re-dispatch them; resume at the first task
-  not marked complete.
+- At skill start, check for a ledger in the plan's own workspace:
+  `cat "$(skills/subagent-driven-development/scripts/sdd-workspace PLAN_FILE)/progress.md"`.
+  The path is resolved, never literal: two plans running from one repo would
+  otherwise share a ledger, which is how six releases ended up inventing
+  filename prefixes (`v750-`, `v760-`, ... ) to keep their progress apart.
+  Tasks listed there as complete are DONE — do not re-dispatch them; resume
+  at the first task not marked complete.
 - When a task's review comes back clean, append one line to the ledger in
   the same message as your other bookkeeping:
   `Task N: complete (commits <base7>..<head7>, review clean)`.
