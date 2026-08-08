@@ -29,7 +29,8 @@ node scripts/reference-ledger.mjs report
 
 The `consumed` column is this run's gate — the ref a previous review actually
 finished through, not merely looked at. A repo reading `never` has no recorded
-review; choose and record the scope yourself rather than assuming a window.
+review; choose and record the scope yourself rather than assuming a window, and
+see step 3 for where to recover a gate that predates the ledger.
 
 The ledger lives at `../_reference/.sync-ledger.json`, outside this repository,
 and is written only by `scripts/reference-ledger.mjs`. `scan` refreshes observed
@@ -57,6 +58,11 @@ Read the most recent fork release entry in `RELEASE-NOTES.md` for a line of the 
 `<sha>` is the last-synced ref. (7.0.0's is `d884ae0`, upstream tag `v6.1.1`.) `RELEASE-NOTES.md`
 remains the durable historical record and is where the ledger's obra entry was seeded from; the
 ledger is the operational index that saves you this lookup on every subsequent run.
+
+If no resync line exists — a mirror added since the ledger landed, or the first sync of a brand-new
+reference — there is no ref to recover. Do not invent one. Pick the scope deliberately, say so in
+the findings doc, and record the result with `consume` in step 7; from then on the ledger carries
+the gate and this fallback is never needed for that repo again.
 
 ### 4. Enumerate upstream changes since that ref
 
