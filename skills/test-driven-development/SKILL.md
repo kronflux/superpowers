@@ -391,7 +391,7 @@ Bug found? Write failing test reproducing it. Follow TDD cycle. Test proves fix 
 
 Never fix bugs without a test.
 
-## Testing Anti-Patterns
+## Writing Good Tests
 
 When adding mocks or test utilities, read [writing-good-tests.md](writing-good-tests.md).
 
