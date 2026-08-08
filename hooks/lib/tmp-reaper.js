@@ -146,4 +146,57 @@ function sweep(opts = {}) {
   return result;
 }
 
-export { sweep, retentionMs, LEGACY_PREFIXES, MARKER, DEFAULT_RETENTION_DAYS };
+/**
+ * Reap stale per-plan SDD workspaces under <repoRoot>/.superpowers/sdd/.
+ *
+ * Age alone is not sufficient: a long-running plan can go quiet for longer
+ * than the retention window, and deleting its ledger mid-execution would cost
+ * exactly the record a resume depends on. Liveness is checked first and wins.
+ *
+ * @param {string} repoRoot
+ * @param {object} [opts]
+ * @param {object} [opts.env]  environment (for SUPERPOWERS_TMP_RETENTION_DAYS)
+ * @param {number} [opts.now]  clock injection for tests
+ */
+function sweepWorkspaces(repoRoot, opts = {}) {
+  try {
+    const ms = retentionMs(opts.env ?? process.env);
+    if (ms === 0) return;                       // 0 disables, same contract as the tmpdir sweep
+    const base = path.join(repoRoot, '.superpowers', 'sdd');
+    // Never enumerate through a symlinked root — readdirSync follows it and the
+    // deletion would land wherever it points.
+    try {
+      if (fs.lstatSync(base).isSymbolicLink()) return;
+    } catch { return; }
+    const now = opts.now ?? Date.now();
+    let entries;
+    try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = path.join(base, e.name);
+      if (isPlanInFlight(repoRoot, e.name)) continue;
+      try {
+        if (now - fs.statSync(full).mtimeMs <= ms) continue;
+        fs.rmSync(full, { recursive: true, force: true });
+      } catch { /* best-effort; a failed reap must never break SessionStart */ }
+    }
+  } catch {
+    // Fail open. A cleanup routine must never be the reason a session fails to start.
+  }
+}
+
+/** A plan is in flight while its task snapshot still holds unfinished work. */
+function isPlanInFlight(repoRoot, slug) {
+  const snapshot = path.join(repoRoot, '.superpowers', 'plans', `${slug}.md.tasks.json`);
+  try {
+    const data = JSON.parse(fs.readFileSync(snapshot, 'utf8'));
+    if (!Array.isArray(data.tasks)) return false;
+    return data.tasks.some((t) => t && (t.status === 'pending' || t.status === 'in_progress'));
+  } catch {
+    return false;                             // no snapshot: nothing claims it is live
+  }
+}
+
+export {
+  sweep, retentionMs, LEGACY_PREFIXES, MARKER, DEFAULT_RETENTION_DAYS,
+  sweepWorkspaces, isPlanInFlight,
+};
