@@ -17,8 +17,6 @@ Response shape — ordering, ranking, questions, forbidden language, and the pre
 
 The one rule specific to token cost rather than readability: prefer structured output (JSON/YAML) when the result feeds a downstream step rather than a human reader.
 
-Two habits that waste a turn rather than a token: generating reasoning that restates the user's message, and splitting one turn's worth of work across several turns.
-
 ## Tool Execution Rules
 
 1. Batch independent tool calls in a single response — never serialize calls that can run in parallel.
@@ -28,7 +26,11 @@ Two habits that waste a turn rather than a token: generating reasoning that rest
 
 ## Exploration Tracking
 
-Track what you have already read, searched, and globbed this session. Before every Read, Grep, Glob, or ctx analysis call, skip it if you already hold the result.
+Maintain a mental index of this session's exploration. Before every Read, Grep, Glob, or ctx analysis call, check it and skip the call if you already hold the result. Track, per category:
+
+- **Files read** — path, plus whether you or any tool modified it since the read.
+- **Searches performed** — pattern, directory scope, result summary.
+- **Directory structures explored** — which directories you have listed or globbed.
 
 | Situation | Action |
 |---|---|
@@ -38,14 +40,15 @@ Track what you have already read, searched, and globbed this session. Before eve
 | Path already confirmed to exist | Do NOT verify it again |
 | Identical search pattern and scope | Do NOT re-run — reuse the previous results |
 | Similar but broader search pattern | Run it — it may surface new results |
-| Context compression occurred (earlier turns disappeared) | You keep your own reasoning and summaries; re-read only for exact content (line numbers, precise syntax) you genuinely cannot recall. When context-mode is active, query `ctx_search` (`sort:"timeline"`) before re-fetching |
+| Context compression occurred (earlier turns disappeared) | You keep your own reasoning and summaries; re-read only for exact content (line numbers, precise syntax) you genuinely cannot recall. When context-mode is active, prior decisions, errors, and captured outputs are searchable — query `ctx_search` (`sort:"timeline"`) before re-fetching |
 
 ## Agent & External Content Rules
 
 1. **Agent results are compressed.** A subagent's full context — file reads, web fetches, reasoning — is reduced to a summary on return. Never dispatch an agent to fetch and return raw content, local or web-fetched: the content stays in its context and only the summary survives.
 2. **Use agents for conclusions, not data relay.** Good: "analyze the test failures in X and recommend fixes." Bad: "fetch files A, B, C and return their contents." Content you need in your own context you pull in yourself, as a discovery job per the Adapter Link above.
-3. **Verbatim URL content needs the right fetch path.** Fetch as a discovery job — raw page bytes never enter context when ctx tools are used. Do not assume read_url_content returns raw text; when context-mode is inactive it may return an AI-generated summary, so name the verbatim section explicitly.
-4. **project-map.md is orientation, not understanding.** It gives directory purposes, key file roles, and constraints — never the logic inside a file. To modify, compare, or debug, read the file itself as a discovery job.
+3. **For local files, pull them in yourself.** Never dispatch an agent to read project files and report back — you lose the actual content and pay for the round trip. Read them as a discovery job.
+4. **Verbatim URL content needs the right fetch path.** Fetch as a discovery job — raw page bytes never enter context when ctx tools are used. Do not assume read_url_content returns raw text; when context-mode is inactive it may return an AI-generated summary, so name the verbatim section explicitly.
+5. **project-map.md is orientation, not understanding.** It gives directory purposes, key file roles, and constraints — never the logic inside a file. To modify, compare, or debug, read the file itself as a discovery job.
 
 ## Proactive Compaction Breakpoints
 
@@ -82,11 +85,25 @@ Invoke `.agent/skills/context-management/SKILL.md` when state must cross session
 
 When context-mode is active, noisy commands run through `ctx_batch_execute` / `ctx_execute` so only derived results enter context, and the bash-compress hook yields to that routing. This section applies when context-mode is **inactive**: the smart-compress hook then filters noisy Bash output before it enters your context, marking it `[compressed: 120->4 lines | git-status]`.
 
-- **Compressed, near-lossless:** git add/commit/push/pull/clone/fetch, npm/pip/cargo install — reduced to one-line summaries.
-- **Compressed, filtered:** git status (hint lines removed), git log (truncated), passing tests and successful builds (summary only), lint output (grouped by severity), large ls/find results (truncated).
-- **NEVER compressed:** `git diff` (any variant), file reads, commands with user-applied pipes (`| grep`, `| awk`, `| sed`), commands with `--verbose` or `--debug`, HTTP responses, any command that fails (non-zero exit — error output passes through raw), and output shorter than 200 characters.
+- **Tier 1 (near-lossless):** git add/commit/push/pull/clone/fetch, npm/pip/cargo install — reduced to one-line summaries.
+- **Tier 2 (smart filtering):** git status (hint lines removed), git log (truncated), passing tests and successful builds (summary only), lint output (grouped by severity), large ls/find results (truncated).
+- **NEVER compressed:** `git diff` (any variant, since every line matters for review), file reads (content was explicitly requested), commands with user-applied pipes (`| grep`, `| awk`, `| sed`), commands with `--verbose` or `--debug`, HTTP responses (API output should not be truncated), any command that fails (non-zero exit — error output passes through raw), and output shorter than 200 characters.
 - **Adaptive re-run:** the same command run twice within 60 seconds passes through uncompressed the second time, for when the compressed output was insufficient.
 - **Disable:** set `SP_NO_COMPRESS=1`, or create `.sp-no-compress` in the project root.
+
+## Front-Loading
+
+Before starting a multi-step task, identify every piece of missing information and request it all at once, rather than discovering gaps one at a time mid-task.
+
+## Anti-Patterns
+
+- Reading a file to confirm it exists
+- Re-reading a file you already read and have not modified
+- Re-running a search you already ran this session
+- Re-exploring directory structure you already mapped
+- Running the same check twice
+- Generating reasoning that restates the user's message
+- Splitting one turn's worth of work across multiple turns
 
 ## Activation
 

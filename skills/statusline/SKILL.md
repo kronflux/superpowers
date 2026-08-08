@@ -87,7 +87,7 @@ Call `patchSettings(cwd, command)` with `command` = `node "<launcher path>"`, ap
 Call `ensureGitignored(cwd)` and report which of its four states applied. Do NOT collapse them — they mean different things:
 
 - **`already`** — an existing `.gitignore` rule already covers `.claude/`. Nothing written. Say so.
-- **`added`** — no rule existed and `.claude/` was untracked, or `cwd` is not a git repo; a `.claude/` line was appended. Say so and show the line.
+- **`added`** — no rule existed and `.claude/` was untracked, or `cwd` is not a git repo at all; a `.claude/` line was appended to `.gitignore`. Say so and show the line that was added.
 - **`tracked`** — `.claude/` is already tracked by git. **No rule was written.** A `.gitignore` rule never untracks an already-tracked path, so writing one would change nothing while implying the job was done. Say this plainly, then offer `git rm --cached -r .claude` as **their** decision to run in their own terminal — NEVER run it yourself.
 - **`unknown`** — `cwd` is a git repo but the tracked-files probe failed (lock contention, permissions, timeout), so whether `.claude/` is tracked is undetermined. **No rule was written.** Report this as **inconclusive** — NOT as success and NOT as `tracked`. Say the check could not complete and that the tool cannot confirm whether `.claude/` is safe to ignore. Do NOT claim a rule was added.
 
