@@ -50,6 +50,13 @@ export function validate(entries) {
     if ('async' in entry && typeof entry.async !== 'boolean') {
       throw new Error(`${at}: async must be a boolean when present`);
     }
+    // Only 'bash' is a known-good value: it's the one shell every dispatch
+    // path in this repo (run-hook.cmd's polyglot header, docs/windows/polyglot-hooks.md)
+    // is written to run under. Widen this only with evidence Claude Code
+    // honours another shell name.
+    if ('shell' in entry && entry.shell !== 'bash') {
+      throw new Error(`${at}: shell must be "bash" when present`);
+    }
   });
 }
 

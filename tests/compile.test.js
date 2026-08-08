@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { validate } from '../scripts/compile-hooks.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -92,5 +93,20 @@ describe('generated manifests (validity)', () => {
       .flatMap((g) => g.hooks || [])
       .filter((h) => 'shell' in h);
     expect(withShell).toHaveLength(1);
+  });
+
+  it('validate() rejects a hook entry whose shell is not "bash"', () => {
+    // "zsh" is a plausible typo/attempt; 123 covers the non-string case;
+    // "" covers an empty-string field. All three must be rejected the same
+    // way "matcher" and "async" already are when malformed.
+    const base = { event: 'SessionStart', command: 'echo test', platforms: ['claude-code'] };
+    for (const badShell of ['zsh', 123, '']) {
+      expect(() => validate([{ ...base, shell: badShell }]), `shell: ${JSON.stringify(badShell)}`).toThrow(/shell/);
+    }
+  });
+
+  it('validate() accepts shell: "bash"', () => {
+    const entry = { event: 'SessionStart', command: 'echo test', shell: 'bash', platforms: ['claude-code'] };
+    expect(() => validate([entry])).not.toThrow();
   });
 });
