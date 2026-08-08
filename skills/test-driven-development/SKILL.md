@@ -393,10 +393,7 @@ Never fix bugs without a test.
 
 ## Testing Anti-Patterns
 
-When adding mocks or test utilities, read [testing-anti-patterns.md](testing-anti-patterns.md) to avoid common pitfalls:
-- Testing mock behavior instead of real behavior
-- Adding test-only methods to production classes
-- Mocking without understanding dependencies
+When adding mocks or test utilities, read [writing-good-tests.md](writing-good-tests.md).
 
 ## Advanced Test Strategy
 
@@ -406,7 +403,7 @@ For complex, high-risk, or hard-to-test behavior, go beyond basic unit tests whi
 
 - Use `superpowers:systematic-debugging` to find root cause before writing the fix test.
 - Use `superpowers:verification-before-completion` before success claims.
-- Read `testing-anti-patterns.md` when introducing heavy mocking.
+- Read `writing-good-tests.md` when introducing heavy mocking.
 
 ## Final Rule
 
