@@ -58,6 +58,12 @@ export default {
     },
     {
       event: 'PreToolUse',
+      matcher: 'Edit|Write',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/comment-gate.js"',
+      platforms: ['claude-code'],
+    },
+    {
+      event: 'PreToolUse',
       matcher: 'Grep|Glob|Read',
       command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/conductor-nudges.js"',
       platforms: ['claude-code'],
