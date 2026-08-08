@@ -164,6 +164,44 @@ function report(dir) {
   return [line(head), ...rows.map(line)].join('\n') + '\n';
 }
 
+/** Minimal flag parser: `--k v` pairs, the boolean `--no-ref`, positionals in `_`. */
+function parseFlags(argv) {
+  const out = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--no-ref') out.noRef = true;
+    else if (a.startsWith('--')) out[a.slice(2)] = argv[++i];
+    else out._.push(a);
+  }
+  return out;
+}
+
+/**
+ * The ONLY writer of `consumed`. Refuses an unknown repo rather than creating
+ * one, so a typo cannot invent a consumed repository that no one ever reviewed.
+ */
+function consume(dir, name, workstream, opts = {}) {
+  const ledger = load(dir);
+  if (!ledger.repos[name]) {
+    // Self-prefixing, matching load()'s thrown messages: main()'s shared
+    // try/catch prints err.message verbatim and adds nothing.
+    throw new Error(`reference-ledger: unknown repository '${name}' - run scan first`);
+  }
+  const ref = opts.noRef
+    ? null
+    // Live HEAD, not ledger.repos[name].head: a pull since the last scan would
+    // make the stored field stale, and a stale ref understates the gap.
+    : (opts.ref || git(path.join(dir, name), ['log', '-1', '--format=%h']));
+  ledger.repos[name].consumed = {
+    ...(ref ? { ref } : {}),
+    date: opts.date || today(),
+    workstream,
+    ...(opts.by ? { by: opts.by } : {}),
+  };
+  save(dir, ledger);
+  return ledger.repos[name].consumed;
+}
+
 function main(argv) {
   const dir = referenceDir();
   if (!fs.existsSync(dir)) {
@@ -186,6 +224,20 @@ function main(argv) {
       process.stdout.write(report(dir));
       return;
     }
+    if (cmd === 'consume') {
+      const f = parseFlags(argv.slice(1));
+      const [name, workstream] = f._;
+      if (!name || !workstream) {
+        process.stderr.write('usage: reference-ledger consume <repo> <workstream> '
+          + '[--ref <sha>] [--date <YYYY-MM-DD>] [--by <sha>] [--no-ref]\n');
+        process.exit(2);
+      }
+      // No inner try/catch: Task 2 added one shared try/catch around the whole
+      // dispatch, so a thrown error already prints as one clean line and exits 1.
+      const recorded = consume(dir, name, workstream, f);
+      process.stdout.write(`${name}: consumed ${recorded.ref || recorded.date} for ${workstream}\n`);
+      return;
+    }
   } catch (err) {
     // The 'reference-ledger: ' prefix is the contract that separates a known
     // operational failure (load(), and per plan consume()/archive()) from a
@@ -206,4 +258,4 @@ const isEntry = process.argv[1]
   && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 if (isEntry) main(process.argv.slice(2));
 
-export { referenceDir, ledgerPath, discover, load, save, scan, gap, report, today, git };
+export { referenceDir, ledgerPath, discover, load, save, scan, gap, report, consume, parseFlags, today, git };

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
-import { discover, load, save, scan, gap, ledgerPath } from '../scripts/reference-ledger.mjs';
+import { discover, load, save, scan, gap, ledgerPath, consume, parseFlags, today, git } from '../scripts/reference-ledger.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'reference-ledger.mjs');
@@ -385,5 +385,95 @@ describe('CLI contract', () => {
     const result = runCli(root, ['scan']);
     expect(result.status).toBe(0);
     expect(fs.existsSync(ledgerPath(root))).toBe(true);
+  });
+});
+
+describe('parseFlags', () => {
+  it('treats --no-ref as a boolean, not a value-taking flag', () => {
+    // If --no-ref ever fell into the generic `--k v` branch, it would swallow
+    // the next token as its own value and shift every flag after it - the
+    // parser bug that would make "--no-ref --date X" silently drop the date.
+    const f = parseFlags(['alpha', 'obsidian-sync', '--no-ref', '--date', '2026-07-26']);
+    expect(f._).toEqual(['alpha', 'obsidian-sync']);
+    expect(f.noRef).toBe(true);
+    expect(f.date).toBe('2026-07-26');
+  });
+});
+
+describe('consume', () => {
+  let root;
+  beforeEach(() => { root = newRoot(); });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it('records ref, date, workstream and by', () => {
+    mkRepo(root, 'alpha');
+    scan(root);
+    const recorded = consume(root, 'alpha', 'upstream-sync', { by: 'abc1234' });
+    expect(recorded.workstream).toBe('upstream-sync');
+    expect(recorded.by).toBe('abc1234');
+    expect(recorded.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(recorded.ref).toMatch(/^[0-9a-f]{7,}$/);
+    expect(ledger(root).repos.alpha.consumed).toEqual(recorded);
+  });
+
+  it('defaults ref to live HEAD, not the stale head field', () => {
+    const repo = mkRepo(root, 'alpha');
+    scan(root);
+    const staleHead = ledger(root).repos.alpha.head;
+    // A commit lands after the scan; consume must see it, not the scan-time head.
+    addCommit(repo, 'later');
+    const liveHead = git(repo, ['log', '-1', '--format=%h']);
+    const recorded = consume(root, 'alpha', 'upstream-sync');
+    expect(recorded.ref).not.toBe(staleHead);
+    expect(recorded.ref).toBe(liveHead);
+  });
+
+  it('honours an explicit ref and date', () => {
+    mkRepo(root, 'alpha');
+    scan(root);
+    const recorded = consume(root, 'alpha', 'upstream-sync', { ref: 'd884ae0', date: '2026-07-10' });
+    expect(recorded).toEqual({ ref: 'd884ae0', date: '2026-07-10', workstream: 'upstream-sync' });
+  });
+
+  it('records a date-only entry under --no-ref with an explicit date', () => {
+    mkRepo(root, 'alpha');
+    scan(root);
+    const recorded = consume(root, 'alpha', 'obsidian-sync', { noRef: true, date: '2026-07-26' });
+    expect(recorded).toEqual({ date: '2026-07-26', workstream: 'obsidian-sync' });
+    expect('ref' in recorded).toBe(false);
+  });
+
+  it('never writes a consumed block lacking both ref and date: --no-ref with no --date still records today', () => {
+    // The exact failure mode this tool exists to prevent: a consumed entry
+    // with neither field makes gap() run `rev-list --since=undefined`, which
+    // git answers with a real, misleading 0 - "up to date" for a repo never
+    // reviewed. --no-ref alone must not be able to produce that shape.
+    mkRepo(root, 'alpha');
+    scan(root);
+    const recorded = consume(root, 'alpha', 'obsidian-sync', { noRef: true });
+    expect('ref' in recorded).toBe(false);
+    expect(recorded.date).toBe(today());
+  });
+
+  it('refuses an unknown repo and leaves the ledger byte-identical', () => {
+    mkRepo(root, 'alpha');
+    scan(root);
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    expect(() => consume(root, 'typo', 'upstream-sync')).toThrow();
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('CLI: an unknown repo exits non-zero and leaves the ledger byte-identical', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    expect(runCli(root, ['consume', 'typo', 'upstream-sync']).status).not.toBe(0);
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('CLI: a missing workstream argument exits non-zero', () => {
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    expect(runCli(root, ['consume', 'alpha']).status).not.toBe(0);
   });
 });
