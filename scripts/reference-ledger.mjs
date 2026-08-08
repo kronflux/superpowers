@@ -111,12 +111,26 @@ function isValidDate(d) {
   }
 }
 
-/** Refresh observed state. Never writes `consumed`. */
+/**
+ * Refresh observed state. Never writes `consumed`.
+ *
+ * `discover(dir)` only ever lists names that currently exist as a git repo
+ * directly under `dir` - an archived entry's directory normally lives under
+ * `_archive/`, so it simply never reaches this loop. The one time a
+ * previously-archived name DOES show up here is a revival: `mv _archive/<name>
+ * <name>` per the documented recovery step, or a dormant upstream re-cloned
+ * under its original name. Skipping that case (as an earlier version did)
+ * left the entry permanently archived with a stale `head` - the doc's claim
+ * that the move is "reversible with `mv`" was false. An archived entry whose
+ * directory is still absent is untouched by this loop either way, so it
+ * stays archived without any special-case check.
+ */
 function scan(dir) {
   const ledger = load(dir);
+  let scanned = 0;
+  let skipped = 0;
   for (const name of discover(dir)) {
     const prev = ledger.repos[name] || {};
-    if (prev.status === 'archived') continue;
     let head, headDate;
     try {
       head = git(path.join(dir, name), ['log', '-1', '--format=%h']);
@@ -125,19 +139,25 @@ function scan(dir) {
       // Swallows an empty repo (no commits yet), a missing `git` binary, and
       // permission errors reading the repo's object store alike. Leaving the
       // entry alone beats recording a half-entry that later reads as fact.
+      skipped++;
       continue;
     }
-    // `prev` spreads FIRST, then `status`/`head`/`headDate` override it.
+    // `archivedAt`/`reason` describe a state that just ended on revival and
+    // must not leak into the resumed entry; `consumed` is a fact about
+    // review history and must survive untouched, so it stays in `rest`.
+    const { archivedAt, reason, ...rest } = prev;
+    // `rest` spreads FIRST, then `status`/`head`/`headDate` override it.
     // Reversed, stale `prev.head`/`prev.headDate` would win over the values
     // just observed above, freezing `head` at its first-ever value on every
     // later scan - silent, and unrelated to whether `consumed` is dropped.
     // Guarded by "updates head on a subsequent scan while preserving a
     // pre-existing consumed block", which commits again between two scans
     // and checks both facts at once.
-    ledger.repos[name] = { ...prev, status: 'active', head, headDate };
+    ledger.repos[name] = { ...rest, status: 'active', head, headDate };
+    scanned++;
   }
   save(dir, ledger);
-  return ledger;
+  return { ledger, scanned, skipped };
 }
 
 /**
@@ -172,12 +192,21 @@ function gap(dir, name, entry) {
   }
 }
 
+/**
+ * The main table never renders an archived row - but archiving has no
+ * dormancy check, no gap check, and a free-text reason, so with nothing
+ * anywhere printing an archived entry, retiring a repo with an open gap was
+ * an invisible escape hatch from this tool's own purpose. The trailing
+ * section below keeps a retired repo and its stated justification on screen
+ * without changing what the main table shows.
+ */
 function report(dir) {
   const ledger = load(dir);
-  const names = Object.keys(ledger.repos)
-    .filter((n) => ledger.repos[n].status !== 'archived')
-    .sort();
-  const rows = names.map((name) => {
+  const names = Object.keys(ledger.repos).sort();
+  const active = names.filter((n) => ledger.repos[n].status !== 'archived');
+  const archived = names.filter((n) => ledger.repos[n].status === 'archived');
+
+  const rows = active.map((name) => {
     const entry = ledger.repos[name];
     const g = gap(dir, name, entry);
     return [name, entry.head || '-', g.label, g.count === null ? '-' : `${g.count} commits`];
@@ -185,7 +214,19 @@ function report(dir) {
   const head = ['repo', 'head', 'consumed', 'gap'];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r) => r.map((cell, i) => cell.padEnd(widths[i])).join('  ').trimEnd();
-  return [line(head), ...rows.map(line)].join('\n') + '\n';
+  let out = [line(head), ...rows.map(line)].join('\n') + '\n';
+
+  if (archived.length > 0) {
+    const aRows = archived.map((name) => {
+      const entry = ledger.repos[name];
+      return [name, entry.archivedAt || '-', entry.reason || '-'];
+    });
+    const aHead = ['repo', 'archivedAt', 'reason'];
+    const aWidths = aHead.map((h, i) => Math.max(h.length, ...aRows.map((r) => r[i].length)));
+    const aLine = (r) => r.map((cell, i) => cell.padEnd(aWidths[i])).join('  ').trimEnd();
+    out += `\narchived:\n${[aLine(aHead), ...aRows.map(aLine)].join('\n')}\n`;
+  }
+  return out;
 }
 
 const KNOWN_FLAGS = new Set(['ref', 'date', 'by', 'reason']);
@@ -378,9 +419,14 @@ function main(argv) {
   // one to remember its own catch block.
   try {
     if (cmd === 'scan') {
-      const ledger = scan(dir);
-      const n = Object.values(ledger.repos).filter((e) => e.status === 'active').length;
-      process.stdout.write(`scanned ${n} reference repositories\n`);
+      // Counts what this run actually did, not `ledger.repos` at large: that
+      // would also count stale 'active' entries whose directory vanished
+      // without going through archive(), and entries this run skipped on a
+      // git failure - both observed inflating the printed count above the
+      // number of repos really scanned.
+      const { scanned, skipped } = scan(dir);
+      const skippedMsg = skipped > 0 ? `, skipped ${skipped}` : '';
+      process.stdout.write(`scanned ${scanned} reference repositories${skippedMsg}\n`);
       return;
     }
     if (cmd === 'report') {

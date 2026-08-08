@@ -113,16 +113,26 @@ describe('scan — merge behavior on a single-repo fixture', () => {
     expect(readLedger(root).repos.alpha.consumed).toBeUndefined();
   });
 
-  it('skips repos already marked archived', () => {
+  it('resumes an entry hand-marked archived once its directory is found present again, clearing archivedAt/reason', () => {
+    // This fixture's 'alpha' directory lives at dir/alpha throughout the
+    // describe block (see beforeAll above) - so an entry marked 'archived'
+    // here is exactly the revival case (directory present under its
+    // original name), not the properly-archived case (directory moved under
+    // _archive/, so discover() never lists it and this loop never reaches
+    // it). See the 'archive' suite for the full archive()-then-`mv`-back
+    // round trip and the sibling "stays archived while the directory is
+    // still absent" case.
     save(root, {
       schema: 1,
       updatedAt: null,
       repos: { alpha: { status: 'archived', archivedAt: '2026-01-01', reason: 'dormant' } },
     });
     scan(root);
-    expect(readLedger(root).repos.alpha).toEqual({
-      status: 'archived', archivedAt: '2026-01-01', reason: 'dormant',
-    });
+    const after = readLedger(root).repos.alpha;
+    expect(after.status).toBe('active');
+    expect('archivedAt' in after).toBe(false);
+    expect('reason' in after).toBe(false);
+    expect(after.head).toMatch(/^[0-9a-f]{7,}$/);
   });
 
   it('is idempotent apart from updatedAt', () => {
@@ -161,6 +171,35 @@ describe('scan — HEAD advances between scans', () => {
     expect(after.head).not.toBe(firstHead);
     expect(after.consumed)
       .toEqual({ ref: 'deadbee', date: '2026-01-01', workstream: 'upstream-sync' });
+  });
+});
+
+describe('scan — reported counts', () => {
+  let root;
+  beforeEach(() => { root = newRoot(); });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it('reports what it actually scanned this run, not a stale count of every active ledger entry', () => {
+    // Reproduced against the unfixed code: beta's ledger entry stays
+    // 'active' from the first scan even after its directory is gone, so
+    // `Object.values(ledger.repos).filter(active).length` counted it again
+    // on the second scan even though this run never touched it.
+    mkRepo(root, 'alpha');
+    mkRepo(root, 'beta');
+    expect(runCli(root, ['scan']).stdout).toMatch(/^scanned 2 reference repositories\n$/);
+    fs.rmSync(path.join(root, 'beta'), { recursive: true, force: true });
+    const second = runCli(root, ['scan']);
+    expect(second.stdout).toMatch(/^scanned 1 reference repositories\n$/);
+    expect(second.stdout).not.toMatch(/scanned 2/);
+  });
+
+  it('does not count a repo skipped on a git-log failure (no commits yet) as scanned', () => {
+    mkRepo(root, 'alpha');
+    const emptyRepo = path.join(root, 'empty');
+    fs.mkdirSync(emptyRepo, { recursive: true });
+    execFileSync('git', ['-C', emptyRepo, 'init', '-q'], { stdio: 'pipe' });
+    const result = runCli(root, ['scan']);
+    expect(result.stdout).toMatch(/^scanned 1 reference repositories, skipped 1\n$/);
   });
 });
 
@@ -243,18 +282,11 @@ function runCli(refDir, args) {
   }
 }
 
-/** Aliases matching report tests' call shape: parsed ledger object, stdout-only CLI result. */
-function ledger(refDir) {
-  return readLedger(refDir);
-}
-function run(refDir, args) {
-  return runCli(refDir, args).stdout;
-}
-
+/** Builds on readLedger/writeLedger above rather than re-implementing the write. */
 function setConsumed(refDir, name, consumed) {
-  const l = ledger(refDir);
+  const l = readLedger(refDir);
   l.repos[name].consumed = consumed;
-  fs.writeFileSync(path.join(refDir, '.sync-ledger.json'), JSON.stringify(l, null, 2) + '\n');
+  writeLedger(refDir, l);
 }
 
 describe('report', () => {
@@ -266,58 +298,68 @@ describe('report', () => {
     const repo = mkRepo(root, 'alpha', 3);
     const first = execFileSync('git', ['-C', repo, 'rev-list', '--max-parents=0', 'HEAD'],
       { encoding: 'utf8' }).trim();
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     setConsumed(root, 'alpha', { ref: first, date: '2026-01-01', workstream: 'upstream-sync' });
-    expect(run(root, ['report'])).toMatch(/alpha.*2 commits/);
+    expect(runCli(root, ['report']).stdout).toMatch(/alpha.*2 commits/);
   });
 
   it('counts commits since a date-only consumed entry', () => {
     mkRepo(root, 'alpha', 2);
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     setConsumed(root, 'alpha', { date: '2000-01-01', workstream: 'upstream-sync' });
-    const out = run(root, ['report']);
+    const out = runCli(root, ['report']).stdout;
     expect(out).toMatch(/2000-01-01 \(date\)/);
     expect(out).toMatch(/2 commits/);
   });
 
   it('prints never for a repo that has not been consumed', () => {
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
-    expect(run(root, ['report'])).toMatch(/alpha\s+\S+\s+never/);
+    expect(runCli(root, ['scan']).status).toBe(0);
+    expect(runCli(root, ['report']).stdout).toMatch(/alpha\s+\S+\s+never/);
   });
 
   it('prints unresolvable instead of throwing on a bad ref', () => {
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     setConsumed(root, 'alpha', { ref: 'nosuchref', date: '2026-01-01', workstream: 'x' });
-    expect(run(root, ['report'])).toMatch(/unresolvable/);
+    expect(runCli(root, ['report']).stdout).toMatch(/unresolvable/);
   });
 
   it('writes nothing', () => {
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
-    const before = fs.readFileSync(path.join(root, '.sync-ledger.json'), 'utf8');
-    run(root, ['report']);
-    expect(fs.readFileSync(path.join(root, '.sync-ledger.json'), 'utf8')).toBe(before);
+    expect(runCli(root, ['scan']).status).toBe(0);
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    expect(runCli(root, ['report']).status).toBe(0);
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
   });
 
-  it('omits archived repos', () => {
+  it('keeps archived repos out of the main table but lists them in a trailing archived section', () => {
     mkRepo(root, 'alpha');
     mkRepo(root, 'beta');
-    run(root, ['scan']);
-    const l = ledger(root);
+    expect(runCli(root, ['scan']).status).toBe(0);
+    const l = readLedger(root);
     l.repos.beta = { status: 'archived', archivedAt: '2026-01-01', reason: 'dormant' };
-    fs.writeFileSync(path.join(root, '.sync-ledger.json'), JSON.stringify(l, null, 2) + '\n');
-    expect(run(root, ['report'])).not.toMatch(/beta/);
+    writeLedger(root, l);
+    const out = runCli(root, ['report']).stdout;
+    const [mainTable, archivedSection] = out.split(/\narchived:\n/);
+    expect(mainTable).not.toMatch(/beta/);
+    expect(archivedSection).toBeDefined();
+    expect(archivedSection).toMatch(/beta\s+2026-01-01\s+dormant/);
+  });
+
+  it('omits the archived section entirely when nothing is archived', () => {
+    mkRepo(root, 'alpha');
+    expect(runCli(root, ['scan']).status).toBe(0);
+    expect(runCli(root, ['report']).stdout).not.toMatch(/archived:/);
   });
 
   it('falls back to a readable label instead of "undefined" for a ref with no date', () => {
     const repo = mkRepo(root, 'alpha', 2);
     const first = execFileSync('git', ['-C', repo, 'rev-list', '--max-parents=0', 'HEAD'],
       { encoding: 'utf8' }).trim();
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     setConsumed(root, 'alpha', { ref: first, workstream: 'upstream-sync' });
-    const out = run(root, ['report']);
+    const out = runCli(root, ['report']).stdout;
     expect(out).not.toMatch(/undefined/);
     expect(out).toMatch(new RegExp(`${first} \\(no date\\)`));
   });
@@ -431,13 +473,13 @@ describe('consume', () => {
     expect(recorded.by).toBe('abc1234');
     expect(recorded.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(recorded.ref).toMatch(/^[0-9a-f]{7,}$/);
-    expect(ledger(root).repos.alpha.consumed).toEqual(recorded);
+    expect(readLedger(root).repos.alpha.consumed).toEqual(recorded);
   });
 
   it('defaults ref to live HEAD, not the stale head field', () => {
     const repo = mkRepo(root, 'alpha');
     scan(root);
-    const staleHead = ledger(root).repos.alpha.head;
+    const staleHead = readLedger(root).repos.alpha.head;
     // A commit lands after the scan; consume must see it, not the scan-time head.
     addCommit(repo, 'later');
     const liveHead = git(repo, ['log', '-1', '--format=%h']);
@@ -482,7 +524,7 @@ describe('consume', () => {
     addCommit(repo, 'c3');
     addCommit(repo, 'c4');
     scan(root);
-    const g = gap(root, 'alpha', ledger(root).repos.alpha);
+    const g = gap(root, 'alpha', readLedger(root).repos.alpha);
     expect(g.count).toBe(2);
   });
 
@@ -563,8 +605,8 @@ describe('consume', () => {
     // no git call, so consume() wrote a consumed block that report() (which
     // filters archived entries) never displays.
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
-    run(root, ['archive', 'alpha', '--reason', 'dormant']);
+    expect(runCli(root, ['scan']).status).toBe(0);
+    expect(runCli(root, ['archive', 'alpha', '--reason', 'dormant']).status).toBe(0);
     const before = fs.readFileSync(ledgerPath(root), 'utf8');
     const result = runCli(root, ['consume', 'alpha', 'upstream-sync', '--no-ref']);
     expect(result.status).not.toBe(0);
@@ -593,7 +635,7 @@ describe('consume', () => {
 
   it('CLI: an unknown repo exits non-zero with a one-line prefixed message, no stack trace, and leaves the ledger byte-identical', () => {
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     const before = fs.readFileSync(ledgerPath(root), 'utf8');
     const result = runCli(root, ['consume', 'typo', 'upstream-sync']);
     expect(result.status).not.toBe(0);
@@ -605,7 +647,7 @@ describe('consume', () => {
 
   it('CLI: a missing workstream argument exits non-zero', () => {
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     expect(runCli(root, ['consume', 'alpha']).status).not.toBe(0);
   });
 });
@@ -636,29 +678,62 @@ describe('archive', () => {
   it('moves the directory and marks the entry', () => {
     mkRepo(root, 'alpha');
     mkRepo(root, 'stale');
-    run(root, ['scan']);
-    run(root, ['archive', 'stale', '--reason', 'no commits in 5.4 months']);
+    expect(runCli(root, ['scan']).status).toBe(0);
+    expect(runCli(root, ['archive', 'stale', '--reason', 'no commits in 5.4 months']).status).toBe(0);
     expect(fs.existsSync(path.join(root, 'stale'))).toBe(false);
     expect(fs.existsSync(path.join(root, '_archive', 'stale', '.git'))).toBe(true);
-    const e = ledger(root).repos.stale;
+    const e = readLedger(root).repos.stale;
     expect(e.status).toBe('archived');
     expect(e.reason).toBe('no commits in 5.4 months');
     expect(e.archivedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it('stays archived across a later scan', () => {
+  it('stays archived across a later scan when the directory is still absent (the ordinary case)', () => {
     mkRepo(root, 'alpha');
     mkRepo(root, 'stale');
-    run(root, ['scan']);
-    run(root, ['archive', 'stale', '--reason', 'dormant']);
-    run(root, ['scan']);
-    expect(ledger(root).repos.stale.status).toBe('archived');
+    expect(runCli(root, ['scan']).status).toBe(0);
+    expect(runCli(root, ['archive', 'stale', '--reason', 'dormant']).status).toBe(0);
+    const archivedEntry = readLedger(root).repos.stale;
+    expect(runCli(root, ['scan']).status).toBe(0);
+    const after = readLedger(root).repos.stale;
+    expect(after.status).toBe('archived');
+    // A scan that never even sees this directory again must not touch the
+    // entry it already recorded - not just the status field.
+    expect(after).toEqual(archivedEntry);
     expect(fs.existsSync(path.join(root, 'stale'))).toBe(false);
+  });
+
+  it('resumes tracking an archived entry whose directory reappears under its original name, per the documented `mv` recovery step', () => {
+    // docs/superpowers/upstream-sync.md's archive convention frames the move
+    // as reversible with `mv`. Before this fix, scan() skipped any entry
+    // whose status was already 'archived' before ever consulting the disk,
+    // so `mv _archive/stale stale` left the entry archived forever with a
+    // stale head - recovery needed a hand-edit of the JSON, the one
+    // operation this design exists to make unnecessary.
+    mkRepo(root, 'stale');
+    expect(runCli(root, ['scan']).status).toBe(0);
+    const recorded = consume(root, 'stale', 'upstream-sync', { by: 'abc1234' });
+    expect(runCli(root, ['archive', 'stale', '--reason', 'dormant']).status).toBe(0);
+
+    addCommit(path.join(root, '_archive', 'stale'), 'revival-commit');
+    const liveHead = git(path.join(root, '_archive', 'stale'), ['log', '-1', '--format=%h']);
+    fs.renameSync(path.join(root, '_archive', 'stale'), path.join(root, 'stale'));
+
+    expect(runCli(root, ['scan']).status).toBe(0);
+    const revived = readLedger(root).repos.stale;
+    expect(revived.status).toBe('active');
+    expect('archivedAt' in revived).toBe(false);
+    expect('reason' in revived).toBe(false);
+    expect(revived.head).toBe(liveHead);
+    // consumed is a fact about review history, not about where the mirror
+    // currently lives - it must survive the archive/revive round trip untouched.
+    expect(revived.consumed).toEqual(recorded);
+    expect(fs.existsSync(path.join(root, '_archive', 'stale'))).toBe(false);
   });
 
   it('refuses when the archive destination already exists', () => {
     mkRepo(root, 'stale');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     mkRepo(path.join(root, '_archive'), 'stale');
     expect(runCli(root, ['archive', 'stale', '--reason', 'dormant']).status).not.toBe(0);
     // The source must survive a refused archive.
@@ -671,7 +746,7 @@ describe('archive', () => {
     // guard were deleted entirely, because renameSync's raw ENOENT on a
     // nonexistent source also exits non-zero.
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     const result = runCli(root, ['archive', 'nosuch', '--reason', 'dormant']);
     expect(result.status).not.toBe(0);
     expect(result.stderr.trim().split('\n')).toHaveLength(1);
@@ -685,7 +760,7 @@ describe('archive', () => {
     // ledger-membership check, archiving 'stray' would invent a fresh
     // 'archived' entry for something no scan ever observed.
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     fs.mkdirSync(path.join(root, 'stray'), { recursive: true });
     expect(() => archive(root, 'stray', 'dormant'))
       .toThrow(/^reference-ledger: unknown repository 'stray'/);
@@ -695,7 +770,7 @@ describe('archive', () => {
   it('refuses when the ledger has the entry but the source directory is already gone from disk', () => {
     // The other half of the pair above: ledger says yes, disk says no.
     mkRepo(root, 'stale');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     fs.rmSync(path.join(root, 'stale'), { recursive: true, force: true });
     expect(() => archive(root, 'stale', 'dormant'))
       .toThrow(/^reference-ledger: no such reference 'stale'/);
@@ -706,7 +781,7 @@ describe('archive', () => {
     // collapses back to a path outside _reference/ entirely - the
     // destination-exists check alone guards nothing against this.
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     const outsideName = `evil-${path.basename(root)}`;
     const outside = path.join(path.dirname(root), outsideName);
     fs.mkdirSync(outside, { recursive: true });
@@ -722,14 +797,14 @@ describe('archive', () => {
 
   it('refuses a name containing a path separator outright', () => {
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     expect(() => archive(root, 'sub/evil', 'dormant'))
       .toThrow(/^reference-ledger: invalid reference name/);
   });
 
   it('refuses to archive the _archive directory itself, with a prefixed message and no stack trace', () => {
     mkRepo(root, 'alpha');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     fs.mkdirSync(path.join(root, '_archive'), { recursive: true });
     const result = runCli(root, ['archive', '_archive', '--reason', 'dormant']);
     expect(result.status).not.toBe(0);
@@ -743,7 +818,7 @@ describe('archive', () => {
     // writable: otherwise a load() failure strands a relocated directory
     // that nothing records as archived.
     mkRepo(root, 'stale');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     fs.writeFileSync(ledgerPath(root), '{"schema":1,"updated');
     expect(() => archive(root, 'stale', 'dormant')).toThrow();
     expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
@@ -752,7 +827,7 @@ describe('archive', () => {
 
   it('refuses a missing reason', () => {
     mkRepo(root, 'stale');
-    run(root, ['scan']);
+    expect(runCli(root, ['scan']).status).toBe(0);
     expect(runCli(root, ['archive', 'stale']).status).not.toBe(0);
     expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
   });
@@ -760,8 +835,8 @@ describe('archive', () => {
   it('never deletes: the archived tree is intact', () => {
     const repo = mkRepo(root, 'stale', 2);
     const before = fs.readdirSync(repo).sort();
-    run(root, ['scan']);
-    run(root, ['archive', 'stale', '--reason', 'dormant']);
+    expect(runCli(root, ['scan']).status).toBe(0);
+    expect(runCli(root, ['archive', 'stale', '--reason', 'dormant']).status).toBe(0);
     expect(fs.readdirSync(path.join(root, '_archive', 'stale')).sort()).toEqual(before);
   });
 
