@@ -93,6 +93,24 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Shape AND calendar validity: `/^\d{4}-\d{2}-\d{2}$/` alone still accepts
+ * `2026-13-45` (two digits is two digits), and git's approxidate accepts
+ * almost anything with exit 0 - `garbage`, `yesterday`, `07-10-2026` all
+ * silently resolve to *something*. A round trip through `Date` is the
+ * cheapest check that rejects all of those alongside a real calendar
+ * impossibility like `2026-02-30`, which parses but quietly rolls over to
+ * March 2.
+ */
+function isValidDate(d) {
+  if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  try {
+    return new Date(d).toISOString().slice(0, 10) === d;
+  } catch {
+    return false;
+  }
+}
+
 /** Refresh observed state. Never writes `consumed`. */
 function scan(dir) {
   const ledger = load(dir);
@@ -141,6 +159,12 @@ function gap(dir, name, entry) {
       const n = git(repo, ['rev-list', '--count', `${c.ref}..HEAD`]);
       return { label: `${c.ref} (${c.date || 'no date'})`, count: Number(n) };
     }
+    // consume() validates --date itself, but a hand-edited ledger file
+    // reaches gap() straight from load(), skipping that gate entirely.
+    // `--since=<garbage>` is the same 0-that-lies failure mode the
+    // both-fields-absent check above exists to prevent, reachable through a
+    // different door.
+    if (!isValidDate(c.date)) return { label: `${c.date} (invalid date)`, count: null };
     const n = git(repo, ['rev-list', '--count', `--since=${c.date}`, 'HEAD']);
     return { label: `${c.date} (date)`, count: Number(n) };
   } catch {
@@ -209,20 +233,60 @@ function parseFlags(argv) {
  * asserts a review happened without saying which one.
  */
 function consume(dir, name, workstream, opts = {}) {
+  // Mirrors archive()'s guard: only reachable through a hand-edited ledger
+  // key (a real scan() never writes a name containing a separator), but an
+  // unchecked name would otherwise reach `git -C` with an attacker-controlled
+  // path.
+  const resolved = path.resolve(dir, name);
+  if (name.includes('/') || name.includes(path.sep)
+    || !resolved.startsWith(`${path.resolve(dir)}${path.sep}`)) {
+    throw new Error(`reference-ledger: invalid reference name '${name}'`);
+  }
   const ledger = load(dir);
   if (!ledger.repos[name]) {
     // Self-prefixing, matching load()'s thrown messages: main()'s shared
     // try/catch prints err.message verbatim and adds nothing.
     throw new Error(`reference-ledger: unknown repository '${name}' - run scan first`);
   }
+  // An archived entry still exists in the ledger, but its directory has
+  // moved under _archive/, so a git call against dir/name would throw an
+  // unprefixed ENOENT - and worse, --no-ref needs no git call at all, so it
+  // would silently succeed and write a consumed block that report() (which
+  // filters archived entries out) never shows.
+  if (ledger.repos[name].status === 'archived') {
+    throw new Error(`reference-ledger: '${name}' is archived - not a live reference`);
+  }
+  if (!fs.existsSync(path.join(dir, name))) {
+    throw new Error(`reference-ledger: no such reference '${name}'`);
+  }
   if (typeof workstream !== 'string' || workstream.length === 0) {
     throw new Error('reference-ledger: workstream is required and must be a non-empty string');
   }
-  const ref = opts.noRef
-    ? null
+  if (opts.date !== undefined && !isValidDate(opts.date)) {
+    throw new Error(`reference-ledger: --date '${opts.date}' is not a valid YYYY-MM-DD date`);
+  }
+  let ref;
+  if (opts.noRef) {
+    ref = null;
+  } else if (opts.ref) {
+    try {
+      // Resolved to a concrete sha at record time, never stored verbatim:
+      // `--ref HEAD` stored as the literal string 'HEAD' would freeze the gap
+      // at 0 forever, since gap() re-evaluates `HEAD..HEAD` fresh on every
+      // later report. Omitting --ref was already safe (it resolves live HEAD
+      // to a sha below); passing it explicitly was the one path that wasn't.
+      // `--verify` also rejects a typo now, while the operator can still fix
+      // it, instead of it silently becoming "(unresolvable)" at the next
+      // report - and normalises a pasted 40-char sha to short form.
+      ref = git(path.join(dir, name), ['rev-parse', '--short', '--verify', `${opts.ref}^{commit}`]);
+    } catch {
+      throw new Error(`reference-ledger: '${opts.ref}' does not resolve to a commit in '${name}'`);
+    }
+  } else {
     // Live HEAD, not ledger.repos[name].head: a pull since the last scan would
     // make the stored field stale, and a stale ref understates the gap.
-    : (opts.ref || git(path.join(dir, name), ['log', '-1', '--format=%h']));
+    ref = git(path.join(dir, name), ['log', '-1', '--format=%h']);
+  }
   ledger.repos[name].consumed = {
     ...(ref ? { ref } : {}),
     date: opts.date || today(),

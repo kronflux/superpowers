@@ -446,11 +446,44 @@ describe('consume', () => {
     expect(recorded.ref).toBe(liveHead);
   });
 
-  it('honours an explicit ref and date', () => {
+  it('resolves an explicit symbolic ref to a concrete short sha, honouring the explicit date', () => {
+    // Not stored verbatim: an earlier version wrote opts.ref straight through,
+    // so 'HEAD' (or any moving ref) never resolved differently on a later
+    // report - a permanent 0 gap. See the dedicated regression test below.
+    const repo = mkRepo(root, 'alpha', 2);
+    scan(root);
+    const resolved = git(repo, ['rev-parse', '--short', 'HEAD~1']);
+    const recorded = consume(root, 'alpha', 'upstream-sync', { ref: 'HEAD~1', date: '2026-07-10' });
+    expect(recorded).toEqual({ ref: resolved, date: '2026-07-10', workstream: 'upstream-sync' });
+  });
+
+  it('normalises a pasted 40-character sha to short form', () => {
+    const repo = mkRepo(root, 'alpha');
+    scan(root);
+    const full = git(repo, ['rev-parse', 'HEAD']);
+    const recorded = consume(root, 'alpha', 'upstream-sync', { ref: full });
+    expect(recorded.ref).toMatch(/^[0-9a-f]{7,12}$/);
+    expect(recorded.ref.length).toBeLessThan(full.length);
+  });
+
+  it('rejects an unresolvable --ref with a prefixed error and leaves the ledger untouched', () => {
     mkRepo(root, 'alpha');
     scan(root);
-    const recorded = consume(root, 'alpha', 'upstream-sync', { ref: 'd884ae0', date: '2026-07-10' });
-    expect(recorded).toEqual({ ref: 'd884ae0', date: '2026-07-10', workstream: 'upstream-sync' });
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    expect(() => consume(root, 'alpha', 'upstream-sync', { ref: 'nosuchref' }))
+      .toThrow(/^reference-ledger: 'nosuchref' does not resolve to a commit in 'alpha'/);
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('resolving --ref HEAD to a concrete sha keeps the gap accurate as commits land (regression: a stored symbolic ref used to freeze the gap at 0 forever)', () => {
+    const repo = mkRepo(root, 'alpha', 3);
+    scan(root);
+    consume(root, 'alpha', 'upstream-sync', { ref: 'HEAD' });
+    addCommit(repo, 'c3');
+    addCommit(repo, 'c4');
+    scan(root);
+    const g = gap(root, 'alpha', ledger(root).repos.alpha);
+    expect(g.count).toBe(2);
   });
 
   it('records a date-only entry under --no-ref with an explicit date', () => {
@@ -508,6 +541,56 @@ describe('consume', () => {
     expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
   });
 
+  it('rejects invalid or ambiguous --date values instead of letting git approxidate silently misinterpret them', () => {
+    // Reproduced against the unfixed code: --no-ref --date 2026-13-45 recorded
+    // a consumed block that reported 0 commits - git's approxidate accepts
+    // almost any string with exit 0. garbage, yesterday, and 07-10-2026 all
+    // resolve to *something*; 2026-02-30 parses by silently rolling over to
+    // March 2 rather than failing.
+    mkRepo(root, 'alpha');
+    scan(root);
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    for (const bad of ['2026-13-45', '2026-02-30', 'garbage', 'yesterday', '07-10-2026']) {
+      expect(() => consume(root, 'alpha', 'upstream-sync', { noRef: true, date: bad }))
+        .toThrow(/^reference-ledger: --date /);
+    }
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('refuses to consume an archived repo instead of silently succeeding on a directory that has moved', () => {
+    // Reproduced against the unfixed code: an archived entry still exists in
+    // ledger.repos, so the membership guard alone passed, and --no-ref needs
+    // no git call, so consume() wrote a consumed block that report() (which
+    // filters archived entries) never displays.
+    mkRepo(root, 'alpha');
+    run(root, ['scan']);
+    run(root, ['archive', 'alpha', '--reason', 'dormant']);
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    const result = runCli(root, ['consume', 'alpha', 'upstream-sync', '--no-ref']);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr.trim().split('\n')).toHaveLength(1);
+    expect(result.stderr).toMatch(/^reference-ledger: 'alpha' is archived/);
+    expect(result.stderr).not.toMatch(/^\s*at /m);
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('refuses when the directory is missing from disk even though the ledger still lists it', () => {
+    mkRepo(root, 'alpha');
+    scan(root);
+    fs.rmSync(path.join(root, 'alpha'), { recursive: true, force: true });
+    const before = fs.readFileSync(ledgerPath(root), 'utf8');
+    expect(() => consume(root, 'alpha', 'upstream-sync', { noRef: true }))
+      .toThrow(/^reference-ledger: no such reference 'alpha'/);
+    expect(fs.readFileSync(ledgerPath(root), 'utf8')).toBe(before);
+  });
+
+  it('refuses a name containing a path separator outright (matches archive()\'s guard)', () => {
+    mkRepo(root, 'alpha');
+    scan(root);
+    expect(() => consume(root, 'sub/evil', 'upstream-sync', { noRef: true }))
+      .toThrow(/^reference-ledger: invalid reference name/);
+  });
+
   it('CLI: an unknown repo exits non-zero with a one-line prefixed message, no stack trace, and leaves the ledger byte-identical', () => {
     mkRepo(root, 'alpha');
     run(root, ['scan']);
@@ -524,6 +607,24 @@ describe('consume', () => {
     mkRepo(root, 'alpha');
     run(root, ['scan']);
     expect(runCli(root, ['consume', 'alpha']).status).not.toBe(0);
+  });
+});
+
+describe('gap — defensive date validation', () => {
+  // consume() rejects an invalid --date at write time, but gap() reads
+  // straight from load(), which accepts anything shape-valid enough to parse
+  // as JSON. A hand-edited ledger (or a future writer that forgets the
+  // guard) must not reach `--since=<garbage>` regardless.
+  it('treats a hand-edited invalid consumed date as unresolvable, never as a git-approxidate guess', () => {
+    const root = newRoot();
+    try {
+      mkRepo(root, 'alpha');
+      const result = gap(root, 'alpha', { consumed: { date: 'garbage', workstream: 'x' } });
+      expect(result.count).toBeNull();
+      expect(result.label).toMatch(/invalid date/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
