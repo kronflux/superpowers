@@ -675,3 +675,51 @@ describe('archive', () => {
     expect(fs.existsSync(path.join(root, 'stale', '.git'))).toBe(true);
   });
 });
+
+describe('upstream-sync playbook wiring', () => {
+  const DOC = path.join(__dirname, '..', 'docs', 'superpowers', 'upstream-sync.md');
+  const doc = fs.readFileSync(DOC, 'utf8');
+
+  it('opens the procedure by reading the ledger, and closes it by consuming', () => {
+    expect(doc).toMatch(/scripts\/reference-ledger\.mjs/);
+    expect(doc).toMatch(/reference-ledger\.mjs report/);
+    expect(doc).toMatch(/reference-ledger\.mjs consume/);
+
+    // Step 1 must actually be the report command, not merely mentioned
+    // anywhere in the file.
+    const step1 = /^### 1\..*$([\s\S]*?)(?=^### )/m.exec(doc);
+    expect(step1).not.toBeNull();
+    expect(step1[0]).toMatch(/reference-ledger\.mjs report/);
+
+    // The mirror-refresh step must be immediately followed by a scan, not
+    // merely mention "scan" somewhere later in the document.
+    const mirrorStep = /^### \d+\.\s*Refresh the upstream mirror\s*$([\s\S]*?)(?=^### )/m.exec(doc);
+    expect(mirrorStep).not.toBeNull();
+    expect(mirrorStep[0]).toMatch(/reference-ledger\.mjs scan/);
+
+    // consume must be the last ledger-mutating command in the file, after
+    // both the full-suite gate and the RELEASE-NOTES entry - not merely
+    // present somewhere. A rewrite that keeps the command but moves it
+    // earlier (e.g. before the gate) must fail this.
+    const gateIdx = doc.indexOf('### 6. Full suite gate');
+    const releaseNotesIdx = doc.indexOf('### 7. Update RELEASE-NOTES and record the new synced ref');
+    const consumeIdx = doc.lastIndexOf('reference-ledger.mjs consume');
+    expect(gateIdx).toBeGreaterThan(-1);
+    expect(releaseNotesIdx).toBeGreaterThan(gateIdx);
+    expect(consumeIdx).toBeGreaterThan(releaseNotesIdx);
+  });
+
+  it('documents the archive convention with the dormancy window', () => {
+    expect(doc).toMatch(/reference-ledger\.mjs archive/);
+    expect(doc.toLowerCase()).toMatch(/dormant/);
+    // The specific window, not just the word "dormant" - a rewrite that
+    // drops the five-to-six-month rule but keeps the word must still fail.
+    expect(doc).toMatch(/five to six months/i);
+  });
+
+  it('numbers procedure sections sequentially with no duplicates or gaps', () => {
+    const headings = [...doc.matchAll(/^### (\d+)\./gm)].map((m) => Number(m[1]));
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings).toEqual(headings.map((_, i) => i + 1));
+  });
+});
