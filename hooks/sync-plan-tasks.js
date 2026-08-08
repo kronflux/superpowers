@@ -23,16 +23,48 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-/** Newest plan snapshot under cwd, or null. Sorted by name: plans are date-prefixed. */
-function newestSnapshot(cwd) {
+/** All plan snapshot paths under cwd, or []. */
+function allSnapshots(cwd) {
   const dir = path.join(cwd, '.superpowers', 'plans');
   let files;
   try {
-    files = fs.readdirSync(dir).filter((f) => f.endsWith('.md.tasks.json')).sort();
+    files = fs.readdirSync(dir).filter((f) => f.endsWith('.md.tasks.json'));
   } catch {
-    return null;
+    return [];
   }
-  return files.length ? path.join(dir, files[files.length - 1]) : null;
+  return files.map((f) => path.join(dir, f));
+}
+
+/**
+ * The single snapshot that contains a task with this id, or null.
+ *
+ * Filename order (e.g. picking the alphabetically- or date-newest snapshot)
+ * does not tell us which plan a running session is actually working — an
+ * older plan can be resumed while a newer snapshot exists on disk, and a
+ * TaskUpdate for it must not land on the wrong file. Task id containment is
+ * the only reliable signal.
+ *
+ * If more than one snapshot contains the id, this is ambiguous and we
+ * refuse to guess: returning null leaves every file untouched. A wrong
+ * write is exactly the failure this function exists to prevent, and
+ * isPlanInFlight (hooks/lib/tmp-reaper.js) treats a missing update as, at
+ * worst, a stale-looking snapshot — never data loss. Silently picking one
+ * of several matches could instead flip a live plan to "no pending work"
+ * and get its workspace reaped.
+ */
+function snapshotForTask(cwd, taskId) {
+  const matches = [];
+  for (const snapshot of allSnapshots(cwd)) {
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(snapshot, 'utf8'));
+    } catch {
+      continue; // corrupt snapshot: cannot tell if it contains the id, skip it
+    }
+    if (!data || !Array.isArray(data.tasks)) continue;
+    if (data.tasks.some((t) => t && String(t.id) === String(taskId))) matches.push(snapshot);
+  }
+  return matches.length === 1 ? matches[0] : null;
 }
 
 /**
@@ -65,7 +97,7 @@ async function main() {
     // removing an entry would change the denominator and make a resumed plan
     // look shorter than it is.
     if (taskId && ['pending', 'in_progress', 'completed'].includes(status)) {
-      const snapshot = newestSnapshot(data?.cwd || process.cwd());
+      const snapshot = snapshotForTask(data?.cwd || process.cwd(), taskId);
       if (snapshot) applyStatus(snapshot, taskId, status);
     }
   } catch { /* bookkeeping is best-effort; never block a TaskUpdate */ }
@@ -75,4 +107,4 @@ async function main() {
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) main().catch(() => { process.stdout.write('{}'); });
 
-export { newestSnapshot, applyStatus };
+export { snapshotForTask, applyStatus };

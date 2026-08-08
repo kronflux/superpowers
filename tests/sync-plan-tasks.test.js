@@ -45,12 +45,54 @@ describe('sync-plan-tasks', () => {
     expect(read(p).tasks[0].status).toBe('in_progress');
   });
 
-  it('writes to the NEWEST snapshot when several plans exist', () => {
-    const old = seed('2026-01-01-old', [{ id: '5', status: 'pending' }]);
-    const cur = seed('2026-09-09-current', [{ id: '5', status: 'pending' }]);
+  it('updates the snapshot that actually contains the task id, regardless of filename order', () => {
+    // The id lives only in the oldest (alphabetically-first) snapshot. A newer
+    // snapshot exists too, but selection must be by task identity, not by
+    // filename order — an older plan can be resumed while a newer snapshot
+    // sits on disk unrelated to it.
+    const oldest = seed('2026-01-01-oldest', [{ id: '5', status: 'pending' }]);
+    const middleBefore = fs.readFileSync(
+      seed('2026-05-05-middle', [{ id: '6', status: 'pending' }]), 'utf8',
+    );
+    const middle = path.join(cwd, '.superpowers', 'plans', '2026-05-05-middle.md.tasks.json');
+    const newestBefore = fs.readFileSync(
+      seed('2026-09-09-newest', [{ id: '7', status: 'pending' }]), 'utf8',
+    );
+    const newest = path.join(cwd, '.superpowers', 'plans', '2026-09-09-newest.md.tasks.json');
+
     run({ tool_name: 'TaskUpdate', tool_input: { taskId: '5', status: 'completed' } });
-    expect(read(cur).tasks[0].status).toBe('completed');
-    expect(read(old).tasks[0].status).toBe('pending');
+
+    expect(read(oldest).tasks[0].status).toBe('completed');
+    expect(fs.readFileSync(middle, 'utf8')).toBe(middleBefore);
+    expect(fs.readFileSync(newest, 'utf8')).toBe(newestBefore);
+  });
+
+  it('is a byte-identical no-op across all snapshots when the id is in none of them', () => {
+    const a = seed('2026-01-01-a', [{ id: '1', status: 'pending' }]);
+    const b = seed('2026-02-02-b', [{ id: '2', status: 'pending' }]);
+    const aBefore = fs.readFileSync(a, 'utf8');
+    const bBefore = fs.readFileSync(b, 'utf8');
+
+    const out = run({ tool_name: 'TaskUpdate', tool_input: { taskId: '999', status: 'completed' } });
+
+    expect(JSON.parse(out)).toEqual({});
+    expect(fs.readFileSync(a, 'utf8')).toBe(aBefore);
+    expect(fs.readFileSync(b, 'utf8')).toBe(bBefore);
+  });
+
+  it('leaves every snapshot untouched when the id is ambiguous across multiple plans', () => {
+    // Present in two snapshots at once: refuse to guess. A wrong write is the
+    // exact failure this hook exists to prevent, so no file is written.
+    const a = seed('2026-01-01-a', [{ id: '42', status: 'pending' }]);
+    const b = seed('2026-02-02-b', [{ id: '42', status: 'pending' }]);
+    const aBefore = fs.readFileSync(a, 'utf8');
+    const bBefore = fs.readFileSync(b, 'utf8');
+
+    const out = run({ tool_name: 'TaskUpdate', tool_input: { taskId: '42', status: 'completed' } });
+
+    expect(JSON.parse(out)).toEqual({});
+    expect(fs.readFileSync(a, 'utf8')).toBe(aBefore);
+    expect(fs.readFileSync(b, 'utf8')).toBe(bBefore);
   });
 
   it('leaves the file untouched for an id the plan does not contain', () => {
