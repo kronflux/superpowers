@@ -246,28 +246,49 @@ function formatStatsSummary(stats) {
 //   - /\bi can (?:certainly|definitely) (?:help|do|write|generate)\b/i —
 //     sycophancy, not a did-you-do-the-work signal. Belongs to the
 //     banned-vocabulary purity gate, not this guard.
+//
+// A later review found the broadened list, validated only against terse
+// past-tense report prose, misfired on ordinary conversational prose —
+// a genre the report corpus structurally cannot exercise. Fixed against a
+// second, negative corpus of realistic assistant turns that legitimately
+// end with no tool use (see the "report corpus stays silent" and
+// "innocent conversational prose stays silent" describe blocks):
+//   - /\bmoving on to\b/i shipped with zero corpus coverage and turned out
+//     to be a paragraph-transition idiom ("Moving on to the tradeoffs, the
+//     second approach..."), not a commitment marker. Dropped outright.
+//   - The bare "proceeding to/on/with" forms fired on topic transitions
+//     ("Proceeding to the next section, the article covers..."). Merged
+//     into a single pattern requiring "now" in the same clause, matching
+//     the writing/generating tightening below.
+//   - "let me start/now/begin", "let's dive in/start/begin", and "allow me
+//     to start/begin" fired on ordinary explanatory openers ("Let me start
+//     by explaining...", "Let's dive in: the reason this fails...",
+//     "Allow me to start with the constraints..."). Narrowed each list to
+//     verbs naming a concrete deliverable (write/generate/implement/
+//     create/handle/go ahead), which did not misfire on the negative
+//     corpus.
 const FORWARD_COMMITMENT_PATTERNS = [
   /\bi'll now\b/i,
   /\bi will now\b/i,
-  /\bproceeding (to|on|now)\b/i,
-  /\blet me (start|now)\b/i,
   /\bstarting now\b/i,
   // "writing ... now" within a short, same-clause span (no sentence break).
   /\bwriting\b[^.\n]{0,40}\bnow\b/i,
   /\bi(?:'ll| will) (?:now|go ahead|start|begin|generate|write|create|implement|update|proceed)\b/i,
-  /\blet me (?:start|now|go ahead|begin|write|generate|implement|create|handle)\b/i,
+  /\blet me (?:go ahead|write|generate|implement|create|handle)\b/i,
   /\b(?:i'm|i am) going to (?:start|begin|generate|write|create|implement|update|proceed)\b/i,
-  /\blet's (?:get started|dive in|start|begin|implement|write|create)\b/i,
-  /\bproceeding (?:to|on|now|with)\b/i,
+  /\blet's (?:get started|implement|write|create)\b/i,
+  // Requires "now" in the same clause as "proceeding", mirroring the
+  // writing/generating tightening below, instead of matching bare
+  // "proceeding to/on/with" (fires on ordinary topic transitions).
+  /\bproceeding\b[^.\n]{0,40}\bnow\b/i,
   /\b(?:starting|beginning) now\b/i,
-  /\ballow me to (?:start|begin|write|generate|implement|create)\b/i,
+  /\ballow me to (?:write|generate|implement|create)\b/i,
   // Tightened from the candidate form (verb ... now/for you anywhere in the
   // message): that form matched past-tense reporting like "still working on
   // the reaper now covered by tests". Require the verb to open the message
   // or a sentence, or follow a first-person "I'm"/"I am", so it only catches
   // an announcement, not a status update embedded mid-sentence.
   /(?:^|(?<=[.!?\n]\s)|(?<=\bi(?:'m|m| am) ))(?:writing|generating|creating|implementing|updating|working on)\b[^.\n]{0,40}\b(?:now|for you)\b/i,
-  /\bmoving on to\b/i,
 ];
 
 const FILE_CHANGING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash']);

@@ -129,18 +129,55 @@ describe('stop-reminders: forward-commitment guard — expanded patterns', () =>
     expect(run({ finalMessage: text, toolUses: [] })).toBe('');
   });
 
-  it('fires on "moving on to" as a bare commitment', () => {
-    expect(
-      run({ finalMessage: 'Moving on to the next task now.', toolUses: [] })
-    ).not.toBe('');
-  });
-
-  it('does not include the two rejected patterns (presenting work, sycophancy)', () => {
+  it('does not include the three rejected patterns (presenting work, sycophancy, transition idiom)', () => {
     expect(
       run({ finalMessage: 'Here is the code you asked for.', toolUses: [] })
     ).toBe('');
     expect(
       run({ finalMessage: 'I can certainly help with that.', toolUses: [] })
     ).toBe('');
+    // "moving on to" was dropped: zero corpus coverage at adoption time, and
+    // it turned out to be a paragraph-transition idiom, not a commitment
+    // marker — see the negative corpus below.
+    expect(
+      run({ finalMessage: 'Moving on to the next task now.', toolUses: [] })
+    ).toBe('');
   });
+});
+
+// Negative corpus: realistic assistant messages of the kind that legitimately
+// end a turn with no file-changing tool use — explanations, comparisons,
+// answers, refusals, clarifying questions. Drawn up after a review found the
+// report corpus above (terse past-tense engineering prose) structurally
+// cannot exercise ordinary conversational phrasing, which is where several
+// broadened patterns actually misfired: "let me start/now/begin", "let's
+// dive in/start/begin", "allow me to start/begin", bare "proceeding
+// to/on/with", and "moving on to" all fired on innocent transitions or
+// explanatory openers. None of the messages below promise unfinished work,
+// so all must produce ''.
+const CONVERSATIONAL_CORPUS = [
+  'Moving on to the tradeoffs, the second approach trades memory for throughput.',
+  'Moving on to error handling, the retry logic already covers timeouts.',
+  "Let's dive in: the reason this fails is that the mutex releases before the callback runs.",
+  'Let me be specific about what changed: the timeout went from 30s to 60s, nothing else.',
+  "Let's start with the good news: your tests already cover this case.",
+  'Allow me to clarify what I meant by idempotent in that context.',
+  'Proceeding to the next section, the article covers caching strategies in more detail.',
+  'In terms of performance, the second approach avoids an extra allocation.',
+  "I won't be able to help with that request -- it involves bypassing a paywall.",
+  'What version of Node are you running? That determines which fix applies.',
+  'The bug was caused by a race condition between the reaper and the session-end hook, not a missing lock.',
+  "Here's a comparison: option A is simpler, option B scales better under load.",
+  "Let's begin with why this matters: context loss between sessions is the real cost.",
+  'Allow me to walk through the reasoning: the cache invalidates on write, not on read.',
+  'Let me start by explaining why this happens.',
+  'Allow me to start with the constraints before proposing anything.',
+];
+
+describe('stop-reminders: forward-commitment guard — conversational prose stays silent', () => {
+  for (const text of CONVERSATIONAL_CORPUS) {
+    it(`silent on: ${text.slice(0, 60)}...`, () => {
+      expect(run({ finalMessage: text, toolUses: [] })).toBe('');
+    });
+  }
 });
