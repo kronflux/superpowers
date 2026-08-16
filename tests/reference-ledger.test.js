@@ -773,7 +773,7 @@ describe('archive', () => {
   });
 
   it('resumes tracking an archived entry whose directory reappears under its original name, per the documented `mv` recovery step', () => {
-    // docs/superpowers/upstream-sync.md's archive convention frames the move
+    // docs/upstream-sync.md's archive convention frames the move
     // as reversible with `mv`. Before this fix, scan() skipped any entry
     // whose status was already 'archived' before ever consulting the disk,
     // so `mv _archive/stale stale` left the entry archived forever with a
@@ -922,7 +922,7 @@ describe('archive', () => {
 });
 
 describe('upstream-sync playbook wiring', () => {
-  const DOC = path.join(__dirname, '..', 'docs', 'superpowers', 'upstream-sync.md');
+  const DOC = path.join(__dirname, '..', 'docs', 'upstream-sync.md');
   const doc = fs.readFileSync(DOC, 'utf8');
 
   it('opens the procedure by reading the ledger, and closes it by consuming', () => {

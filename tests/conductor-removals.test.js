@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // Operational surfaces only. The allowlist below is history, not code:
-// RELEASE-NOTES is a changelog, docs/adr and docs/superpowers are a committed
-// design archive, .superpowers is local scratch. Rewriting any of them to make
-// a grep return clean would be falsifying the record.
+// RELEASE-NOTES is a changelog, docs/adr is a committed decision record, and
+// .superpowers is local scratch holding plans and specs. Rewriting any of them
+// to make a grep return clean would be falsifying the record.
 const SCAN_DIRS = ['skills', 'hooks', 'commands', 'agents', 'scripts'];
 
 // plugin.universal.mjs isn't a .md file, so the root markdown glob below
@@ -18,8 +18,8 @@ const SCAN_ROOT_EXTRA = ['plugin.universal.mjs'];
 
 // RELEASE-NOTES.md is a changelog: it must keep its historical mentions of
 // retired tooling as a record of what shipped and when. Excluding it here is
-// deliberate, not an oversight — same rationale as the docs/adr and
-// docs/superpowers exclusion noted above.
+// deliberate, not an oversight — same rationale as the docs/adr exclusion
+// noted above.
 const UNSCANNED_ROOT = ['RELEASE-NOTES.md'];
 
 function rootMarkdownFiles() {

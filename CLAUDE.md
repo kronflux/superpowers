@@ -37,7 +37,9 @@ manifests by the bump script.
 - `agents/` — `code-reviewer`, `red-team` subagent definitions.
 - `commands/` — slash-command wrappers (`brainstorm`, `write-plan`, `execute-plan`, `onboard`, gate commands).
 - `scripts/` — `compile-hooks.mjs`, `sync-to-codex-plugin.sh`, `sync-to-antigravity.sh`, `bump-version.sh`.
-- `docs/` — harness/porting/testing docs plus `docs/superpowers/{plans,specs}` committed design history.
+- `docs/` — committed documentation only: harness/porting/testing guides, `docs/adr/` decision
+  records, fork-divergence and upstream-sync references, and the middleware config example. Plans
+  and specs are session artifacts and live in the gitignored `.superpowers/`, never here.
 - `.superpowers/` — gitignored local scratch: active plans/specs/`.tasks.json` (session artifacts, never committed unless explicitly asked), sdd workspace, brainstorm-server state.
 - `tests/` — vitest suites + shell/python integration checks.
 - `plugin.universal.mjs` — single source for all hook manifests.
@@ -68,7 +70,7 @@ manifests by the bump script.
   `SUPERPOWERS_TMP_RETENTION_DAYS`), with one exception: a workspace whose plan still has a
   `pending` or `in_progress` task in `<plan>.md.tasks.json` is never reaped, regardless of age.
   This is a deliberate deviation from upstream's `2026-07-06-sdd-plan-scoped-workspace` design
-  (mirrored only in `../_reference/`, not this fork's `docs/superpowers/`), which specified
+  (mirrored only in `../_reference/`, not this fork's own history), which specified
   deleting the workspace at finish: deletion at finish destroys reports and review packages at
   the moment they are most wanted, and three reporting defects on 2026-08-08 were caught only by
   re-reading reports after their tasks had already closed — evidence delete-at-finish would have

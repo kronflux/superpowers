@@ -131,7 +131,7 @@ const HANDOFF_BLOCK = [
   'Required structure (copy this exactly):',
   '',
   '  AskUserQuestion:',
-  '    question: "Plan complete and saved to docs/superpowers/plans/<filename>.md. How would you like to execute it?"',
+  '    question: "Plan complete and saved to .superpowers/plans/<filename>.md. How would you like to execute it?"',
   '    header: "Execution"',
   '    options:',
   '      - label: "Subagent-Driven (this session)"',

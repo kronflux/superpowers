@@ -223,7 +223,7 @@ async function main() {
   const die = (msg, code) => { console.error(`middleware-exec: ${msg}`); process.exit(code); };
   if (!args.task || typeof args.task !== 'string') die('usage: middleware-exec --task <name> [--input-file F] [--out F]', EXIT.USAGE);
   const resolved = resolveConfig();
-  if (!resolved) die('no middleware-config.json in ./.claude/, $CLAUDE_CONFIG_DIR/, or ~/.claude/ — see docs/superpowers/middleware-config.example.json', EXIT.UNCONFIGURED);
+  if (!resolved) die('no middleware-config.json in ./.claude/, $CLAUDE_CONFIG_DIR/, or ~/.claude/ — see docs/middleware-config.example.json', EXIT.UNCONFIGURED);
   const input = args['input-file'] ? fs.readFileSync(args['input-file'], 'utf8') : fs.readFileSync(0, 'utf8');
   try {
     const desc = endpointFor(resolved.cfg);

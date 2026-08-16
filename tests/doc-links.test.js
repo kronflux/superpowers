@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Scope is deliberately narrow. docs/superpowers/** and docs/plans/** are a
-// committed archive of past design work; they reference files that were later
-// renamed or deleted on purpose, and rewriting history to satisfy a linter
-// would be worse than the dangling link.
+// Scope is deliberately narrow: the skills tree, the ADR record, and the one
+// root document skills link into. Plans and specs are session artifacts under
+// the gitignored `.superpowers/` tree, outside version control and outside
+// this check.
 const SCOPES = [
   path.join(ROOT, 'skills'),
   path.join(ROOT, 'docs', 'adr'),
