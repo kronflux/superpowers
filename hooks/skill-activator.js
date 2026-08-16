@@ -49,12 +49,15 @@ const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 // Minimum score threshold — matches below this are discarded as noise
 const CONFIDENCE_THRESHOLD = 2;
 
-// Minimum match score before a rule's authored priority is shown. A
-// `critical` label on a single-keyword match reports a strong match when only
-// the rule's author was confident; the score is what the prompt earned.
-// Scoring weights an intent pattern at 2 and a keyword at 1, so `critical`
-// requires an intent match plus two keywords, or two intent matches.
-const LABEL_MIN_SCORE = { critical: 4, high: 3, medium: 2, low: 2 };
+// Minimum match score before a rule's authored priority is shown. A score of
+// 2 is the confidence floor a match must already clear to appear at all —
+// one intent pattern, or two keywords — and means the prompt barely matched,
+// so no priority is shown at the floor regardless of the rule's own tier.
+// Above the floor, the authored priority is shown. `critical` additionally
+// requires an intent match plus two keywords, or two intent matches, since a
+// `critical` label on a bare-floor match reports a strong match when only
+// the rule's author was confident.
+const LABEL_MIN_SCORE = { critical: 4, high: 3, medium: 3, low: 3 };
 
 /** One hint line: the skill, and its priority only when the score earns it. */
 function renderMatch(m) {

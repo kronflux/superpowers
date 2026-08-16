@@ -130,8 +130,37 @@ describe('renderMatch severity calibration', () => {
       .toBe('  - superpowers:claude-md-creator (medium)');
   });
 
+  it('omits a medium label at the bare confidence floor', () => {
+    expect(renderMatch({ skill: 'claude-md-creator', priority: 'medium', score: 2 }))
+      .toBe('  - superpowers:claude-md-creator');
+  });
+
   it('omits the label for an unknown priority', () => {
     expect(renderMatch({ skill: 'x', priority: 'bogus', score: 99 }))
       .toBe('  - superpowers:x');
+  });
+});
+
+describe('renderMatch wiring through the hook', () => {
+  // Both prompts match only the systematic-debugging rule (critical) in
+  // hooks/skill-rules.json. Scores confirmed via matchSkills():
+  //   weak:   'bug' + 'error' keywords, no intent pattern   -> score 2
+  //   strong: "can't figure" intent pattern (2) + 'crash','broken','exception'
+  //           keywords (3)                                  -> score 5
+  // LABEL_MIN_SCORE.critical is 4, so weak stays unlabelled and strong is labelled.
+  it('emits an unlabelled critical hint for a weak match', () => {
+    const out = run({ prompt: 'This bug looks like an error somewhere.', cwd: '/tmp' });
+    const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
+    expect(ctx).toContain('  - superpowers:systematic-debugging\n');
+    expect(ctx).not.toContain('(critical)');
+  });
+
+  it('emits a (critical)-labelled hint for a strong match', () => {
+    const out = run({
+      prompt: "I can't figure out why this keeps crashing with a broken exception.",
+      cwd: '/tmp',
+    });
+    const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
+    expect(ctx).toContain('  - superpowers:systematic-debugging (critical)');
   });
 });
