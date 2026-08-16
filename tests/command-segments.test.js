@@ -3,7 +3,6 @@ import {
   stripHeredocs,
   stripQuoted,
   splitSegments,
-  normalizeCommand,
 } from '../hooks/lib/command-segments.js';
 
 describe('stripHeredocs', () => {
@@ -132,16 +131,5 @@ describe('splitSegments', () => {
 
   it('does not split the & in an &> redirect', () => {
     expect(splitSegments('cmd &> log.txt')).toEqual(['cmd &> log.txt']);
-  });
-});
-
-describe('normalizeCommand', () => {
-  it('collapses whitespace and trims', () => {
-    expect(normalizeCommand('  git   add    -A   ')).toBe('git add -A');
-  });
-
-  it('is idempotent', () => {
-    const once = normalizeCommand('git commit -m "x"   &&  git push');
-    expect(normalizeCommand(once)).toBe(once);
   });
 });

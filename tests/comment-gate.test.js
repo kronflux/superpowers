@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { check, findViolation, addedLines, buildDenyMessage } from '../hooks/comment-gate.js';
 import { classifyComment, extractComments } from '../hooks/lib/comment-patterns.js';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
+import { markerPath } from '../hooks/lib/rejection-dedup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK_PATH = path.resolve(__dirname, '../hooks/comment-gate.js');
@@ -211,6 +212,44 @@ describe('comment-gate: self-application', () => {
       }
     }
     expect(flagged).toEqual([]);
+  });
+});
+
+describe('comment-gate: dedupeReason wiring end-to-end', () => {
+  it('emits the full reason once per session, then a single line naming the subject', () => {
+    const dir = mkProjectDir();
+    const sessionId = `dd-cg-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = markerPath(sessionId, 'comment-gate', 'narration');
+    try {
+      const first = runHook({
+        session_id: sessionId,
+        tool_name: 'Write',
+        tool_input: {
+          file_path: path.join(dir, 'a.js'),
+          content: '// Added retry logic to handle unstable network\n',
+        },
+        cwd: dir,
+      });
+      const reason1 = first.hookSpecificOutput.permissionDecisionReason;
+      expect(reason1.split('\n').length).toBeGreaterThan(1);
+      expect(reason1).toContain('matched:');
+
+      const second = runHook({
+        session_id: sessionId,
+        tool_name: 'Write',
+        tool_input: {
+          file_path: path.join(dir, 'b.js'),
+          content: '// Added retry logic to handle unstable network\n',
+        },
+        cwd: dir,
+      });
+      const reason2 = second.hookSpecificOutput.permissionDecisionReason;
+      expect(reason2.split('\n')).toHaveLength(1);
+      expect(reason2).toContain('narration');
+      expect(reason2).toContain(path.join(dir, 'b.js'));
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
   });
 });
 

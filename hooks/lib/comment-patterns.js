@@ -148,7 +148,7 @@ function classifyTraceability(line) {
  * or { violation: 'narration'|'impermanence'|'traceability', match } for the
  * first construction matched.
  */
-export function classifyComment(line) {
+function classifyComment(line) {
   if (typeof line !== 'string' || !line) return null;
   for (const re of NARRATION) {
     const m = line.match(re);
@@ -177,7 +177,7 @@ const BLOCK_DELIMITERS = [
  * skipped. A block body is returned one line at a time, with leading `*`
  * decoration removed.
  */
-export function extractComments(text) {
+function extractComments(text) {
   const src = String(text);
   const bodies = [];
   let i = 0;
@@ -221,3 +221,5 @@ export function extractComments(text) {
 
   return bodies;
 }
+
+export { classifyComment, extractComments };

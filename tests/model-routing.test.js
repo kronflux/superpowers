@@ -7,6 +7,7 @@ import { loadRouting, normalizeRouting, TIERS, REQUIRED_TIERS } from '../hooks/l
 import { checkDispatch, scanTranscript } from '../hooks/pre-agent-model-routing.js';
 import { checkTaskCreate } from '../hooks/pre-taskcreate-model-tier.js';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
+import { markerPath } from '../hooks/lib/rejection-dedup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOKS = {
@@ -906,5 +907,72 @@ describe('routing-dispatch.log', () => {
     });
 
     expect(readLog().slice(before.length)).toBe('');
+  });
+});
+
+describe('dedupeReason wiring at the routing hooks', () => {
+  it('pre-taskcreate-model-tier: full reason once per session, single line naming the subject after', () => {
+    const cwd = makeProject(ROUTING);
+    const sessionId = `dd-tc-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = markerPath(sessionId, 'taskcreate', 'missing-tier');
+    try {
+      const first = run('taskcreate', { ...denyingTaskCreate(cwd), session_id: sessionId });
+      const reason1 = first.hookSpecificOutput.permissionDecisionReason;
+      expect(reason1.split('\n').length).toBeGreaterThan(1);
+
+      const payload2 = denyingTaskCreate(cwd);
+      payload2.tool_input.subject = 'Task 2: build the other widget';
+      const second = run('taskcreate', { ...payload2, session_id: sessionId });
+      const reason2 = second.hookSpecificOutput.permissionDecisionReason;
+      expect(reason2.split('\n')).toHaveLength(1);
+      expect(reason2).toContain('missing-tier');
+      expect(reason2).toContain('Task 2: build the other widget');
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
+  });
+
+  it('pre-agent-model-routing: full reason once per session, single line naming the subject after', () => {
+    const cwd = makeProject(ROUTING);
+    const sessionId = `dd-ag-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = markerPath(sessionId, 'agent-routing', 'tier-mismatch');
+    try {
+      const transcript = mechanicalInProgressTranscript();
+      const first = run('agent', { ...denyingAgent(cwd, transcript), session_id: sessionId });
+      const reason1 = first.hookSpecificOutput.permissionDecisionReason;
+      expect(reason1.split('\n').length).toBeGreaterThan(1);
+
+      const payload2 = denyingAgent(cwd, transcript);
+      payload2.tool_input.description = 'second impl attempt';
+      const second = run('agent', { ...payload2, session_id: sessionId });
+      const reason2 = second.hookSpecificOutput.permissionDecisionReason;
+      expect(reason2.split('\n')).toHaveLength(1);
+      expect(reason2).toContain('tier-mismatch');
+      expect(reason2).toContain('second impl attempt');
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
+  });
+
+  it('pre-askuser-handoff-guard: full reason once per session, single line naming the subject after', () => {
+    const cwd = makeProject(ROUTING);
+    const sessionId = `dd-au-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = markerPath(sessionId, 'askuser-guard', 'handoff-violation');
+    try {
+      const transcript = armedTranscript();
+      const first = run('askuser', { ...denyingAskUser(cwd, transcript), session_id: sessionId });
+      const reason1 = first.hookSpecificOutput.permissionDecisionReason;
+      expect(reason1.split('\n').length).toBeGreaterThan(1);
+
+      const payload2 = denyingAskUser(cwd, transcript);
+      payload2.tool_input.questions[0].question = 'Which phase second time around?';
+      const second = run('askuser', { ...payload2, session_id: sessionId });
+      const reason2 = second.hookSpecificOutput.permissionDecisionReason;
+      expect(reason2.split('\n')).toHaveLength(1);
+      expect(reason2).toContain('handoff-violation');
+      expect(reason2).toContain('Which phase second time around?');
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
   });
 });

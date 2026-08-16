@@ -72,11 +72,6 @@ function stripQuoted(cmd) {
   return out;
 }
 
-/** Heredoc bodies and quoted bodies removed, whitespace collapsed, trimmed. */
-function normalizeCommand(cmd) {
-  return stripQuoted(stripHeredocs(cmd)).replace(/\s+/g, ' ').trim();
-}
-
 /**
  * The command split on unquoted `&&`, `||`, `;`, `|`, `&` and newline.
  * Heredoc bodies and quoted bodies are removed first, so every remaining
@@ -98,4 +93,4 @@ function splitSegments(cmd) {
     .filter(Boolean);
 }
 
-export { stripHeredocs, stripQuoted, splitSegments, normalizeCommand };
+export { stripHeredocs, stripQuoted, splitSegments };
