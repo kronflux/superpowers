@@ -21,12 +21,11 @@ function allowlistPath(sessionId) {
 /**
  * The allowlist key for a command: the command verbatim, ends trimmed.
  *
- * No normalisation of any kind. Every transform considered — collapsing
- * quoted bodies, collapsing whitespace runs — turned out to be content-lossy
- * in a way that let one approval authorise a different command. Two commands
- * that differ only in whitespace layout now take two prompts, which costs one
- * redundant prompt in a rare case and cannot ever authorise something the
- * operator did not see.
+ * No normalisation of any kind. Collapsing quoted bodies or whitespace runs is
+ * content-lossy, and a lossy key lets one approval authorise a different
+ * command. Two commands differing only in whitespace layout therefore take two
+ * prompts: one redundant prompt in a rare case, against no possibility of
+ * authorising something the operator did not see.
  */
 function fingerprint(cmd) {
   return String(cmd).trim();
