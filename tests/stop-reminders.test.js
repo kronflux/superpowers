@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
-import { checkForwardCommitment, evaluatePayload, isSourceFile, getUncommittedSessionCount } from '../hooks/stop-reminders.js';
+import { checkForwardCommitment, evaluatePayload, isSourceFile, getUncommittedSessionCount, parsePorcelainPath } from '../hooks/stop-reminders.js';
 
 // Task 4: guard against a turn that announces work and does none.
 // run() exercises the pure detector directly — no transcript file needed,
@@ -234,10 +234,26 @@ describe('getUncommittedSessionCount', () => {
     expect(getUncommittedSessionCount(repo, [path.join(repo, 'src', 'c.py')], ['src/a.py'])).toBe(0);
   });
 
-  it('counts a rename entry when the session edited the new path', () => {
-    // getUncommittedPaths parses 'R  old/a.py -> new/b.py' to 'new/b.py'
-    const dirty = ['new/b.py', 'src/c.py'];
-    const edited = [path.join(repo, 'new', 'b.py')];
-    expect(getUncommittedSessionCount(repo, edited, dirty)).toBe(1);
+});
+
+describe('parsePorcelainPath', () => {
+  it('returns the new path for a rename', () => {
+    expect(parsePorcelainPath('R  old/a.py -> new/b.py')).toBe('new/b.py');
+  });
+
+  it('returns the path for an ordinary entry', () => {
+    expect(parsePorcelainPath(' M src/c.py')).toBe('src/c.py');
+  });
+
+  it('handles an untracked entry', () => {
+    expect(parsePorcelainPath('?? e.py')).toBe('e.py');
+  });
+
+  it('takes the final arrow when a path contains the arrow substring', () => {
+    expect(parsePorcelainPath('R  a -> b.py -> c.py')).toBe('c.py');
+  });
+
+  it('handles a rename with a modified flag', () => {
+    expect(parsePorcelainPath('RM x.py -> y.py')).toBe('y.py');
   });
 });

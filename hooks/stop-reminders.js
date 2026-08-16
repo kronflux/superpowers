@@ -396,6 +396,17 @@ function getLastTurnData(transcriptPath) {
 }
 
 /** Repository-relative paths reported dirty by git, or [] on any fault. */
+/**
+ * The path a `git status --porcelain` line refers to. The two-character
+ * status and its trailing space are dropped; a rename renders as
+ * `old -> new` and resolves to the new path.
+ */
+function parsePorcelainPath(line) {
+  const p = line.slice(3).trim();
+  const arrow = p.lastIndexOf(' -> ');
+  return arrow === -1 ? p : p.slice(arrow + 4);
+}
+
 function getUncommittedPaths(cwd) {
   try {
     const result = spawnSync('git', ['status', '--porcelain'], {
@@ -407,11 +418,7 @@ function getUncommittedPaths(cwd) {
     return (result.stdout || '')
       .split('\n')
       .filter(l => l.trim().length > 0)
-      .map((l) => {
-        const p = l.slice(3).trim();
-        const arrow = p.indexOf(' -> ');
-        return arrow === -1 ? p : p.slice(arrow + 4);
-      });
+      .map(parsePorcelainPath);
   } catch {
     return [];
   }
@@ -677,8 +684,10 @@ export {
   isWithinRepo,
   matchesSession,
   parseLogLine,
+  parsePorcelainPath,
   setGuard,
   shouldFire,
 };
+
 
 
