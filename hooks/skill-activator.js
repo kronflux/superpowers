@@ -49,6 +49,22 @@ const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 // Minimum score threshold — matches below this are discarded as noise
 const CONFIDENCE_THRESHOLD = 2;
 
+// Minimum match score before a rule's authored priority is shown. A
+// `critical` label on a single-keyword match reports a strong match when only
+// the rule's author was confident; the score is what the prompt earned.
+// Scoring weights an intent pattern at 2 and a keyword at 1, so `critical`
+// requires an intent match plus two keywords, or two intent matches.
+const LABEL_MIN_SCORE = { critical: 4, high: 3, medium: 2, low: 2 };
+
+/** One hint line: the skill, and its priority only when the score earns it. */
+function renderMatch(m) {
+  const min = LABEL_MIN_SCORE[m.priority];
+  const labelled = typeof min === 'number' && m.score >= min;
+  return labelled
+    ? `  - superpowers:${m.skill} (${m.priority})`
+    : `  - superpowers:${m.skill}`;
+}
+
 // ── Memory recall constants ───────────────────────────────────────────────────
 const MAX_MEMORY_ENTRIES = 2;    // Never inject more than 2 matched entries
 const MIN_KEYWORD_LENGTH = 4;   // Skip tokens shorter than this
@@ -174,7 +190,7 @@ function buildContext(matches) {
   if (matches.length === 0) return null;
 
   const skillList = matches
-    .map(m => `  - superpowers:${m.skill} (${m.priority})`)
+    .map(renderMatch)
     .join('\n');
 
   return [
@@ -516,39 +532,74 @@ function capInjection(blocks /* [{text, score}] sorted desc by score */) {
   return blocks;
 }
 
-// Accumulate injected-byte telemetry into the same session-stats.json that
-// track-session-stats.js maintains (same file path and 2-hour expiry convention).
+// Accumulate telemetry into the same session-stats.json that track-session-stats.js
+// maintains (same file path and 2-hour expiry convention) — the mechanism by which
+// this UserPromptSubmit hook and that PostToolUse hook, running as separate
+// processes, share session state: this hook records which skills were hinted and
+// that hook, seeing the same file, can tell whether a later Skill invocation
+// converts one of them.
 // Deliberately self-contained — no import from track-session-stats.js — so a
 // missing or changed sibling module can never crash this hook at load time.
 // Fail-open: all IO errors are swallowed.
 const STATS_EXPIRY_MS = 2 * 60 * 60 * 1000;
+
+function loadOrInitSessionStats(logDir, statsFile) {
+  let stats = null;
+  try {
+    stats = JSON.parse(fs.readFileSync(statsFile, 'utf8'));
+  } catch {
+    // Absent or corrupt — start fresh below
+  }
+  // Mirror track-session-stats.js: auto-expire stats after 2 hours (new session)
+  if (!stats || !stats.startedAt
+      || (Date.now() - new Date(stats.startedAt).getTime()) > STATS_EXPIRY_MS) {
+    stats = {
+      startedAt: new Date().toISOString(),
+      skillInvocations: {},
+      totalSkillCalls: 0,
+      hookBlocks: 0,
+      filesEdited: 0,
+      verificationsRun: 0,
+      hintsEmitted: 0,
+      hintedSkills: [],
+      hintsConverted: 0,
+    };
+  }
+  return stats;
+}
+
+function writeSessionStats(logDir, statsFile, stats) {
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
+}
 
 function recordInjectedBytes(bytes) {
   if (!bytes) return;
   try {
     const logDir = path.join(configDir(process.env), 'hooks-logs');
     const statsFile = path.join(logDir, 'session-stats.json');
-    let stats = null;
-    try {
-      stats = JSON.parse(fs.readFileSync(statsFile, 'utf8'));
-    } catch {
-      // Absent or corrupt — start fresh below
-    }
-    // Mirror track-session-stats.js: auto-expire stats after 2 hours (new session)
-    if (!stats || !stats.startedAt
-        || (Date.now() - new Date(stats.startedAt).getTime()) > STATS_EXPIRY_MS) {
-      stats = {
-        startedAt: new Date().toISOString(),
-        skillInvocations: {},
-        totalSkillCalls: 0,
-        hookBlocks: 0,
-        filesEdited: 0,
-        verificationsRun: 0,
-      };
-    }
+    const stats = loadOrInitSessionStats(logDir, statsFile);
     stats.injectedBytes = (stats.injectedBytes || 0) + bytes;
-    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
-    fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
+    writeSessionStats(logDir, statsFile, stats);
+  } catch {
+    // Telemetry is best-effort; swallow all IO errors.
+  }
+}
+
+// Records one emitted hint block and the skills it named, so hintsConverted
+// can later be computed from the same session-stats.json when a Skill
+// invocation names a skill already present in hintedSkills.
+function recordHintTelemetry(matches) {
+  if (!matches || matches.length === 0) return;
+  try {
+    const logDir = path.join(configDir(process.env), 'hooks-logs');
+    const statsFile = path.join(logDir, 'session-stats.json');
+    const stats = loadOrInitSessionStats(logDir, statsFile);
+    stats.hintsEmitted = (stats.hintsEmitted || 0) + 1;
+    const hinted = new Set(stats.hintedSkills || []);
+    for (const m of matches) hinted.add(m.skill);
+    stats.hintedSkills = [...hinted];
+    writeSessionStats(logDir, statsFile, stats);
   } catch {
     // Telemetry is best-effort; swallow all IO errors.
   }
@@ -597,6 +648,8 @@ async function main() {
     const skillContext = buildContext(matches);
     const memoryContext = buildMemoryContext(memoryEntries.map(e => e.text));
     const knownIssuesContext = buildKnownIssuesContext(knownIssueEntries.map(e => e.text));
+
+    if (skillContext) recordHintTelemetry(matches);
 
     // Nothing to inject
     if (!skillContext && !memoryContext && !knownIssuesContext) {
@@ -655,6 +708,8 @@ export {
   INJECTION_CAP_BYTES,
   RULES,
   CONFIDENCE_THRESHOLD,
+  LABEL_MIN_SCORE,
+  renderMatch,
   STOP_WORDS,
   MAX_MEMORY_ENTRIES,
   CONTEXT_WINDOW_SIZE,

@@ -49,6 +49,9 @@ function createFreshStats() {
     filesEdited: 0,
     verificationsRun: 0,
     tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
+    hintsEmitted: 0,
+    hintedSkills: [],
+    hintsConverted: 0,
   };
 }
 
@@ -115,6 +118,12 @@ async function main() {
     // Track skill invocation
     stats.skillInvocations[skillName] = (stats.skillInvocations[skillName] || 0) + 1;
     stats.totalSkillCalls += 1;
+
+    // A hint converts when the invoked skill was named in a hint this session.
+    // hintedSkills is written by skill-activator.js into this same stats file.
+    if (Array.isArray(stats.hintedSkills) && stats.hintedSkills.includes(skillName)) {
+      stats.hintsConverted = (stats.hintsConverted || 0) + 1;
+    }
 
     saveStats(stats);
   } catch {

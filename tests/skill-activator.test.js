@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
-import { capInjection, INJECTION_CAP_BYTES } from '../hooks/skill-activator.js';
+import { capInjection, INJECTION_CAP_BYTES, LABEL_MIN_SCORE, renderMatch } from '../hooks/skill-activator.js';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -111,5 +111,27 @@ describe('capInjection', () => {
     const mem = { text: 'M'.repeat(2000), score: 0.5 };
     const kept = capInjection([hint, mem]);
     expect(kept).toEqual([hint, mem]);
+  });
+});
+
+describe('renderMatch severity calibration', () => {
+  it('omits the label when a critical match is weak', () => {
+    expect(renderMatch({ skill: 'systematic-debugging', priority: 'critical', score: 2 }))
+      .toBe('  - superpowers:systematic-debugging');
+  });
+
+  it('keeps the label when a critical match is strong', () => {
+    expect(renderMatch({ skill: 'systematic-debugging', priority: 'critical', score: 4 }))
+      .toBe('  - superpowers:systematic-debugging (critical)');
+  });
+
+  it('keeps a medium label at its own threshold', () => {
+    expect(renderMatch({ skill: 'claude-md-creator', priority: 'medium', score: LABEL_MIN_SCORE.medium }))
+      .toBe('  - superpowers:claude-md-creator (medium)');
+  });
+
+  it('omits the label for an unknown priority', () => {
+    expect(renderMatch({ skill: 'x', priority: 'bogus', score: 99 }))
+      .toBe('  - superpowers:x');
   });
 });
