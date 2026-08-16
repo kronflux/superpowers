@@ -109,6 +109,30 @@ describe('splitSegments', () => {
   it('does not join a literal backslash before a newline', () => {
     expect(splitSegments('echo a\\\\\ngit add --all')).toEqual(['echo a\\\\', 'git add --all']);
   });
+
+  it('does not split a bare & that is part of a 2>&1 redirect', () => {
+    expect(splitSegments('git commit 2>&1 -am x')).toEqual(['git commit 2>&1 -am x']);
+  });
+
+  it('does not split a bare & that is part of a redirect after -A', () => {
+    expect(splitSegments('git add -A 2>&1')).toEqual(['git add -A 2>&1']);
+  });
+
+  it('splits on a separator & following a redirect that has its own &', () => {
+    expect(splitSegments('sleep 1 2>&1 & git add --all')).toEqual(['sleep 1 2>&1', 'git add --all']);
+  });
+
+  it('splits a mix of bare & and && in one command', () => {
+    expect(splitSegments('a & b && c')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('splits on |& treating the trailing & as a separator', () => {
+    expect(splitSegments('make build |& git add -A')).toEqual(['make build', 'git add -A']);
+  });
+
+  it('does not split the & in an &> redirect', () => {
+    expect(splitSegments('cmd &> log.txt')).toEqual(['cmd &> log.txt']);
+  });
 });
 
 describe('normalizeCommand', () => {

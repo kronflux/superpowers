@@ -135,6 +135,9 @@ const MUST_ASK = [
   'sleep 5 & git add -A',
   'npm start & git add --all',
   'git add -A & echo done',
+  'git commit 2>&1 -am x',
+  'git commit -a 2>&1 -m x',
+  'git add -A 2>&1',
 ];
 
 // A command prefix — a wrapper, a shell keyword left at the head of a
