@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { checkForwardCommitment, evaluatePayload } from '../hooks/stop-reminders.js';
+import path from 'node:path';
+import { spTmpDir } from '../hooks/lib/sp-tmp.js';
+import { checkForwardCommitment, evaluatePayload, isSourceFile, getUncommittedSessionCount } from '../hooks/stop-reminders.js';
 
 // Task 4: guard against a turn that announces work and does none.
 // run() exercises the pure detector directly — no transcript file needed,
@@ -179,4 +181,63 @@ describe('stop-reminders: forward-commitment guard — conversational prose stay
       expect(run({ finalMessage: text, toolUses: [] })).toBe('');
     });
   }
+});
+
+describe('isSourceFile containment', () => {
+  const cwd = path.resolve('/home/richard/creality-re');
+
+  it('excludes a scratch file under the shared temp root', () => {
+    expect(isSourceFile(path.join(path.dirname(spTmpDir()), 'covn.py'), cwd)).toBe(false);
+  });
+
+  it('excludes a file under the plugin temp root', () => {
+    expect(isSourceFile(path.join(spTmpDir(), 'x.py'), cwd)).toBe(false);
+  });
+
+  it('includes a source file inside the repository', () => {
+    expect(isSourceFile(path.join(cwd, 'src', 'main.py'), cwd)).toBe(true);
+  });
+
+  it('excludes a source file outside the repository', () => {
+    expect(isSourceFile(path.resolve('/home/richard/other-repo/main.py'), cwd)).toBe(false);
+  });
+
+  it('applies no containment filter when cwd is absent', () => {
+    expect(isSourceFile(path.resolve('/anywhere/main.py'))).toBe(true);
+  });
+
+  it('still excludes config files inside the repository', () => {
+    expect(isSourceFile(path.join(cwd, 'package.json'), cwd)).toBe(false);
+  });
+});
+
+describe('isSourceFile edge cases', () => {
+  it('includes a source file inside a repository located under temp', () => {
+    const tempCwd = path.join(path.dirname(spTmpDir()), 'runner', 'work', 'proj');
+    expect(isSourceFile(path.join(tempCwd, 'src', 'main.py'), tempCwd)).toBe(true);
+  });
+
+  it('includes a scratch path when cwd is omitted, matching pre-task behaviour', () => {
+    expect(isSourceFile(path.join(spTmpDir(), 'x.py'))).toBe(true);
+  });
+});
+
+describe('getUncommittedSessionCount', () => {
+  const repo = path.resolve('/repo');
+  it('counts only dirty paths this session edited', () => {
+    const dirty = ['src/a.py', 'src/b.py', 'docs/unrelated.md'];
+    const edited = [path.join(repo, 'src', 'a.py'), path.join(repo, 'src', 'b.py')];
+    expect(getUncommittedSessionCount(repo, edited, dirty)).toBe(2);
+  });
+
+  it('is zero when the session edited nothing dirty', () => {
+    expect(getUncommittedSessionCount(repo, [path.join(repo, 'src', 'c.py')], ['src/a.py'])).toBe(0);
+  });
+
+  it('counts a rename entry when the session edited the new path', () => {
+    // getUncommittedPaths parses 'R  old/a.py -> new/b.py' to 'new/b.py'
+    const dirty = ['new/b.py', 'src/c.py'];
+    const edited = [path.join(repo, 'new', 'b.py')];
+    expect(getUncommittedSessionCount(repo, edited, dirty)).toBe(1);
+  });
 });

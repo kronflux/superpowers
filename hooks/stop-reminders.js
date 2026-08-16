@@ -104,8 +104,26 @@ function isTestFile(filePath) {
   return TEST_PATTERNS.some(p => p.test(filePath));
 }
 
-function isSourceFile(filePath) {
-  return SOURCE_PATTERNS.some(p => p.test(filePath)) && !CONFIG_PATTERNS.some(p => p.test(filePath));
+/** True when the path resolves to a location inside cwd. */
+function isWithinRepo(filePath, cwd) {
+  if (!cwd) return true;
+  const rel = path.relative(path.resolve(cwd), path.resolve(filePath));
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/**
+ * True for a non-test, non-config source file that lives inside the session
+ * repository. Containment against cwd is what excludes scratch: a probe
+ * written to the temp root is outside the repository, while a repository
+ * that happens to be checked out under the temp root is still the
+ * repository. Without a cwd there is nothing to contain against, so the
+ * extension match alone decides, exactly as before this change.
+ */
+function isSourceFile(filePath, cwd) {
+  if (!SOURCE_PATTERNS.some(p => p.test(filePath))) return false;
+  if (CONFIG_PATTERNS.some(p => p.test(filePath))) return false;
+  if (!cwd) return true;
+  return isWithinRepo(filePath, cwd);
 }
 
 /**
@@ -377,19 +395,41 @@ function getLastTurnData(transcriptPath) {
   }
 }
 
-function getUncommittedCount(cwd) {
+/** Repository-relative paths reported dirty by git, or [] on any fault. */
+function getUncommittedPaths(cwd) {
   try {
     const result = spawnSync('git', ['status', '--porcelain'], {
       cwd: cwd || process.cwd(),
       encoding: 'utf8',
       timeout: 5000,
     });
-    if (result.status !== 0 || result.error) return 0;
-    const lines = (result.stdout || '').split('\n').filter(l => l.trim().length > 0);
-    return lines.length;
+    if (result.status !== 0 || result.error) return [];
+    return (result.stdout || '')
+      .split('\n')
+      .filter(l => l.trim().length > 0)
+      .map((l) => {
+        const p = l.slice(3).trim();
+        const arrow = p.indexOf(' -> ');
+        return arrow === -1 ? p : p.slice(arrow + 4);
+      });
   } catch {
-    return 0;
+    return [];
   }
+}
+
+/**
+ * Count of dirty paths that this session also edited. Scoping to session
+ * edits keeps a reminder about the operator's own work from counting a
+ * working tree another agent left dirty.
+ */
+function getUncommittedSessionCount(cwd, editedPaths, dirtyPaths) {
+  const dirty = dirtyPaths || getUncommittedPaths(cwd);
+  const edited = new Set(
+    (editedPaths || []).map(p =>
+      path.relative(path.resolve(cwd || '.'), path.resolve(p)).split(path.sep).join('/')
+    )
+  );
+  return dirty.filter(d => edited.has(d)).length;
 }
 
 /**
@@ -409,7 +449,7 @@ function generateReminders(edits, cwd) {
   if (edits.length === 0) return reminders;
 
   const editedPaths = [...new Set(edits.map(e => e.filePath))];
-  const sourceFiles = editedPaths.filter(isSourceFile);
+  const sourceFiles = editedPaths.filter(p => isSourceFile(p, cwd));
   const testFiles = editedPaths.filter(isTestFile);
 
   // TDD reminder: source files changed without corresponding tests
@@ -421,9 +461,9 @@ function generateReminders(edits, cwd) {
     );
   }
 
-  // Commit reminder: check actual uncommitted changes via git, not just session edits.
+  // Commit reminder: only files this session touched and left dirty.
   if (editedPaths.length >= 5) {
-    const uncommittedCount = getUncommittedCount(cwd);
+    const uncommittedCount = getUncommittedSessionCount(cwd, editedPaths);
     if (uncommittedCount >= 5) {
       reminders.push(
         `Commit reminder: ${uncommittedCount} files with uncommitted changes. ` +
@@ -470,7 +510,7 @@ function checkStateMdStaleness(cwd, recentEdits) {
 
     const stateMtime = fs.statSync(stateMdPath).mtimeMs;
     const editsAfterState = recentEdits.filter(e =>
-      new Date(e.timestamp).getTime() > stateMtime && isSourceFile(e.filePath)
+      new Date(e.timestamp).getTime() > stateMtime && isSourceFile(e.filePath, cwd)
     );
 
     if (editsAfterState.length >= 2) {
@@ -628,12 +668,17 @@ export {
   getLastSavedEntryTime,
   getLastTurnData,
   getRecentEdits,
+  getUncommittedPaths,
+  getUncommittedSessionCount,
   guardFile,
   isRealUserMessage,
   isSourceFile,
   isTestFile,
+  isWithinRepo,
   matchesSession,
   parseLogLine,
   setGuard,
   shouldFire,
 };
+
+
