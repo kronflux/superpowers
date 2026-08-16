@@ -40,10 +40,10 @@ describe('allowlist storage', () => {
     expect(isAllowed('sess-c', 'git add --all')).toBe(false);
   });
 
-  it('matches the exact normalized command only', () => {
+  it('treats a whitespace-different command as a distinct entry', () => {
     written.push(allowlistPath('sess-d'));
     recordAllowed('sess-d', 'git add --all');
-    expect(isAllowed('sess-d', 'git   add   --all')).toBe(true);
+    expect(isAllowed('sess-d', 'git   add   --all')).toBe(false);
     expect(isAllowed('sess-d', 'git add -A')).toBe(false);
   });
 
@@ -52,7 +52,7 @@ describe('allowlist storage', () => {
     written.push(p);
     recordAllowed('sess-dup', 'git add --all');
     recordAllowed('sess-dup', 'git add --all');
-    expect(fs.readFileSync(p, 'utf8').split('\n').filter(Boolean)).toHaveLength(1);
+    expect(fs.readFileSync(p, 'utf8').split('\0').filter(Boolean)).toHaveLength(1);
   });
 
   it('reports not-allowed when no allowlist exists', () => {
@@ -69,6 +69,25 @@ describe('allowlist storage', () => {
     written.push(allowlistPath('sess-heredoc'));
     recordAllowed('sess-heredoc', "git commit -F - <<'EOF'\nmsg one\nEOF");
     expect(isAllowed('sess-heredoc', "git commit -F - <<'EOF'\nmsg two\nEOF")).toBe(false);
+  });
+
+  it('treats a tab and a space inside a quoted message as distinct entries', () => {
+    written.push(allowlistPath('sess-tab'));
+    recordAllowed('sess-tab', 'git commit -m "a\tb"');
+    expect(isAllowed('sess-tab', 'git commit -m "a b"')).toBe(false);
+  });
+
+  it('treats a heredoc body with a blank line and one without as distinct entries', () => {
+    written.push(allowlistPath('sess-blank'));
+    recordAllowed('sess-blank', "git commit -F - <<'EOF'\nFix bug\n\nRefs #1\nEOF");
+    expect(isAllowed('sess-blank', "git commit -F - <<'EOF'\nFix bug\nRefs #1\nEOF")).toBe(false);
+  });
+
+  it('treats two byte-identical commands as the same entry', () => {
+    written.push(allowlistPath('sess-same'));
+    const cmd = "git commit -F - <<'EOF'\nFix bug\n\nRefs #1\nEOF";
+    recordAllowed('sess-same', cmd);
+    expect(isAllowed('sess-same', cmd)).toBe(true);
   });
 });
 

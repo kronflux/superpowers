@@ -19,23 +19,27 @@ function allowlistPath(sessionId) {
 }
 
 /**
- * The allowlist key for a command: internal whitespace runs collapsed to one
- * space, both ends trimmed, every other character preserved verbatim.
+ * The allowlist key for a command: the command verbatim, ends trimmed.
  *
- * Deliberately not normalizeCommand. That collapses quoted bodies to `ARG`
- * and heredoc bodies to `<<HEREDOC`, which is correct for pattern matching
- * and wrong for an authorization key: `git commit -am "fix typo"` and
- * `git commit -am "rewrite the auth layer"` would share one key, so a single
- * approval would silence every later -am commit in the session.
+ * No normalisation of any kind. Every transform considered — collapsing
+ * quoted bodies, collapsing whitespace runs — turned out to be content-lossy
+ * in a way that let one approval authorise a different command. Two commands
+ * that differ only in whitespace layout now take two prompts, which costs one
+ * redundant prompt in a rare case and cannot ever authorise something the
+ * operator did not see.
  */
 function fingerprint(cmd) {
-  return String(cmd).replace(/\s+/g, ' ').trim();
+  return String(cmd).trim();
 }
 
+// Entries are separated by a NUL byte, not a newline: the fingerprint is the
+// command verbatim, so a multi-line heredoc body carries its own newlines and
+// a newline-delimited file would read one recorded command back as several
+// unrelated lines. A shell command string cannot itself contain a NUL byte.
 function readAllowlist(sessionId) {
   try {
     return new Set(
-      fs.readFileSync(allowlistPath(sessionId), 'utf8').split('\n').filter(Boolean)
+      fs.readFileSync(allowlistPath(sessionId), 'utf8').split('\0').filter(Boolean)
     );
   } catch {
     return new Set();
@@ -52,7 +56,7 @@ function recordAllowed(sessionId, cmd) {
   try {
     const entry = fingerprint(cmd);
     if (!entry || readAllowlist(sessionId).has(entry)) return;
-    fs.appendFileSync(allowlistPath(sessionId), `${entry}\n`);
+    fs.appendFileSync(allowlistPath(sessionId), `${entry}\0`);
   } catch {
     // Silently ignore — a missing allowlist entry costs one extra prompt
   }
