@@ -1,5 +1,46 @@
 # Superpowers Release Notes
 
+## Unreleased — hook precision
+
+- **Ask-tier git patterns match one shell segment at a time and honour pathspec scope.** Across 58
+  real permission prompts in one operator's hook logs, 38 were false positives, the largest class
+  being `git add -A <pathspec>` — which stages only that pathspec and is not a repository sweep.
+  Heredoc bodies and quoted arguments are stripped before matching, so a commit message is no
+  longer scanned as command text, and the command is split on `&&`, `||`, `;`, `|`, `&` and
+  newline so a token run cannot cross into the following command. `.`, `./`, `*` and the
+  repository root remain non-scoping, so `git add -A .` still asks.
+- **A bulk-staging command the operator approved is not asked again in the same session.** Both
+  observed configurations run `bypassPermissions`, which does not suppress a hook's own `ask`, so
+  every prompt came from this plugin. The allowlist key is the command verbatim: any normalisation
+  tried — collapsing quoted bodies, collapsing whitespace — proved content-lossy in a way that let
+  one approval authorise a different command. Session-scoped only; entries do not persist.
+- **Stop reminders count only source files inside the session repository, and only files the
+  session left dirty.** 276 of 500 entries in one edit log pointed at `/tmp` scratch that had never
+  been part of any repository, and the commit reminder counted the whole working tree. Containment
+  against the session directory replaces extension matching, so a repository checked out under the
+  system temp directory — the ordinary CI layout — keeps its own files. Renamed paths are read from
+  the `R  old -> new` form rather than treated as a literal.
+- **The language-server notice states the diagnostic gap without offering an install.** It still
+  names the decline marker and still states that diagnostics never replace a verification gate.
+- **A blocking hook explains each rule once per session.** Six tool calls failing the same
+  validation emitted the same forty-line explanation six times, burying the only thing that
+  differed: which subject failed. Later rejections name the subject and refer back. With no session
+  id the full explanation always emits, so the failure direction is verbose rather than silent.
+- **`.gitignore` entries are written only inside a git repository.** The helper previously created
+  or appended `.gitignore` in whatever directory it was handed. `.git` is a directory in a clone
+  and a file in a worktree or submodule, so existence is the test and worktrees keep working.
+- **Comment linting covers block and HTML comments, and flags traceability prefixes.**
+  `REQ-014: verify the decoder` is a violation; `SHA-256 hashing`, `RFC-3339 timestamps` and
+  `UTF-8 - the encoding used here` are not. Position and punctuation separate them, since the token
+  shape alone cannot. Docstrings stay out — they carry prose and code samples that read as
+  violations without being comments.
+- **Activation hints are labelled by measured match strength, not by an authored constant.** A
+  `critical` label on a single-keyword match reported a strong match when only the rule's author
+  was confident. A match at the confidence floor is now unlabelled at every priority. Hint emission
+  and hint-to-invocation conversion are recorded, because the planned suppression engine rested on
+  an estimate the transcripts did not support: measured conversion was 0% across 389,029 records,
+  and the skill the report named as 54% of hints was 5%.
+
 ## 7.15.0 — output and evidence contracts
 
 - **`skills/shared/output-contract.md` governs what a human reads.** Its acceptance test is the
