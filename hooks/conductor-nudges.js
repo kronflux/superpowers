@@ -30,7 +30,7 @@ const TIPS = {
 };
 
 function lspTip(plugin) {
-  return `Conductor: no language server covers this file type, so edits here produce no diagnostics. At the next natural break in the current task - not now, do not derail what you are doing - offer the user: install \`${plugin}\` via /plugin from the claude-plugins-official marketplace, for inline diagnostics after each edit. NEVER run the install yourself. On decline, append "${plugin}" on its own line to \`.superpowers-no-lsp\` in the project root. Diagnostics are a fast first signal only - they NEVER replace a verification gate named in a plan's acceptance criteria (skills/shared/conductor/lsp.md).`;
+  return `Conductor: no language server covers this file type, so edits here produce no diagnostics. Verification for these files rests entirely on the gates named in the plan's acceptance criteria. To silence this notice for this project, append "${plugin}" on its own line to \`.superpowers-no-lsp\` in the project root. Diagnostics are a fast first signal only - they NEVER replace a verification gate named in a plan's acceptance criteria (skills/shared/conductor/lsp.md).`;
 }
 
 // Failure heuristic for Bash output: generic across vitest/pytest/cargo/tsc.
@@ -171,6 +171,8 @@ async function main() {
     process.stdout.write('{}');
   }
 }
+
+export { lspTip };
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) main().catch(() => { process.stdout.write('{}'); });

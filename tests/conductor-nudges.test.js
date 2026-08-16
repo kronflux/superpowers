@@ -193,7 +193,7 @@ describe('conductor-nudges', () => {
       tool_input: { file_path: 'src/index.ts' }, tool_response: {},
     });
     expect(ctx(out)).toMatch(/typescript-lsp/);
-    expect(ctx(out)).toMatch(/natural break/);
+    expect(ctx(out)).toMatch(/Verification for these files rests/);
   });
 
   it('stays silent when a language server already covers the extension', () => {
@@ -297,5 +297,30 @@ describe('conductor-nudges', () => {
     for (const o of [codegraphOut, lspOut, middlewareOut, codegraphInitOut]) {
       expect(JSON.stringify(o)).not.toMatch(/serena/i);
     }
+  });
+});
+
+import { lspTip } from '../hooks/conductor-nudges.js';
+
+describe('lspTip', () => {
+  const tip = lspTip('pyright');
+
+  it('does not upsell a plugin install', () => {
+    expect(tip).not.toMatch(/\/plugin/);
+    expect(tip).not.toMatch(/marketplace/i);
+    expect(tip).not.toMatch(/\binstall\b/i);
+  });
+
+  it('still names the decline marker and the plugin', () => {
+    expect(tip).toContain('.superpowers-no-lsp');
+    expect(tip).toContain('pyright');
+  });
+
+  it('still states that diagnostics never replace a verification gate', () => {
+    expect(tip).toMatch(/NEVER replace a verification gate/);
+  });
+
+  it('still names the source of the rule', () => {
+    expect(tip).toContain('skills/shared/conductor/lsp.md');
   });
 });
