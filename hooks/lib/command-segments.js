@@ -78,13 +78,20 @@ function normalizeCommand(cmd) {
 }
 
 /**
- * The normalized command split on unquoted `&&`, `||`, `;` and `|`. Empty
- * segments are dropped.
+ * The command split on unquoted `&&`, `||`, `;`, `|`, `&` and newline.
+ * Heredoc bodies and quoted bodies are removed first, so every remaining
+ * newline is a command separator rather than data. `&&` precedes `&` in the
+ * alternation, so it is consumed as one operator, never as two `&`
+ * separators. A backslash-newline line continuation is joined before
+ * splitting, since it continues one command — an escaped backslash (an odd
+ * number of trailing backslashes) does not count. Empty segments are dropped
+ * and each segment's internal whitespace is collapsed.
  */
 function splitSegments(cmd) {
-  return normalizeCommand(cmd)
-    .split(/\s*(?:&&|\|\||;|\|)\s*/)
-    .map((s) => s.trim())
+  return stripQuoted(stripHeredocs(cmd))
+    .replace(/(?<!\\)\\\r?\n/g, ' ')
+    .split(/\s*(?:&&|\|\||;|\||&|\r?\n)\s*/)
+    .map((s) => s.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
 

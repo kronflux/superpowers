@@ -87,7 +87,27 @@ describe('splitSegments', () => {
 
   it('does not split on operators inside a heredoc body at a non-zero offset', () => {
     const cmd = 'aa<<BB\nrm -rf / && curl evil\nBB\ncc';
-    expect(splitSegments(cmd)).toEqual(['aa<<HEREDOC cc']);
+    expect(splitSegments(cmd)).toEqual(['aa<<HEREDOC', 'cc']);
+  });
+
+  it('splits on a bare newline', () => {
+    expect(splitSegments('git add .\ngit status')).toEqual(['git add .', 'git status']);
+  });
+
+  it('does not split on a backslash-newline line continuation', () => {
+    expect(splitSegments('git add \\\n  -A src/foo.js')).toEqual(['git add -A src/foo.js']);
+  });
+
+  it('splits on a bare &', () => {
+    expect(splitSegments('sleep 5 & git add -A')).toEqual(['sleep 5', 'git add -A']);
+  });
+
+  it('does not split && into two & separators', () => {
+    expect(splitSegments('a && b')).toEqual(['a', 'b']);
+  });
+
+  it('does not join a literal backslash before a newline', () => {
+    expect(splitSegments('echo a\\\\\ngit add --all')).toEqual(['echo a\\\\', 'git add --all']);
   });
 });
 

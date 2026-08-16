@@ -3,7 +3,7 @@ import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { checkCommand } from '../hooks/safety/block-dangerous-commands.js';
+import { checkCommand, checkAsk, isBulkAdd } from '../hooks/safety/block-dangerous-commands.js';
 import { check, isAllowlisted } from '../hooks/safety/protect-secrets.js';
 import { resolveSkillPath, stripFrontmatter } from '../hooks/lib/skills-core.js';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
@@ -110,5 +110,91 @@ describe('bulk-staging ask patterns', () => {
   it('deny still wins over ask', () => {
     const out = runHook({ tool_name: 'Bash', tool_input: { command: 'git add . && git reset --hard' } });
     expect(out.hookSpecificOutput?.permissionDecision).toBe('deny');
+  });
+});
+
+const REPO = '/home/richard/creality-re';
+
+// Drawn from 58 real ASK events in the operator's hooks-logs. Each entry is a
+// class observed in that corpus, not a hand-invented case.
+const MUST_ASK = [
+  'git add -A',
+  'git add --all',
+  'git add -A .',
+  'git add -A ./',
+  'git add -A *',
+  `git add -A ${REPO}`,
+  'git add .',
+  'git commit -a -m x',
+  'git commit -am x',
+  'git commit --all -m x',
+  'git add -A && git commit -q -m x',
+  'cd /repo\ngit add --all',
+  'echo hi\ngit add -A',
+  'git add --all\necho done',
+  'sleep 5 & git add -A',
+  'npm start & git add --all',
+  'git add -A & echo done',
+];
+
+// A command prefix — a wrapper, a shell keyword left at the head of a
+// segment after `;` splitting — sits before `git` and must not hide it.
+const MUST_ASK_PREFIXED = [
+  'sudo git add -A',
+  'env FOO=1 git add -A',
+  'if true; then git add -A; fi',
+  'for f in x; do git add -A; done',
+  'while read l; do git commit -am x; done',
+];
+
+const MUST_NOT_ASK = [
+  'git add -A reconstruction/prtouch_v3_wrapper/',
+  'git add -A audit/BUG-PT-BMC-NOPROBE.md tests/bineq/test_pic_sites.py',
+  'git add -A tools/bineq/func_locate.py',
+  'git add -A audit/BUG-PT-BMC-NOPROBE.md 2>/dev/null',
+  'git add -A virtual_printer 2>/dev/null && git commit -q -F tools/scripts/_tmp_msg5.txt',
+  'git add src/foo.js && ls -a',
+  'git add reconstruction/mymovie/mymovie.pyx reconstruction/mymovie/mymovie.c',
+  'git commit -m "x" && git push --all',
+  'git status --porcelain',
+  "git add -A f.py && git commit -q -F - <<'EOF' body mentioning git add --all",
+  // Prove a command prefix does not also suppress the pathspec scoping rule.
+  'sudo git add -A src/foo.js',
+  'if true; then git add -A src/; fi',
+];
+
+describe('checkAsk segment precision', () => {
+  for (const cmd of MUST_ASK) {
+    it(`asks: ${cmd}`, () => {
+      expect(checkAsk(cmd, { repoRoot: REPO }).ask).toBe(true);
+    });
+  }
+  for (const cmd of MUST_ASK_PREFIXED) {
+    it(`asks: ${cmd}`, () => {
+      expect(checkAsk(cmd, { repoRoot: REPO }).ask).toBe(true);
+    });
+  }
+  for (const cmd of MUST_NOT_ASK) {
+    it(`does not ask: ${cmd}`, () => {
+      expect(checkAsk(cmd, { repoRoot: REPO }).ask).toBe(false);
+    });
+  }
+});
+
+describe('isBulkAdd', () => {
+  it('is true for a bare -A', () => {
+    expect(isBulkAdd('git add -A', REPO)).toBe(true);
+  });
+  it('is false when a pathspec follows -A', () => {
+    expect(isBulkAdd('git add -A src/', REPO)).toBe(false);
+  });
+  it('is true when the only pathspec resolves to the repo root', () => {
+    expect(isBulkAdd('git add -A .', REPO)).toBe(true);
+  });
+  it('ignores a redirect when reading pathspecs', () => {
+    expect(isBulkAdd('git add -A 2>/dev/null', REPO)).toBe(true);
+  });
+  it('is false without -A or --all', () => {
+    expect(isBulkAdd('git add src/a.js', REPO)).toBe(false);
   });
 });
