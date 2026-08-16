@@ -25,6 +25,7 @@ const EPHEMERAL = [
   (id) => `stop-${id}.lock`,
   (id) => `ctx-${id}.json`,
   (id) => `compress-${id}.json`,
+  (id) => `askallow-${id}`,
 ];
 
 function removeForSession(sessionId) {
@@ -37,6 +38,16 @@ function removeForSession(sessionId) {
     const base = `conductor-${spSafe(sessionId)}`;
     for (const entry of fs.readdirSync(spTmpDir())) {
       if (entry === base || entry.startsWith(`${base}-`)) {
+        try { fs.rmSync(path.join(spTmpDir(), entry), { force: true }); } catch {}
+      }
+    }
+  } catch {}
+  // Rejection markers are one file per hook/rule pair, and both vary — match
+  // by prefix rather than enumerating hooks and rules.
+  try {
+    const rejectPrefix = `reject-${spSafe(sessionId)}-`;
+    for (const entry of fs.readdirSync(spTmpDir())) {
+      if (entry.startsWith(rejectPrefix)) {
         try { fs.rmSync(path.join(spTmpDir(), entry), { force: true }); } catch {}
       }
     }

@@ -76,4 +76,37 @@ describe('session-end-cleanup', () => {
       fs.rmSync(spTmp(`ctx-${other}.json`), { force: true });
     }
   });
+
+  it('removes the ask-allowlist marker for this session', () => {
+    fs.writeFileSync(spTmp(`askallow-${sid}`), 'x');
+    run({ session_id: sid, hook_event_name: 'SessionEnd', reason: 'clear' });
+    expect(fs.existsSync(spTmp(`askallow-${sid}`))).toBe(false);
+  });
+
+  it('removes every rejection marker for this session, regardless of hook or rule', () => {
+    const markerA = spTmp(`reject-${sid}-taskcreate-missing-fence`);
+    const markerB = spTmp(`reject-${sid}-comment-gate-narration`);
+    fs.writeFileSync(markerA, '1');
+    fs.writeFileSync(markerB, '1');
+    try {
+      run({ session_id: sid, hook_event_name: 'SessionEnd', reason: 'clear' });
+      expect(fs.existsSync(markerA)).toBe(false);
+      expect(fs.existsSync(markerB)).toBe(false);
+    } finally {
+      fs.rmSync(markerA, { force: true });
+      fs.rmSync(markerB, { force: true });
+    }
+  });
+
+  it('leaves a rejection marker belonging to a different session untouched', () => {
+    const other = `other-session-${sid}`;
+    const otherMarker = spTmp(`reject-${other}-taskcreate-missing-fence`);
+    fs.writeFileSync(otherMarker, '1');
+    try {
+      run({ session_id: sid, hook_event_name: 'SessionEnd', reason: 'clear' });
+      expect(fs.existsSync(otherMarker)).toBe(true);
+    } finally {
+      fs.rmSync(otherMarker, { force: true });
+    }
+  });
 });

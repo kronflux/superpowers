@@ -4,8 +4,9 @@
  *
  * PostToolUse fires only after a tool executes, so a Bash command that
  * matched an ASK pattern and reached this hook is one the operator approved.
- * Its normalized form is appended to the session allowlist that
- * block-dangerous-commands.js reads before asking again.
+ * Its fingerprint — the command verbatim, ends trimmed — is appended to the
+ * session allowlist that block-dangerous-commands.js reads before asking
+ * again.
  */
 
 import path from 'path';

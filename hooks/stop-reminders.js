@@ -395,7 +395,6 @@ function getLastTurnData(transcriptPath) {
   }
 }
 
-/** Repository-relative paths reported dirty by git, or [] on any fault. */
 /**
  * The path a `git status --porcelain` line refers to. The two-character
  * status and its trailing space are dropped; a rename renders as
@@ -407,6 +406,7 @@ function parsePorcelainPath(line) {
   return arrow === -1 ? p : p.slice(arrow + 4);
 }
 
+/** Repository-relative paths reported dirty by git, or [] on any fault. */
 function getUncommittedPaths(cwd) {
   try {
     const result = spawnSync('git', ['status', '--porcelain'], {
