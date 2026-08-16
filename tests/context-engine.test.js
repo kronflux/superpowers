@@ -15,7 +15,11 @@ function tmpDir() {
 
 describe('ensureGitignored (shared helper)', () => {
   let dir;
-  beforeEach(() => { dir = tmpDir(); });
+  beforeEach(() => {
+    dir = tmpDir();
+    // Helper writes only inside a repository, so tests must simulate one
+    fs.mkdirSync(path.join(dir, '.git'), { recursive: true });
+  });
   afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 
   function gi() {
