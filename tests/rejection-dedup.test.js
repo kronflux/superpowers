@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
@@ -45,8 +45,26 @@ describe('dedupeReason', () => {
     expect(path.dirname(markerPath('s3', 'taskcreate', 'x'))).toBe(spTmpDir());
   });
 
-  it('returns the full reason when the marker cannot be written', () => {
-    const out = dedupeReason({ sessionId: '../../..', hook: 'taskcreate', ruleId: 'x', reason: LONG, subject: 'T' });
-    expect(out).toBe(LONG);
+  it('sanitises a traversal payload into a single marker name inside the sp/ root', () => {
+    const marker = markerPath('../../..', 'taskcreate', 'x');
+    written.push(marker);
+    expect(path.dirname(marker)).toBe(spTmpDir());
+    expect(path.basename(marker)).not.toMatch(/[\\/]/);
+  });
+
+  it('returns the full reason when the marker write fails for a reason other than EEXIST', () => {
+    const marker = markerPath('s4', 'taskcreate', 'missing-fence');
+    written.push(marker);
+    const spy = vi.spyOn(fs, 'writeFileSync').mockImplementationOnce(() => {
+      const err = new Error('permission denied');
+      err.code = 'EACCES';
+      throw err;
+    });
+    try {
+      const out = dedupeReason({ sessionId: 's4', hook: 'taskcreate', ruleId: 'missing-fence', reason: LONG, subject: 'Task 5' });
+      expect(out).toBe(LONG);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
