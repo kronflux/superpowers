@@ -46,6 +46,7 @@ import readline from 'readline';
 import { fileURLToPath } from 'url';
 import { loadRouting, fenceMeta, routingSource } from './lib/routing-config.js';
 import { configDir } from './lib/config-dir.js';
+import { dedupeReason } from './lib/rejection-dedup.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
@@ -357,11 +358,20 @@ async function main() {
 
     if (result.blocked) {
       log({ level: 'BLOCKED', model: tool_input?.model, allowed: result.allowed, inProgress, session_id, cwd });
+      // frontierConsentBlock leaves allowed null; the tier-mismatch path always
+      // sets it to a non-empty array, so the two denial reasons key separately.
+      const ruleId = result.allowed === null ? 'frontier-consent' : 'tier-mismatch';
       process.stdout.write(JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: result.reason,
+          permissionDecisionReason: dedupeReason({
+            sessionId: session_id,
+            hook: 'agent-routing',
+            ruleId,
+            reason: result.reason,
+            subject: tool_input?.description || '(no description)',
+          }),
         },
       }));
       return;

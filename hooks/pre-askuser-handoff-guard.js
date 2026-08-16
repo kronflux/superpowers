@@ -29,6 +29,7 @@ import readline from 'readline';
 import { fileURLToPath } from 'url';
 import { loadRouting } from './lib/routing-config.js';
 import { configDir } from './lib/config-dir.js';
+import { dedupeReason } from './lib/rejection-dedup.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
@@ -193,7 +194,13 @@ async function main() {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
-        permissionDecisionReason: HANDOFF_BLOCK,
+        permissionDecisionReason: dedupeReason({
+          sessionId: session_id,
+          hook: 'askuser-guard',
+          ruleId: 'handoff-violation',
+          reason: HANDOFF_BLOCK,
+          subject: questionText.slice(0, 80) || '(no question text)',
+        }),
       },
     }));
   } catch (e) {

@@ -22,6 +22,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadRouting, fenceMeta, TIERS, routingSource } from './lib/routing-config.js';
 import { configDir } from './lib/config-dir.js';
+import { dedupeReason } from './lib/rejection-dedup.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
 
@@ -81,12 +82,13 @@ export function checkTaskCreate(toolInput, routing) {
   const subject = typeof toolInput?.subject === 'string' ? toolInput.subject : '';
 
   const planShaped = PLAN_HEADERS_RE.test(description) || PLAN_SUBJECT_RE.test(subject);
-  if (!planShaped) return { blocked: false, reason: null };
+  if (!planShaped) return { blocked: false, reason: null, ruleId: null };
 
   const hasFence = /```json:metadata/.test(description);
   if (!hasFence) {
     return {
       blocked: true,
+      ruleId: 'missing-fence',
       reason: [
         'PLAN TASK MISSING METADATA FENCE',
         '',
@@ -102,17 +104,18 @@ export function checkTaskCreate(toolInput, routing) {
 
   const meta = fenceMeta(description);
   // Unparseable fence JSON -> fail open (malformed fences are someone else's problem).
-  if (meta === null) return { blocked: false, reason: null };
+  if (meta === null) return { blocked: false, reason: null, ruleId: null };
 
   // Concrete model pin overrides tier enforcement.
   if (typeof meta.model === 'string' && meta.model.length > 0) {
-    return { blocked: false, reason: null };
+    return { blocked: false, reason: null, ruleId: null };
   }
 
   if (TIERS.includes(meta.modelTier)) {
     if (meta.modelTier === 'frontier' && routing && routing.frontier === 'off' && routing.schema !== 1) {
       return {
         blocked: true,
+        ruleId: 'frontier-off',
         reason: [
           'FRONTIER TIER IS NOT ENABLED',
           '',
@@ -130,7 +133,7 @@ export function checkTaskCreate(toolInput, routing) {
         ].join('\n'),
       };
     }
-    return { blocked: false, reason: null };
+    return { blocked: false, reason: null, ruleId: null };
   }
 
   const problem = meta.modelTier === undefined || meta.modelTier === ''
@@ -139,6 +142,7 @@ export function checkTaskCreate(toolInput, routing) {
   const configPath = routingSource() || '.superpowers/model-routing.json';
   return {
     blocked: true,
+    ruleId: 'missing-tier',
     reason: [
       'PLAN TASK MISSING MODEL TIER',
       '',
@@ -177,7 +181,13 @@ async function main() {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: result.reason,
+          permissionDecisionReason: dedupeReason({
+            sessionId: session_id,
+            hook: 'taskcreate',
+            ruleId: result.ruleId,
+            reason: result.reason,
+            subject: tool_input?.subject || '(no subject)',
+          }),
         },
       }));
       return;

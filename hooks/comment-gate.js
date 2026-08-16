@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { classifyComment, extractComments } from './lib/comment-patterns.js';
+import { dedupeReason } from './lib/rejection-dedup.js';
 
 /**
  * Lines present in `newText` that are absent from `oldText`, by exact-text
@@ -127,7 +128,7 @@ async function main() {
 
   try {
     const data = JSON.parse(input);
-    const { tool_name, tool_input, cwd } = data;
+    const { tool_name, tool_input, cwd, session_id } = data;
     const result = check(tool_name, tool_input, cwd);
 
     if (result.blocked) {
@@ -135,7 +136,13 @@ async function main() {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: buildDenyMessage(result.violation),
+          permissionDecisionReason: dedupeReason({
+            sessionId: session_id,
+            hook: 'comment-gate',
+            ruleId: result.violation.violation,
+            reason: buildDenyMessage(result.violation),
+            subject: tool_input?.file_path || '(no file path)',
+          }),
         },
       }));
       return;
