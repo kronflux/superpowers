@@ -58,6 +58,7 @@ describe('track-edits.js', () => {
   it('gitignores an AI artifact via the shared helper without duplicating the section', () => {
     const project = path.join(home, 'proj');
     fs.mkdirSync(project);
+    fs.mkdirSync(path.join(project, '.git'));
     const artifact = path.join(project, 'session-log.md');
 
     // Pre-seed the shared section from another producer (context-engine).
@@ -81,6 +82,7 @@ describe('track-edits.js', () => {
   it('does not duplicate an artifact entry on repeated writes', () => {
     const project = path.join(home, 'proj2');
     fs.mkdirSync(project);
+    fs.mkdirSync(path.join(project, '.git'));
     const artifact = path.join(project, 'state.md');
     const payload = { tool_name: 'Write', tool_input: { file_path: artifact, content: 'x' }, cwd: project };
 
@@ -156,5 +158,43 @@ describe('track-session-stats.js', () => {
     expect(loaded.totalSkillCalls).toBe(0);
     process.env.HOME = origHome;
     process.env.USERPROFILE = origUP;
+  });
+});
+
+describe('ensureGitignored repository guard', () => {
+  it('writes nothing in a directory that is not a git repository', () => {
+    const dir = fs.mkdtempSync(path.join(spTmpDir(), 'sp-nogit-'));
+    ensureGitignored(dir, ['context-snapshot.json']);
+    expect(fs.existsSync(path.join(dir, '.gitignore'))).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('leaves an existing .gitignore untouched outside a repository', () => {
+    const dir = fs.mkdtempSync(path.join(spTmpDir(), 'sp-nogit2-'));
+    const gi = path.join(dir, '.gitignore');
+    fs.writeFileSync(gi, 'node_modules/\n');
+    ensureGitignored(dir, ['context-snapshot.json']);
+    expect(fs.readFileSync(gi, 'utf8')).toBe('node_modules/\n');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('writes when .git is a directory', () => {
+    const dir = fs.mkdtempSync(path.join(spTmpDir(), 'sp-git-'));
+    fs.mkdirSync(path.join(dir, '.git'));
+    ensureGitignored(dir, ['context-snapshot.json']);
+    expect(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8')).toContain('context-snapshot.json');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('writes when .git is a file, as in a worktree', () => {
+    const dir = fs.mkdtempSync(path.join(spTmpDir(), 'sp-wt-'));
+    fs.writeFileSync(path.join(dir, '.git'), 'gitdir: /elsewhere/.git/worktrees/x\n');
+    ensureGitignored(dir, ['context-snapshot.json']);
+    expect(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8')).toContain('context-snapshot.json');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not throw when the directory does not exist', () => {
+    expect(() => ensureGitignored(path.join(spTmpDir(), 'sp-absent-dir'), ['x'])).not.toThrow();
   });
 });

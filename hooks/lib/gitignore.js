@@ -14,6 +14,7 @@ const SECTION_HEADER = '# AI assistant artifacts';
  * - The section header is added only if absent.
  * - Each entry is added only if not already present (exact-line match,
  *   whitespace-trimmed).
+ * - Returns without writing if cwd is not a git repository.
  * - Fail-silent: never throws — never blocks a hook.
  *
  * @param {string} cwd     project root containing (or to contain) .gitignore
@@ -21,6 +22,12 @@ const SECTION_HEADER = '# AI assistant artifacts';
  */
 function ensureGitignored(cwd, entries) {
   try {
+    // A .gitignore is meaningless outside a repository, and creating one in a
+    // plain directory modifies a workspace the operator did not ask about.
+    // `.git` is a directory in a normal clone and a file in a worktree or
+    // submodule, so existence is the test rather than type.
+    if (!fs.existsSync(path.join(cwd, '.git'))) return;
+
     const gitignorePath = path.join(cwd, '.gitignore');
     let content = fs.existsSync(gitignorePath)
       ? fs.readFileSync(gitignorePath, 'utf8')
