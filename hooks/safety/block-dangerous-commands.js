@@ -15,6 +15,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { configDir } from '../lib/config-dir.js';
 import { splitSegments } from '../lib/command-segments.js';
+import { isAllowed } from '../lib/ask-allowlist.js';
 
 const SAFETY_LEVEL = 'high';
 
@@ -156,7 +157,7 @@ async function main() {
     }
 
     const askResult = checkAsk(cmd, { repoRoot: cwd });
-    if (askResult.ask) {
+    if (askResult.ask && !isAllowed(session_id, cmd)) {
       const p = askResult.pattern;
       log({ level: 'ASK', id: p.id, cmd, session_id, cwd, permission_mode });
       process.stdout.write(JSON.stringify({

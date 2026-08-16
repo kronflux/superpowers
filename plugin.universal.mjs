@@ -77,6 +77,12 @@ export default {
       platforms: ['claude-code'],
     },
     {
+      event: 'PostToolUse',
+      matcher: 'Bash',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/safety/record-ask-approval.js"',
+      platforms: ['claude-code', 'codex'],
+    },
+    {
       // TaskCreate is a Claude Code-native tool; routing stays claude-code-only.
       event: 'PreToolUse',
       matcher: 'TaskCreate',
