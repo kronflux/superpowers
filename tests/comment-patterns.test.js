@@ -372,3 +372,56 @@ describe('extractComments', () => {
     expect(extractComments(block)).toEqual(['Returns the sum of two numbers']);
   });
 });
+
+describe('traceability prefixes', () => {
+  const HITS = [
+    'REQ-014: verify the decoder',
+    'AC-12 — decoder returns null on empty input',
+    'BUG-4021: guards the empty payload path',
+  ];
+  const MISSES = [
+    'SHA-256 hashing',
+    'RFC-3339 timestamps',
+    'ISO-8601 dates',
+    'HTTP-2 support',
+    'UTF-8 - the encoding used here',
+    'AES-128 in CBC mode',
+    'Returns the ISO-8601 timestamp',
+  ];
+
+  for (const line of HITS) {
+    it(`flags: ${line}`, () => {
+      expect(classifyComment(line)?.violation).toBe('traceability');
+    });
+  }
+  for (const line of MISSES) {
+    it(`passes: ${line}`, () => {
+      expect(classifyComment(line)).toBeNull();
+    });
+  }
+});
+
+describe('block comment extraction', () => {
+  it('extracts a single-line block comment', () => {
+    expect(extractComments('const a = 1; /* TODO later */')).toContain('TODO later');
+  });
+
+  it('extracts a multi-line block comment', () => {
+    const src = '/*\n * first line\n * second line\n */\nconst a = 1;';
+    const bodies = extractComments(src);
+    expect(bodies.join(' ')).toContain('first line');
+    expect(bodies.join(' ')).toContain('second line');
+  });
+
+  it('extracts an html comment', () => {
+    expect(extractComments('<p>x</p><!-- FIXME: broken -->')).toContain('FIXME: broken');
+  });
+
+  it('ignores a block opener inside a string', () => {
+    expect(extractComments('const s = "/* not a comment */";')).toEqual([]);
+  });
+
+  it('ignores a python docstring', () => {
+    expect(extractComments('def f():\n    """TODO: rewrite this"""\n    pass')).toEqual([]);
+  });
+});

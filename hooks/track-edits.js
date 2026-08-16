@@ -4,7 +4,7 @@
  *
  * After every Edit|Write tool use, logs the file path and timestamp
  * to a session-scoped edit log. This log feeds downstream hooks
- * (stop-reminders) to know what was changed during the session.
+ * (stop-reminders) to know which files changed during the session.
  *
  * When Claude writes a known AI workspace artifact, the file is added to
  * the nearest .gitignore via the SHARED ensureGitignored helper
@@ -99,7 +99,7 @@ function rotateIfNeeded() {
 
 /**
  * Read the edit log and return entries from the current session.
- * Used by stop-reminders to check what files were changed.
+ * Used by stop-reminders to check which files changed.
  * Supports both the legacy 3-field format and new 4-field format with session_id.
  */
 function getRecentEdits(withinMinutes = 60) {

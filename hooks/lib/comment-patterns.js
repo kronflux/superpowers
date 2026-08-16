@@ -1,6 +1,7 @@
 // hooks/lib/comment-patterns.js — classifies a single comment line as
-// development narration, impermanence, or a legitimate present-state
-// description, and extracts comment bodies from a block of source text.
+// development narration, impermanence, a traceability marker, or a
+// legitimate present-state description, and extracts comment bodies from a
+// block of source text.
 //
 // Patterns match multi-word constructions, not bare past-tense verbs.
 // "Fixed entries have strikethrough" and "Fixed crash on empty payload"
@@ -8,8 +9,9 @@
 // change rather than a behavior are matched. A bare "Fixed X" fragment
 // passes classifyComment regardless of which of those two shapes it is.
 //
-// Coverage: `//` and `#` line comments only. `--`, `/* */`, `<!-- -->`,
-// and docstrings are not recognized by extractComments.
+// Coverage: `//` and `#` line comments, plus `/* */` and `<!-- -->` block
+// comments. `--` line comments and docstrings are not recognized by
+// extractComments.
 
 // A change to the code, not a behavior of the code. Each group is matched
 // only via the construction that separates a violation from an adjacent
@@ -121,10 +123,30 @@ const IMPERMANENCE = [
   /\bJIRA-\d+\b/i,
 ];
 
+// A traceability identifier used as a comment prefix records where a
+// requirement lives rather than what the code does, and goes stale as soon as
+// the requirement is renumbered.
+//
+// The shape alone is ambiguous: "SHA-256", "RFC-3339" and "UTF-8" are
+// identical in form. Position and punctuation separate them. The identifier
+// must open the comment and be followed by a colon or dash and then prose,
+// which "Returns the ISO-8601 timestamp" is not. Two digits minimum excludes
+// "UTF-8" and "HTTP-2"; the denylist excludes the four-digit standards that
+// clear the digit floor. Both guards are load-bearing — neither excludes
+// every standard on its own.
+const STANDARD_PREFIXES = new Set(['UTF', 'SHA', 'RFC', 'AES', 'HTTP', 'ISO', 'UTC', 'RGB', 'SQL', 'MD']);
+const TRACEABILITY_RE = /^([A-Z]{2,6})-\d{2,4}\s*[:—-]\s+\S/;
+
+function classifyTraceability(line) {
+  const m = TRACEABILITY_RE.exec(line);
+  if (!m || STANDARD_PREFIXES.has(m[1])) return null;
+  return { violation: 'traceability', match: m[0].trim() };
+}
+
 /**
  * Classifies a comment line. Returns null for a present-state description,
- * or { violation: 'narration'|'impermanence', match } for the first
- * construction matched.
+ * or { violation: 'narration'|'impermanence'|'traceability', match } for the
+ * first construction matched.
  */
 export function classifyComment(line) {
   if (typeof line !== 'string' || !line) return null;
@@ -136,46 +158,66 @@ export function classifyComment(line) {
     const m = line.match(re);
     if (m) return { violation: 'impermanence', match: m[0] };
   }
+  const trace = classifyTraceability(line);
+  if (trace) return trace;
   return null;
 }
 
-// Finds the index of the first `//` or `#` on a line that is not inside a
-// quoted string. Tracks single, double, and backtick quotes; a backslash
-// escapes the following character while a quote is open.
-function findCommentStart(line) {
-  let quote = null;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (quote) {
-      if (ch === '\\') {
-        i++;
-        continue;
-      }
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === '`') {
-      quote = ch;
-      continue;
-    }
-    if (ch === '#') return i;
-    if (ch === '/' && line[i + 1] === '/') return i;
-  }
-  return -1;
-}
+// Block comment delimiters scanned in addition to line comments. Docstrings
+// are not included: they carry prose and code samples that read as comment
+// violations without being comments.
+const BLOCK_DELIMITERS = [
+  { open: '/*', close: '*/' },
+  { open: '<!--', close: '-->' },
+];
 
 /**
- * Returns the trimmed bodies of `//` and `#` line comments in text, skipping
- * any `//` or `#` that occurs inside a quoted string.
+ * Returns the trimmed bodies of line comments (`//`, `#`) and block comments
+ * (`/* *\/`, `<!-- -->`) in text. An opener inside a quoted string is
+ * skipped. A block body is returned one line at a time, with leading `*`
+ * decoration removed.
  */
 export function extractComments(text) {
+  const src = String(text);
   const bodies = [];
-  for (const line of String(text).split(/\r?\n/)) {
-    const start = findCommentStart(line);
-    if (start === -1) continue;
-    const markerLength = line[start] === '#' ? 1 : 2;
-    const body = line.slice(start + markerLength).trim();
-    if (body) bodies.push(body);
+  let i = 0;
+  let quote = null;
+
+  while (i < src.length) {
+    const ch = src[i];
+
+    if (quote) {
+      if (ch === '\\') { i += 2; continue; }
+      if (ch === quote) quote = null;
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; i++; continue; }
+
+    const block = BLOCK_DELIMITERS.find((d) => src.startsWith(d.open, i));
+    if (block) {
+      const end = src.indexOf(block.close, i + block.open.length);
+      const body = src.slice(i + block.open.length, end === -1 ? src.length : end);
+      for (const line of body.split(/\r?\n/)) {
+        const cleaned = line.replace(/^\s*\*+\s?/, '').trim();
+        if (cleaned) bodies.push(cleaned);
+      }
+      i = end === -1 ? src.length : end + block.close.length;
+      continue;
+    }
+
+    if (ch === '#' || (ch === '/' && src[i + 1] === '/')) {
+      const nl = src.indexOf('\n', i);
+      const end = nl === -1 ? src.length : nl;
+      const marker = ch === '#' ? 1 : 2;
+      const body = src.slice(i + marker, end).trim();
+      if (body) bodies.push(body);
+      i = end;
+      continue;
+    }
+
+    i++;
   }
+
   return bodies;
 }

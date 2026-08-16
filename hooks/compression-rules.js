@@ -7,7 +7,7 @@
  * Design principles:
  *   - Fail-open: if a compress() function returns null, output passes through raw
  *   - Never compress commands where every line is potential signal (diffs, file reads)
- *   - Transparency: compressed output always gets a marker so Claude knows info was removed
+ *   - Transparency: compressed output always carries a marker noting that information is omitted
  *   - Cross-platform: line ending normalization handled by the optimizer, not here
  */
 
