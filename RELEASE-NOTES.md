@@ -1,5 +1,50 @@
 # Superpowers Release Notes
 
+## Unreleased — output style and config surface
+
+- **Response shape ships as a native output style.** `output-styles/signal.md` is installed by the
+  new `superpowers:output-style` skill into `<configDir()>/output-styles/`, and the selection is
+  written to a settings file whose scope you pick, defaulting to user-global. A style is loaded
+  into the system prompt: it applies every turn without a skill being invoked, survives compaction
+  at no cost, and costs the plugin nothing per turn. The alternative — distributing a style as a
+  SessionStart injection, as Anthropic's own `explanatory-output-style` plugin does — was rejected
+  for exactly the reason that plugin's README warns about.
+- **Four amendments were required before the style could ship**, each resolving a contradiction
+  with a skill that runs under it: a five-item list cap that would have truncated review findings
+  and test failures; a clarifying-question rule that argued against the five interview-shaped
+  skills; a single-recommendation rule that contradicted `brainstorming`'s mandate to propose two
+  or three approaches; and no carve-out for machine-consumed structured returns.
+- **An existing `outputStyle` is never replaced silently.** The skill reads the current value,
+  reports it, and asks. It reports the exact path written in every branch, including when nothing
+  changed.
+- **`patchSettings` reports what it wrote.** It returned `{ changed: true }` without naming a
+  path, so a caller passing a directory already named `.claude` produced
+  `.claude/.claude/settings.json` — a file the harness never reads — and a success report. It now
+  returns the path in every branch, refuses a nested `.claude` outright, and patches an arbitrary
+  top-level key. `loadConfig` gained the config-dir fallback a global install needed and reports
+  which path it used.
+- **The output contract keeps only what a style cannot carry.** The same rules were stated in
+  three places — the style, `skills/shared/output-contract.md`, and this repository's `CLAUDE.md`
+  — and drifted independently. The contract shrank to 2,492 B: precedence, ranking, questions,
+  relative scope, the no-skill-preamble rule, structured returns, and the dispatch-brief
+  requirement. It stays alive for two audiences a style cannot reach: subagents, whose system
+  prompt is their agent definition, and the six non-Claude-Code harness overlays this fork ships.
+- **Dispatch briefs now carry shape rules.** Measured across 49,895 subagent turns, `Output Style`
+  appears 0 times and `output-contract` appears once — neither vehicle reaches a subagent, so
+  editing either document could not fix it. `subagent-driven-development` and
+  `dispatching-parallel-agents` now require the dispatcher to inline report structure, the status
+  line, evidence quoted rather than summarised, and schema-following structured returns.
+- **A plan left mid-execution is named at session start.** `~/.claude/tasks/session-*/` is keyed
+  by session id, so a restart begins with an empty task list while the durable snapshot sits in
+  `.superpowers/plans/<plan>.md.tasks.json`. SessionStart now emits one line naming the plan and
+  its open count. It recreates nothing: restoring tasks unbidden into a session about something
+  else is worse than the gap it closes.
+- **The `ctx_execute` script echo is recorded where routing decisions are made.**
+  `skills/shared/conductor/context-mode-adapter.md` states that each call returns the submitted
+  script before its output, so a call whose script is longer than its answer costs more than the
+  native tool it replaced. The echo belongs to `mksglu/context-mode` and is not configurable from
+  this plugin.
+
 ## Unreleased — session payload economics
 
 - **A compaction no longer re-injects the whole skill document.** `hooks/session-start` reads the

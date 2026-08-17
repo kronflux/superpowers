@@ -34,6 +34,12 @@ context-mode blocks after ~8 searches/60s. Batch every question set into ONE
 not raw stdout. Either cap at the source (`… 2>&1 | tail -30`) or follow the pointer with one
 targeted `ctx_search`. Regardless: echo the decisive pass/fail line natively (Evidence rule).
 
+## Script-echo cost
+`ctx_execute` returns the submitted script before its output. A call whose script is longer
+than the answer it derives costs more than the native tool it replaced — route a one-line
+count or a fixed short output natively instead. The echo belongs to `mksglu/context-mode`
+and is not configurable from here.
+
 ## Evidence rule (gate compatibility — non-negotiable)
 Verification computed via ctx tools MUST surface `AC: <criterion> — PROVEN BY <evidence>`
 lines in the conversation itself. Gate hooks scan the transcript, not the sandbox.
