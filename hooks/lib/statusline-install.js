@@ -15,13 +15,26 @@ function installLauncher(configRoot, sourcePath) {
 }
 
 /**
- * Add or update a top-level key in <projectDir>/.claude/settings.json.
+ * Add or update a top-level key in a settings file.
  *
- * projectDir is the project root, not an arbitrary cwd: a projectDir whose
- * basename is already '.claude' is refused with state 'nested-claude-dir'
- * rather than joined into a '.claude/.claude/settings.json' the harness never
- * reads. Every branch returns the absolute path involved, present or refused,
- * so a caller never has to guess what was written.
+ * By default the target is <projectDir>/.claude/settings.json: projectDir is
+ * the project root, not an arbitrary cwd, and a projectDir whose basename is
+ * already '.claude' is refused with state 'nested-claude-dir' rather than
+ * joined into a '.claude/.claude/settings.json' the harness never reads.
+ *
+ * options.settingsDir bypasses the '.claude' join entirely and targets
+ * <settingsDir>/<filename> directly (projectDir is ignored, and the
+ * nested-claude-dir guard does not apply — there is no nesting to guard
+ * against). This is what a user-global write needs: configDir() is already
+ * the config root, so joining another '.claude' under it, or refusing
+ * because its basename happens to be '.claude', would both be wrong.
+ *
+ * options.filename overrides the default 'settings.json', e.g.
+ * 'settings.local.json' for a project-local write alongside the same
+ * '.claude' directory a default-mode call would use.
+ *
+ * Every branch returns the absolute path involved, present or refused, so a
+ * caller never has to guess what was written.
  *
  * A present-but-unparseable file is left untouched and reported as
  * 'unparseable' rather than treated like an absent one. Overwriting it with a
@@ -32,12 +45,18 @@ function installLauncher(configRoot, sourcePath) {
  * caller can then tell the user their settings file has a syntax error to
  * fix first.
  */
-function patchSettings(projectDir, key, value) {
-  if (path.basename(projectDir) === '.claude') {
-    return { changed: false, path: path.resolve(projectDir), state: 'nested-claude-dir' };
+function patchSettings(projectDir, key, value, options = {}) {
+  const filename = options.filename || 'settings.json';
+  let dir;
+  if (options.settingsDir) {
+    dir = options.settingsDir;
+  } else {
+    if (path.basename(projectDir) === '.claude') {
+      return { changed: false, path: path.resolve(projectDir), state: 'nested-claude-dir' };
+    }
+    dir = path.join(projectDir, '.claude');
   }
-  const dir = path.join(projectDir, '.claude');
-  const file = path.join(dir, 'settings.json');
+  const file = path.join(dir, filename);
   let raw = null;
   try { raw = fs.readFileSync(file, 'utf8'); } catch { raw = null; }
   let json = {};

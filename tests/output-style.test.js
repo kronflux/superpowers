@@ -105,3 +105,116 @@ describe('output-styles/signal.md', () => {
     expect(content).not.toMatch(/ELI5/i);
   });
 });
+
+// Verifies skills/output-style/SKILL.md (the install skill) and its slash-command
+// wrapper. The skill is prose executed by the model, so these assertions are
+// mechanical: frontmatter budget, the three named scopes, the stated default,
+// the read-before-replace confirmation, the no-SessionStart-injection rule, and
+// that the skill points at the shipped asset by the path it actually reads.
+
+const SKILL_PATH = path.join(ROOT, 'skills', 'output-style', 'SKILL.md');
+const COMMAND_PATH = path.join(ROOT, 'commands', 'output-style.md');
+
+function readSkill() {
+  return fs.readFileSync(SKILL_PATH, 'utf8');
+}
+
+function descriptionBytes(fm) {
+  const lines = fm.split(/\r?\n/);
+  const i = lines.findIndex((l) => /^description:/.test(l));
+  if (i === -1) return 0;
+  let v = lines[i].replace(/^description:\s*/, '').trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1);
+  }
+  return Buffer.byteLength(v);
+}
+
+describe('skills/output-style/SKILL.md', () => {
+  it('exists', () => {
+    expect(fs.existsSync(SKILL_PATH)).toBe(true);
+  });
+
+  it('frontmatter lints clean: name present, description present and within the 300B budget', () => {
+    const fm = parseFrontmatter(readSkill());
+    expect(fm, 'no YAML frontmatter block found').not.toBeNull();
+    expect(fm.name).toBeTruthy();
+    expect(fm.description).toBeTruthy();
+    const raw = readSkill().match(/^---\r?\n([\s\S]*?)\r?\n---/)[1];
+    expect(descriptionBytes(raw)).toBeLessThanOrEqual(300);
+  });
+
+  it('names all three selection scopes: user-global, project, and project-local', () => {
+    const src = readSkill();
+    expect(src, 'user-global scope not named').toMatch(/user-global/i);
+    expect(src, 'project scope not named').toMatch(/\.claude\/settings\.json/);
+    expect(src, 'project-local scope not named').toMatch(/settings\.local\.json/);
+  });
+
+  it('states user-global as the default scope', () => {
+    const src = readSkill();
+    const idx = src.search(/user-global/i);
+    expect(idx).toBeGreaterThan(-1);
+    const nearby = src.slice(idx, idx + 200);
+    expect(nearby).toMatch(/default/i);
+  });
+
+  it('requires reading the existing outputStyle and confirming before replacement', () => {
+    const src = readSkill();
+    expect(src, 'no instruction to read the existing settings file first').toMatch(
+      /read (it|the existing settings file)|read.{0,30}before/i,
+    );
+    // A "confirm" word alone proves nothing — "nothing to confirm" on the
+    // already-set branch would satisfy a bare word match while the actual
+    // gate is gone. Require an interactive question with a decline path,
+    // anchored to the branch where the existing value differs from Signal.
+    const idx = src.search(/different value/i);
+    expect(idx, 'no branch for an existing outputStyle holding a different value').toBeGreaterThan(-1);
+    const nearby = src.slice(idx, idx + 800);
+    expect(nearby, 'no interactive question posed before replacing a different value').toMatch(
+      /AskUserQuestion/,
+    );
+    expect(nearby, 'no decline path offered alongside the replace confirmation').toMatch(
+      /no,?\s*stop/i,
+    );
+  });
+
+  it('nowhere instructs a SessionStart injection of the style', () => {
+    const src = readSkill();
+    // Every mention of SessionStart lives on a prose line (this skill has no
+    // hard-wrapped paragraphs); requiring the SAME line to carry a prohibition
+    // word rules out an instruction like "emit the style at SessionStart"
+    // sitting on its own unqualified line.
+    const lines = src.split(/\r?\n/).filter((l) => /SessionStart/.test(l));
+    expect(lines.length, 'SessionStart not mentioned at all').toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line, `SessionStart mention not framed as a prohibition: "${line}"`).toMatch(
+        /never|not\b|does not|no hook/i,
+      );
+    }
+    // No hook-registration shape targeting SessionStart appears anywhere.
+    expect(src).not.toMatch(/hooks\.SessionStart/);
+    expect(src).not.toMatch(/"SessionStart"\s*:/);
+  });
+
+  it('references the shipped asset by the exact path it reads: output-styles/signal.md', () => {
+    expect(readSkill()).toMatch(/output-styles\/signal\.md/);
+  });
+
+  it('installs the document to <configDir()>/output-styles/, not to a settings-only location', () => {
+    const src = readSkill();
+    expect(src).toMatch(/configDir\(\).*output-styles|output-styles.*configDir\(\)/s);
+  });
+});
+
+describe('commands/output-style.md', () => {
+  it('exists', () => {
+    expect(fs.existsSync(COMMAND_PATH)).toBe(true);
+  });
+
+  it('points at the output-style skill', () => {
+    const src = fs.readFileSync(COMMAND_PATH, 'utf8');
+    expect(src).toMatch(/output-style/);
+    expect(src).toMatch(/skill/i);
+  });
+});

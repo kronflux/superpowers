@@ -138,6 +138,48 @@ describe('patchSettings', () => {
     const j = JSON.parse(fs.readFileSync(result.path, 'utf8'));
     expect(j.outputStyle).toBe('Signal');
   });
+
+  it('options.settingsDir targets <settingsDir>/settings.json directly, bypassing the .claude join', () => {
+    const cfgRoot = path.join(root, 'p8-cfg'); fs.mkdirSync(cfgRoot, { recursive: true });
+    const result = patchSettings(null, 'outputStyle', 'Signal', { settingsDir: cfgRoot });
+    expect(result.changed).toBe(true);
+    expect(result.path).toBe(path.join(cfgRoot, 'settings.json'));
+    const j = JSON.parse(fs.readFileSync(result.path, 'utf8'));
+    expect(j.outputStyle).toBe('Signal');
+  });
+
+  it('options.settingsDir with a directory literally named .claude is not refused as nested', () => {
+    // A user-global config root commonly IS named .claude (e.g. ~/.claude).
+    // The nested-claude-dir guard exists to stop a project-root call from
+    // acquiring a second .claude beneath it; settingsDir mode never joins
+    // another .claude, so that guard must not fire here.
+    const cfgRoot = path.join(root, 'p9', '.claude'); fs.mkdirSync(cfgRoot, { recursive: true });
+    const result = patchSettings(null, 'outputStyle', 'Signal', { settingsDir: cfgRoot });
+    expect(result.changed).toBe(true);
+    expect(result.state).toBeUndefined();
+    expect(result.path).toBe(path.join(cfgRoot, 'settings.json'));
+  });
+
+  it('options.filename targets settings.local.json alongside the default .claude join', () => {
+    const cwd = path.join(root, 'p10'); fs.mkdirSync(cwd, { recursive: true });
+    const result = patchSettings(cwd, 'outputStyle', 'Signal', { filename: 'settings.local.json' });
+    expect(result.changed).toBe(true);
+    expect(result.path).toBe(path.join(cwd, '.claude', 'settings.local.json'));
+    expect(fs.existsSync(path.join(cwd, '.claude', 'settings.json'))).toBe(false);
+    const j = JSON.parse(fs.readFileSync(result.path, 'utf8'));
+    expect(j.outputStyle).toBe('Signal');
+  });
+
+  it('options.filename still reports "unparseable" without touching the malformed file', () => {
+    const cwd = path.join(root, 'p11');
+    fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
+    const file = path.join(cwd, '.claude', 'settings.local.json');
+    const before = '{ not json';
+    fs.writeFileSync(file, before);
+    const result = patchSettings(cwd, 'outputStyle', 'Signal', { filename: 'settings.local.json' });
+    expect(result).toEqual({ changed: false, path: file, state: 'unparseable' });
+    expect(fs.readFileSync(file, 'utf8')).toBe(before);
+  });
 });
 
 describe('ensureGitignored', () => {
