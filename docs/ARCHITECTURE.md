@@ -16,8 +16,11 @@ The plugin is driven by lifecycle hooks. Each fires on a harness event and is re
   sent (`hookSpecificOutput.additionalContext`, ~5.2 KB — see Context economy).
 - If `.superpowers/model-routing.json` (canonical) → legacy `docs/superpowers/model-routing.json`
   → `$CLAUDE_CONFIG_DIR/superpowers/model-routing.json` → `~/.claude/superpowers/model-routing.json`
-  resolves (first match wins), a `<model-routing-active>` block carrying the project's tier
-  mapping is appended. Absent config → byte-identical output with no block.
+  resolves (first match wins), the tier mapping and rules reach the agent at the session's first
+  `Agent` dispatch (`hooks/pre-agent-model-routing.js`), not here — a session that never
+  dispatches a subagent never receives them. A legacy project config still triggers a
+  `<model-routing-legacy>` migration offer here, since that concerns configuration rather than
+  dispatch. Absent config → byte-identical output with no block.
 - `hooks/context-engine.js` runs on SessionStart (claude-code and codex) for context-mode
   detection and session bookkeeping.
 - `hooks/lib/config-dir.js` (`CLAUDE_CONFIG_DIR` → `~/.claude`) is the shared config-root

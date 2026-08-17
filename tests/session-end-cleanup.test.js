@@ -83,6 +83,12 @@ describe('session-end-cleanup', () => {
     expect(fs.existsSync(spTmp(`askallow-${sid}`))).toBe(false);
   });
 
+  it('removes the routing-notice marker for this session', () => {
+    fs.writeFileSync(spTmp(`routing-notice-${sid}`), '1');
+    run({ session_id: sid, hook_event_name: 'SessionEnd', reason: 'clear' });
+    expect(fs.existsSync(spTmp(`routing-notice-${sid}`))).toBe(false);
+  });
+
   it('removes every rejection marker for this session, regardless of hook or rule', () => {
     const markerA = spTmp(`reject-${sid}-taskcreate-missing-fence`);
     const markerB = spTmp(`reject-${sid}-comment-gate-narration`);

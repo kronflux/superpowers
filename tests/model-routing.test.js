@@ -6,7 +6,7 @@ import path from 'node:path';
 import { loadRouting, normalizeRouting, TIERS, REQUIRED_TIERS } from '../hooks/lib/routing-config.js';
 import { checkDispatch, scanTranscript } from '../hooks/pre-agent-model-routing.js';
 import { checkTaskCreate } from '../hooks/pre-taskcreate-model-tier.js';
-import { spTmpDir } from '../hooks/lib/sp-tmp.js';
+import { spTmp, spTmpDir } from '../hooks/lib/sp-tmp.js';
 import { markerPath } from '../hooks/lib/rejection-dedup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -974,5 +974,108 @@ describe('dedupeReason wiring at the routing hooks', () => {
     } finally {
       fs.rmSync(marker, { force: true });
     }
+  });
+});
+
+describe('routing dispatch notice (first Agent call only)', () => {
+  const cwd = makeProject(ROUTING);
+
+  function agentPayload(sessionId, overrides = {}) {
+    return {
+      tool_name: 'Agent',
+      cwd,
+      transcript_path: makeTranscript([]),
+      tool_input: { description: 'impl', prompt: 'do it' },
+      session_id: sessionId,
+      ...overrides,
+    };
+  }
+
+  it('the first Agent dispatch surfaces the tier mapping and rules', () => {
+    const sid = `dn-first-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = spTmp(`routing-notice-${sid}`);
+    try {
+      const json = run('agent', agentPayload(sid));
+      const ctx = json.hookSpecificOutput?.additionalContext;
+      expect(ctx).toContain('<model-routing-active>');
+      expect(ctx).toContain('Tier mapping:');
+      expect(ctx).toContain('modelTier');
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
+  });
+
+  it('a second Agent dispatch in the same session does not repeat it', () => {
+    const sid = `dn-second-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = spTmp(`routing-notice-${sid}`);
+    try {
+      run('agent', agentPayload(sid));
+      const second = run('agent', agentPayload(sid));
+      expect(second.hookSpecificOutput?.additionalContext).toBeUndefined();
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
+  });
+
+  it('a session that never dispatches an Agent never receives it or claims the marker', () => {
+    const sid = `dn-none-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = spTmp(`routing-notice-${sid}`);
+    expect(fs.existsSync(marker)).toBe(false);
+    const json = run('taskcreate', { ...denyingTaskCreate(cwd), session_id: sid });
+    expect(JSON.stringify(json)).not.toContain('model-routing-active');
+    expect(fs.existsSync(marker)).toBe(false);
+  });
+
+  it('the plan-tier gate still blocks a fence-less plan task with no notice ever emitted', () => {
+    // pre-taskcreate-model-tier.js reads the routing config directly and
+    // never touches the notice marker, so enforcement holds even in a
+    // session that never dispatches an Agent and thus never claims it.
+    const sid = `dn-enforce-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = spTmp(`routing-notice-${sid}`);
+    expect(fs.existsSync(marker)).toBe(false);
+    const json = run('taskcreate', { ...denyingTaskCreate(cwd), session_id: sid });
+    expect(decision(json)).toBe('deny');
+    expect(fs.existsSync(marker)).toBe(false);
+  });
+
+  it('a blocked dispatch still carries the notice on its first call', () => {
+    const sid = `dn-blocked-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = spTmp(`routing-notice-${sid}`);
+    try {
+      const transcript = mechanicalInProgressTranscript();
+      const json = run('agent', { ...denyingAgent(cwd, transcript), session_id: sid });
+      expect(decision(json)).toBe('deny');
+      expect(json.hookSpecificOutput.additionalContext).toContain('<model-routing-active>');
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
+  });
+
+  it('an exempt custom subagent_type dispatch still counts as the first dispatch', () => {
+    const sid = `dn-exempt-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = spTmp(`routing-notice-${sid}`);
+    try {
+      const json = run('agent', agentPayload(sid, {
+        tool_input: { description: 'x', prompt: 'y', subagent_type: 'Explore' },
+      }));
+      expect(json.hookSpecificOutput?.additionalContext).toContain('<model-routing-active>');
+    } finally {
+      fs.rmSync(marker, { force: true });
+    }
+  });
+
+  it('no routing config: no notice, and no marker is ever claimed', () => {
+    const noRoutingCwd = makeProject(undefined);
+    const sid = `dn-dormant-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const marker = spTmp(`routing-notice-${sid}`);
+    const json = run('agent', {
+      tool_name: 'Agent',
+      cwd: noRoutingCwd,
+      transcript_path: makeTranscript([]),
+      tool_input: { description: 'impl', prompt: 'do it' },
+      session_id: sid,
+    });
+    expect(json).toEqual({});
+    expect(fs.existsSync(marker)).toBe(false);
   });
 });

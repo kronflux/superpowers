@@ -64,46 +64,28 @@ escape_for_json() {
 using_superpowers_escaped=$(escape_for_json "$using_superpowers_content")
 session_context="<EXTREMELY_IMPORTANT>\nYou have superpowers.\n\n**Your 'superpowers:using-superpowers' skill - how to find and use skills. Invoke all other skills via the 'Skill' tool:**\n\n${using_superpowers_escaped}\n</EXTREMELY_IMPORTANT>"
 
-# Opt-in model routing: when the routing config exists (canonical project,
-# then legacy project, then config dir, then home fallback) and the kill
-# switch is not set, append a <model-routing-active> block. Absent config ->
-# output is byte-identical.
-routing_file=""
-routing_legacy=""
-if [ "${SUPERPOWERS_ROUTING_GUARD:-1}" != "0" ]; then
-    if [ -f "${PWD}/.superpowers/model-routing.json" ]; then
-        routing_file="${PWD}/.superpowers/model-routing.json"
-    elif [ -f "${PWD}/docs/superpowers/model-routing.json" ]; then
-        routing_file="${PWD}/docs/superpowers/model-routing.json"
-        routing_legacy=1
-    elif [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "${CLAUDE_CONFIG_DIR}/superpowers/model-routing.json" ]; then
-        routing_file="${CLAUDE_CONFIG_DIR}/superpowers/model-routing.json"
-    elif [ -f "${HOME:-}/.claude/superpowers/model-routing.json" ]; then
-        routing_file="${HOME}/.claude/superpowers/model-routing.json"
-    fi
+# Opt-in model routing: legacy-path migration notice only. The tier mapping
+# and escalation rules surface at the first Agent dispatch instead
+# (hooks/pre-agent-model-routing.js injects them there), the point at which
+# they are relevant - most sessions never dispatch a subagent. A legacy
+# config path is a one-time migration decision unrelated to dispatch, so it
+# stays here. Fires only when the canonical project file is absent and the
+# legacy project file resolves - config-dir/home-fallback candidates are not
+# the deprecated path and get no migration offer. Kill switch or no legacy
+# file -> output is byte-identical.
+routing_legacy_file=""
+if [ "${SUPERPOWERS_ROUTING_GUARD:-1}" != "0" ] \
+   && [ ! -f "${PWD}/.superpowers/model-routing.json" ] \
+   && [ -f "${PWD}/docs/superpowers/model-routing.json" ]; then
+    routing_legacy_file="${PWD}/docs/superpowers/model-routing.json"
 fi
 
-if [ -n "$routing_file" ]; then
-    # Strip control chars (keep tab/newline/CR; escape_for_json handles those).
-    routing_mapping=$(tr -d '\000-\010\013\014\016-\037\177' < "$routing_file" 2>/dev/null || true)
-    routing_legacy_line=""
-    if [ -n "$routing_legacy" ]; then
-        routing_legacy_line="
-LEGACY CONFIG PATH: this config lives at docs/superpowers/ - offer the user a one-time migration to .superpowers/model-routing.json (canonical). An unmigrated legacy file is shadowed the moment a canonical file appears."
-    fi
-    routing_notice="<model-routing-active>
-This project has opted in to subagent model routing (${routing_file}).
-Tier mapping: ${routing_mapping}
-
-Plan tasks carry \"modelTier\" in their json:metadata fence:
-- \"mechanical\": 1-2 files, complete spec with code in the steps, no design judgment.
-- \"standard\": multi-file coordination, integration, pattern matching, debugging. Reviewers always dispatch at standard.
-- \"advanced\": design judgment, architecture decisions, broad codebase understanding. Default ceiling.
-- \"frontier\": gated, 2x cost, needs per-task user approval. Only for long-horizon autonomous runs, first-shot large builds, genuine ambiguity, whole-repo history debugging, wide agent fan-out, or dense visual input. Never for security analysis. If advanced has handled the class before, it is not frontier.
-Tie-break: spec completeness wins - complete code in steps means mechanical. Escalation goes up only and STOPS at advanced (mechanical -> standard -> advanced); frontier requires the approval flow, never escalation. \"inherit\" means no constraint, \"off\" means the tier is unreachable. Full rules: docs/model-routing-flow.md. Kill switch: SUPERPOWERS_ROUTING_GUARD=0.${routing_legacy_line}
-</model-routing-active>"
-    routing_escaped=$(escape_for_json "$routing_notice")
-    session_context="${session_context}\n\n${routing_escaped}"
+if [ -n "$routing_legacy_file" ]; then
+    routing_legacy_notice="<model-routing-legacy>
+This project's model-routing config lives at ${routing_legacy_file} - offer the user a one-time migration to .superpowers/model-routing.json (canonical). An unmigrated legacy file is shadowed the moment a canonical file appears.
+</model-routing-legacy>"
+    routing_legacy_escaped=$(escape_for_json "$routing_legacy_notice")
+    session_context="${session_context}\n\n${routing_legacy_escaped}"
 fi
 
 # Best-effort conductor capability probe: invokes the ESM capability

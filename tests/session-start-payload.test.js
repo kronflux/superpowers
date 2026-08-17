@@ -201,33 +201,54 @@ describe('using-superpowers compact core', () => {
 });
 
 describe('session-start routing candidate chain', () => {
-  it('legacy project routing config adds the migration-offer line', () => {
+  // The tier mapping and escalation rules surface at the first Agent dispatch
+  // (hooks/pre-agent-model-routing.js, covered in tests/model-routing.test.js),
+  // not here. SessionStart's only remaining routing-related output is the
+  // legacy-path migration offer, which concerns configuration rather than
+  // dispatch.
+
+  it('legacy project routing config adds the migration-offer line, never the dispatch block', () => {
     withScratch((scratch) => {
       writeRouting(scratch, ['docs', 'superpowers']);
       const ctx = runHook(scratch);
-      expect(ctx).toContain('<model-routing-active>');
-      expect(ctx).toContain('LEGACY CONFIG PATH');
+      expect(ctx).toContain('<model-routing-legacy>');
       expect(ctx).toContain('.superpowers/model-routing.json');
+      expect(ctx).not.toContain('<model-routing-active>');
     });
   });
 
-  it('canonical project routing config carries no legacy line', () => {
+  it('canonical project routing config produces no routing output at all', () => {
     withScratch((scratch) => {
       writeRouting(scratch, ['.superpowers']);
       const ctx = runHook(scratch);
-      expect(ctx).toContain('<model-routing-active>');
-      expect(ctx).not.toContain('LEGACY CONFIG PATH');
+      expect(ctx).not.toContain('<model-routing-active>');
+      expect(ctx).not.toContain('<model-routing-legacy>');
     });
   });
 
-  it('canonical wins over legacy when both exist, with no legacy line', () => {
+  it('canonical wins over legacy when both exist: no migration offer, no dispatch block', () => {
     withScratch((scratch) => {
       writeRouting(scratch, ['docs', 'superpowers']);
       writeRouting(scratch, ['.superpowers']);
       const ctx = runHook(scratch);
-      expect(ctx).toContain('.superpowers/model-routing.json');
+      expect(ctx).not.toContain('<model-routing-active>');
+      expect(ctx).not.toContain('<model-routing-legacy>');
       expect(ctx).not.toContain('docs/superpowers');
-      expect(ctx).not.toContain('LEGACY CONFIG PATH');
+    });
+  });
+
+  it('the compacted emission is byte-identical whether or not a canonical routing config exists', () => {
+    // The tier-mapping/escalation-rules block reaches the agent at first
+    // Agent dispatch, so a routing config contributes zero bytes here.
+    withScratch((scratch) => {
+      const sid = `t-routing-compact-${Date.now()}`;
+      const withoutRouting = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'compact', session_id: sid })));
+      cleanupGuard(sid, 'compact');
+      writeRouting(scratch, ['.superpowers']);
+      const sid2 = `t-routing-compact-2-${Date.now()}`;
+      const withRouting = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'compact', session_id: sid2 })));
+      cleanupGuard(sid2, 'compact');
+      expect(Buffer.byteLength(withRouting)).toBe(Buffer.byteLength(withoutRouting));
     });
   });
 });

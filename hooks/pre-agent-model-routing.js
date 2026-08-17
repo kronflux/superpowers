@@ -47,8 +47,56 @@ import { fileURLToPath } from 'url';
 import { loadRouting, fenceMeta, routingSource } from './lib/routing-config.js';
 import { configDir } from './lib/config-dir.js';
 import { dedupeReason } from './lib/rejection-dedup.js';
+import { spTmp } from './lib/sp-tmp.js';
 
 const LOG_DIR = path.join(configDir(process.env), 'hooks-logs');
+
+/**
+ * The tier mapping and escalation rules, delivered at the first Agent
+ * dispatch of the session: the earliest point they are relevant. A session
+ * that never dispatches a subagent never receives this text.
+ */
+function routingDispatchNotice(routing, sourcePath) {
+  return [
+    '<model-routing-active>',
+    `This project has opted in to subagent model routing (${sourcePath}).`,
+    `Tier mapping: mechanical=${routing.mechanical}, standard=${routing.standard}, `
+      + `advanced=${routing.advanced}, frontier=${routing.frontier}`,
+    '',
+    'Plan tasks carry "modelTier" in their json:metadata fence:',
+    '- "mechanical": 1-2 files, complete spec with code in the steps, no design judgment.',
+    '- "standard": multi-file coordination, integration, pattern matching, debugging. Reviewers always dispatch at standard.',
+    '- "advanced": design judgment, architecture decisions, broad codebase understanding. Default ceiling.',
+    '- "frontier": gated, 2x cost, needs per-task user approval. Only for long-horizon autonomous runs, first-shot large builds, genuine ambiguity, whole-repo history debugging, wide agent fan-out, or dense visual input. Never for security analysis. If advanced has handled the class before, it is not frontier.',
+    'Tie-break: spec completeness wins - complete code in steps means mechanical. Escalation goes up only and STOPS at advanced (mechanical -> standard -> advanced); frontier requires the approval flow, never escalation. "inherit" means no constraint, "off" means the tier is unreachable. Full rules: docs/model-routing-flow.md. Kill switch: SUPERPOWERS_ROUTING_GUARD=0.',
+    '</model-routing-active>',
+  ].join('\n');
+}
+
+/**
+ * Claims the one-time-per-session right to emit the dispatch notice. Returns
+ * true on the session's first call (marker created), false on every later
+ * call (marker already exists) or when the marker cannot be written - either
+ * way, later calls stay silent rather than repeating the block.
+ */
+function claimDispatchNotice(sessionId) {
+  try {
+    fs.writeFileSync(spTmp(`routing-notice-${sessionId || 'default'}`), '1', { flag: 'wx' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Merges `notice` into a hook response's additionalContext, leaving any existing decision fields intact. */
+function withNotice(payload, notice) {
+  if (!notice) return payload;
+  const out = { ...(payload || {}) };
+  const hso = { hookEventName: 'PreToolUse', ...(out.hookSpecificOutput || {}) };
+  hso.additionalContext = hso.additionalContext ? `${hso.additionalContext}\n\n${notice}` : notice;
+  out.hookSpecificOutput = hso;
+  return out;
+}
 
 function log(data) {
   try {
@@ -314,6 +362,11 @@ async function main() {
   let input = '';
   for await (const chunk of process.stdin) input += chunk;
 
+  // Claimed (if at all) inside the try block below; read here too so a
+  // failure after claiming still delivers the notice instead of losing the
+  // one-time claim silently.
+  let notice = null;
+
   try {
     const data = JSON.parse(input);
     const { tool_name, tool_input, cwd, transcript_path, session_id } = data;
@@ -323,21 +376,29 @@ async function main() {
       return;
     }
 
+    const routing = loadRouting(cwd);
+    // Every Agent dispatch counts as "the first dispatch" for notice purposes,
+    // independent of tier exemption or the gate's own allow/deny decision -
+    // the notice is orientation for dispatching subagents generally.
+    if (routing && claimDispatchNotice(session_id)) {
+      notice = routingDispatchNotice(routing, routingSource() || '.superpowers/model-routing.json');
+    }
+    const emit = (payload) => process.stdout.write(JSON.stringify(withNotice(payload, notice)));
+
     // Custom agent types are exempt; only implementer/reviewer-grade dispatches are routed.
     const agentType = tool_input?.subagent_type;
     if (typeof agentType === 'string' && agentType && agentType !== 'general-purpose') {
-      process.stdout.write('{}');
+      emit({});
       return;
     }
 
-    const routing = loadRouting(cwd);
     if (!routing) {
-      process.stdout.write('{}');
+      emit({});
       return;
     }
 
     if (typeof transcript_path !== 'string' || !transcript_path || !fs.existsSync(transcript_path)) {
-      process.stdout.write('{}');
+      emit({});
       return;
     }
 
@@ -361,7 +422,7 @@ async function main() {
       // frontierConsentBlock leaves allowed null; the tier-mismatch path always
       // sets it to a non-empty array, so the two denial reasons key separately.
       const ruleId = result.allowed === null ? 'frontier-consent' : 'tier-mismatch';
-      process.stdout.write(JSON.stringify({
+      emit({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
@@ -373,14 +434,14 @@ async function main() {
             subject: tool_input?.description || '(no description)',
           }),
         },
-      }));
+      });
       return;
     }
 
-    process.stdout.write('{}');
+    emit({});
   } catch (e) {
     log({ level: 'ERROR', error: e.message });
-    process.stdout.write('{}');
+    process.stdout.write(JSON.stringify(withNotice({}, notice)));
   }
 }
 

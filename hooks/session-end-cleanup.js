@@ -26,6 +26,7 @@ const EPHEMERAL = [
   (id) => `ctx-${id}.json`,
   (id) => `compress-${id}.json`,
   (id) => `askallow-${id}`,
+  (id) => `routing-notice-${id}`,
 ];
 
 function removeForSession(sessionId) {
