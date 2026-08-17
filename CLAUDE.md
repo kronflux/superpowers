@@ -144,9 +144,12 @@ Run these in order. Every step, every time.
 3. Turn the `## Unreleased — …` heading(s) in `RELEASE-NOTES.md` into one `## <version> — <title>`
    section. Bullets state the behaviour change and its measured justification, not the tasks done.
 4. Commit `chore: release <version> — <title>` staging the 7 manifests and `RELEASE-NOTES.md`.
-5. `git tag -a v<version> -m "<version> — <title>"`.
+5. `git tag -a v<version> -m "<version> — <title>"` — **annotated, created locally, always.**
+   `git log --oneline --decorate` then shows every release in local history, which is the point.
 6. `git push origin main && git push origin v<version>`.
-7. **Create the release:**
+7. **Create the release against the tag that already exists.** `gh release create` will create a
+   tag if none is present, but that tag lands only on the remote and local history stays unmarked.
+   Steps 5 and 6 must have run first; never let `gh` be the thing that makes the tag.
    ```bash
    awk '/^## <version> /{f=1;next} /^## /{f=0} f' RELEASE-NOTES.md > /tmp/notes.md
    gh release create v<version> --repo kronflux/superpowers \
