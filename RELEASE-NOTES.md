@@ -1,5 +1,72 @@
 # Superpowers Release Notes
 
+## Unreleased — skill semantics, routing, and two safety-gate holes
+
+### Safety gate
+
+- **A destructive command whose target is quoted is now blocked.** `rm -rf "/"` passed the gate.
+  `rm-home` and `rm-home-var` carried `["']?` around their operand and correctly caught the quoted
+  form; `rm-root`, `rm-system`, `rm-cwd`, `dd-disk`, `mkfs`, `cat-env` and `git-checkout-dot` did
+  not, so a single quote character defeated them. All seven now tolerate quotes. Ordinary cleanup
+  is unaffected: `rm -rf ./build`, `rm -rf node_modules`, `rm -f /tmp/scratch.txt` and
+  `rm -rf "$PWD/dist"` stay unblocked, because a gate that refuses routine work gets switched off.
+- **A dangerous command mentioned inside a heredoc body no longer blocks.** Writing a test fixture
+  or a commit message containing `git reset --hard` was refused outright. Heredoc bodies are
+  stripped before matching, since a heredoc body is stdin data and can never be argv. Quoted
+  arguments are deliberately *not* stripped — several patterns match quoted paths on purpose — and
+  the command is deliberately not segmented, because `curl-pipe-sh` requires crossing a pipe to
+  match. Both non-transforms carry regression guards.
+
+### Skill semantics
+
+- **Skills declare what they assume, and a repository declares which assumptions hold.** An
+  optional `preconditions:` frontmatter list drawn from a closed vocabulary —
+  `artifact-cheap-to-modify`, `execution-safe`, `failure-is-cheap` — with
+  `.superpowers/domain-profile.json` declaring which hold. An absent or malformed profile means all
+  hold, so nothing changes for an existing repository. `test-driven-development` and
+  `systematic-debugging` declare `execution-safe` and `failure-is-cheap`, because both silently
+  assume a codebase where running the artefact is safe and a failure costs little.
+  **Routing states the conflict; it never suppresses the skill** — a repository where running tests
+  risks hardware still needs TDD to say so for a genuine bug, and making it unroutable would trade
+  a silent wrong assumption for a silent missing skill.
+- **Plan step content is conditional on the task's `modelTier`.** `mechanical` keeps the
+  complete-code requirement; `standard`, `advanced` and `frontier` require requirements, interfaces
+  with exact signatures, and verification obligations, with implementation excluded — writing
+  implementation for a design task produced sketches that implementers followed blindly. TBD/TODO,
+  vague error handling and undefined-symbol references remain failures at every tier.
+- **The complexity tier is re-assessable mid-task.** It was decided once, before work started, from
+  the task's description. Four observable conditions now trigger re-assessment: scope past two
+  files, a new gate or trigger, a user-visible change, a migration. **Escalation is a decision
+  point, not a re-route** — the agent stops, names the condition that failed, and asks whether to
+  continue with added gates or re-plan. Routing a finished task back to brainstorming is not the
+  behaviour.
+
+### Dispatch
+
+- **Assumptions and Carried constraints are required brief sections**, with an explicit `None`
+  permitted. Both were improvised during a long execution run and proved load-bearing — an
+  assumptions section caught six false assumptions, and carried constraints prevented later tasks
+  silently violating what earlier ones established. Optional sections get skipped precisely when
+  they matter, so an explicit `None` forces the author to answer rather than forget.
+- **An implementer writes its report to a file as its final action** and returns only a short
+  status; the orchestrator reads the file rather than re-prompting. Implementers finished, committed
+  and went idle without reporting roughly thirteen times, each costing a round trip to reconstruct
+  from git log and diffs. A returned message is compressed by the harness; a file is not.
+
+### Version safety
+
+- **Gate hooks are registered through a version-stable launcher.** `/onboard` wrote absolute paths
+  into the versioned plugin cache, so the next bump silently stopped them running — and a gate
+  mechanism that stops running looks exactly like one with nothing to report. The launcher resolves
+  at runtime: the `installed_plugins.json` registry, then a version-sorted scan, then its own
+  directory. An existing pinned entry is migrated in place.
+- **A superseded plugin load is announced.** One machine held four cached versions while the
+  registry named one. Loading an old version gave no indication, and the symptom — a fix not
+  appearing — is indistinguishable from the fix not working. **Pruning is offered, never performed;**
+  no directory is deleted.
+- Version ordering throughout is semantic, not lexical. With 7.4.0, 7.9.0, 7.15.0 and 7.16.0 on
+  disk, collation order selects 7.15.0 and keeps selecting it after an upgrade.
+
 ## 7.16.0 — hook precision, payload economics, and the output style
 
 ### Output style and config surface
