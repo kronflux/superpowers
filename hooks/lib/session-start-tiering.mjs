@@ -33,14 +33,17 @@ function main() {
   }
 
   const tier = source === 'compact' ? 'core' : 'full';
-  const guardPath = guardPathFor(sessionId, source);
 
-  // /clear wipes the conversation, so this invocation's own guard slot must
-  // never carry a stale entry into the freshness check below — deleting it
-  // first makes that true regardless of when it was written.
+  // A clear wipes the conversation: a second clear inside the window means
+  // the first's injection is already gone, so suppressing the second would
+  // leave the session with no payload at all. No guard is consulted or
+  // written for this source — clear always emits.
   if (source === 'clear') {
-    try { fs.unlinkSync(guardPath); } catch { /* no prior guard */ }
+    process.stdout.write(tier);
+    return;
   }
+
+  const guardPath = guardPathFor(sessionId, source);
 
   try {
     const stat = fs.statSync(guardPath);

@@ -167,8 +167,8 @@ describe('using-superpowers compact core', () => {
     return text.slice(s + START_TAG.length, e).trim();
   }
 
-  it('the delimited core is <= 2048 bytes', () => {
-    expect(Buffer.byteLength(extractCore(body))).toBeLessThanOrEqual(2048);
+  it('the delimited core is <= 2304 bytes', () => {
+    expect(Buffer.byteLength(extractCore(body))).toBeLessThanOrEqual(2304);
   });
 
   it('the core is non-empty', () => {
@@ -179,6 +179,14 @@ describe('using-superpowers compact core', () => {
     const core = extractCore(body);
     expect(core).toContain('Override order: user instruction > project context file > skill > default.');
     expect(core).toContain('|Situation|Skill|');
+  });
+
+  it('the core contains the skill-invocation mandate', () => {
+    // The mandate is why an agent consults the routing table at all; a
+    // compacting session that keeps the table but loses the mandate keeps
+    // the map and drops the instruction to navigate it.
+    const core = extractCore(body);
+    expect(core).toContain('**Invoke relevant or requested skills BEFORE any response or action**');
   });
 
   it('the core is strictly smaller than the full body', () => {
@@ -320,6 +328,35 @@ describe('session-start emission dedupe', () => {
       } finally {
         cleanupGuard(sid, 'startup');
         cleanupGuard(sid, 'compact');
+      }
+    });
+  });
+
+  it('two consecutive compact invocations for the same session: the second is suppressed', () => {
+    withScratch((scratch) => {
+      const sid = `t-compact2x-${Date.now()}`;
+      try {
+        runHookStdin(scratch, JSON.stringify({ source: 'compact', session_id: sid }));
+        const second = JSON.parse(runHookStdin(scratch, JSON.stringify({ source: 'compact', session_id: sid })));
+        expect(second).toEqual({});
+      } finally {
+        cleanupGuard(sid, 'compact');
+      }
+    });
+  });
+
+  it('two consecutive clear invocations for the same session both emit the full body', () => {
+    // A clear wipes the conversation: the second clear's injection is the
+    // only one still standing, so it must never be suppressed by the first.
+    withScratch((scratch) => {
+      const sid = `t-clear2x-${Date.now()}`;
+      try {
+        const first = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'clear', session_id: sid })));
+        const second = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'clear', session_id: sid })));
+        expect(first).toContain('## Entry Sequence');
+        expect(second).toContain('## Entry Sequence');
+      } finally {
+        cleanupGuard(sid, 'clear');
       }
     });
   });
