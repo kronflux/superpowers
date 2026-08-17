@@ -11,7 +11,7 @@ Installs the conductor statusline (`hooks/lib/statusline-*.js`, `scripts/statusl
 
 ## 1. Read existing config first — never start blank
 
-Read `<cwd>/.superpowers/statusline.json`, the file `loadConfig()` in `hooks/lib/statusline-config.js` reads. If it parses, show its `mode`, `segments`, and `separator` and use them as the defaults below, framed as "amend this?" rather than a fresh start. If absent or unreadable, use the schema defaults: `mode: "widget"`, all four segment ids, `separator: " · "`.
+Call `loadConfig(cwd)` from `hooks/lib/statusline-config.js`. It reads `<cwd>/.superpowers/statusline.json` first, falls back to `<configDir()>/superpowers/statusline.json`, and returns the resolved config plus `path` — the absolute path it read, or `null` when neither existed and defaults were used. If `path` is non-null, show the config's `mode`, `segments`, and `separator` and use them as the defaults below, framed as "amend this?" rather than a fresh start, and name which path they came from — a project config and a global one are different scopes. If `path` is `null`, use the schema defaults: `mode: "widget"`, all four segment ids, `separator: " · "`.
 
 ## 2. The interview
 
@@ -77,10 +77,11 @@ Call `installLauncher(configRoot, sourcePath)` from `hooks/lib/statusline-instal
 
 ## 5. Patch settings.json
 
-Call `patchSettings(cwd, command)` with `command` = `node "<launcher path>"`, appending ` --full` when mode is full. It reports `{changed: true|false}`, or `{changed: false, state: 'unparseable'}`.
+Call `patchSettings(cwd, 'statusLine', { type: 'command', command })` with `command` = `node "<launcher path>"`, appending ` --full` when mode is full. `cwd` is the project root, not a `.claude` directory itself — passing one already named `.claude` gets refused rather than nested. It returns `{ changed, path, state }`, `path` always the absolute settings file involved.
 
-- **`changed: true`**, or **`changed: false`** with no `state` — proceed to step 6. `changed: false` means an identical block was already present, not a failure; say so rather than reporting an error.
-- **`state: 'unparseable'`** — `<cwd>/.claude/settings.json` exists but is not valid JSON, so `patchSettings` refused rather than replacing it with a fresh object containing only `statusLine`, which would discard the user's permissions, hooks, and model on a single typo. **Stop here.** Do NOT retry, do NOT repair the file yourself, and do NOT continue to steps 6 or 7 as though the install succeeded — a statusline pointing at settings that were never patched is worse than a clean refusal. Name the exact path (`<cwd>/.claude/settings.json`), say it has a syntax error the user must fix first, and end the interview.
+- **`changed: true`**, or **`changed: false`** with no `state` — proceed to step 6. `changed: false` means an identical value was already present, not a failure; say so rather than reporting an error.
+- **`state: 'unparseable'`** — the `settings.json` at the returned `path` exists but is not valid JSON, so `patchSettings` refused rather than replacing it with a fresh object containing only `statusLine`, which would discard the user's permissions, hooks, and model on a single typo. **Stop here.** Do NOT retry, do NOT repair the file yourself, and do NOT continue to steps 6 or 7 as though the install succeeded — a statusline pointing at settings that were never patched is worse than a clean refusal. Name the exact path, say it has a syntax error the user must fix first, and end the interview.
+- **`state: 'nested-claude-dir'`** — `cwd` already ends in `.claude`; nothing was written. Stop and correct the path rather than nesting a `.claude/.claude/`.
 
 ## 6. gitignore — report the state hit, never assume
 

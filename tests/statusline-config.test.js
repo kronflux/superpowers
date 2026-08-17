@@ -16,14 +16,14 @@ function write(obj) {
 
 describe('statusline-config', () => {
   it('returns defaults when the file is absent', () => {
-    expect(loadConfig(cwd)).toEqual(DEFAULT_CONFIG);
+    expect(loadConfig(cwd)).toEqual({ ...DEFAULT_CONFIG, path: null });
   });
 
   it('returns defaults on malformed JSON rather than throwing', () => {
     write('{not json');
     let cfg;
     expect(() => { cfg = loadConfig(cwd); }).not.toThrow();
-    expect(cfg).toEqual(DEFAULT_CONFIG);
+    expect(cfg).toEqual({ ...DEFAULT_CONFIG, path: null });
   });
 
   it('drops unknown segment ids and preserves file order', () => {

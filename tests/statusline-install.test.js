@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 import { installLauncher, patchSettings, ensureGitignored } from '../hooks/lib/statusline-install.js';
+import { loadConfig } from '../hooks/lib/statusline-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LAUNCHER_SRC = path.join(__dirname, '..', 'scripts', 'statusline-launcher.mjs');
@@ -55,10 +56,13 @@ describe('launcher version resolution', () => {
 });
 
 describe('patchSettings', () => {
-  it('creates the file and adds the block', () => {
+  it('creates the file, adds the key, and returns the path it wrote', () => {
     const cwd = path.join(root, 'p1'); fs.mkdirSync(cwd, { recursive: true });
-    expect(patchSettings(cwd, 'node /x/launcher.mjs').changed).toBe(true);
-    const j = JSON.parse(fs.readFileSync(path.join(cwd, '.claude', 'settings.json'), 'utf8'));
+    const file = path.join(cwd, '.claude', 'settings.json');
+    const result = patchSettings(cwd, 'statusLine', { type: 'command', command: 'node /x/launcher.mjs' });
+    expect(result.changed).toBe(true);
+    expect(result.path).toBe(file);
+    const j = JSON.parse(fs.readFileSync(file, 'utf8'));
     expect(j.statusLine.type).toBe('command');
     expect(j.statusLine.command).toBe('node /x/launcher.mjs');
   });
@@ -68,29 +72,34 @@ describe('patchSettings', () => {
     fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
     fs.writeFileSync(path.join(cwd, '.claude', 'settings.json'),
       JSON.stringify({ permissions: { allow: ['Bash'] } }));
-    patchSettings(cwd, 'node /x/launcher.mjs');
+    patchSettings(cwd, 'statusLine', { type: 'command', command: 'node /x/launcher.mjs' });
     const j = JSON.parse(fs.readFileSync(path.join(cwd, '.claude', 'settings.json'), 'utf8'));
     expect(j.permissions.allow).toEqual(['Bash']);
     expect(j.statusLine).toBeTruthy();
   });
 
-  it('is idempotent', () => {
+  it('is idempotent and reports the path on the unchanged branch too', () => {
     const cwd = path.join(root, 'p3'); fs.mkdirSync(cwd, { recursive: true });
-    expect(patchSettings(cwd, 'node /x/launcher.mjs').changed).toBe(true);
-    expect(patchSettings(cwd, 'node /x/launcher.mjs').changed).toBe(false);
+    const file = path.join(cwd, '.claude', 'settings.json');
+    const first = patchSettings(cwd, 'statusLine', { type: 'command', command: 'node /x/launcher.mjs' });
+    expect(first.changed).toBe(true);
+    expect(first.path).toBe(file);
+    const second = patchSettings(cwd, 'statusLine', { type: 'command', command: 'node /x/launcher.mjs' });
+    expect(second.changed).toBe(false);
+    expect(second.path).toBe(file);
   });
 
-  it('reports "unparseable" and leaves a malformed settings file byte-for-byte untouched', () => {
+  it('reports "unparseable" with the refused path and leaves a malformed settings file byte-for-byte untouched', () => {
     // Real settings files carry permissions, hooks, model, API keys. A single
     // typo (trailing comma below) must never be treated as "no file" and
-    // silently replaced with a fresh {statusLine: ...} object.
+    // silently replaced with a fresh object.
     const cwd = path.join(root, 'p4');
     fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
     const file = path.join(cwd, '.claude', 'settings.json');
     const before = '{\n  "permissions": {"allow": ["Bash"]},\n  "model": "opus",\n  "hooks": {},\n}\n';
     fs.writeFileSync(file, before);
-    const result = patchSettings(cwd, 'node /x/launcher.mjs');
-    expect(result).toEqual({ changed: false, state: 'unparseable' });
+    const result = patchSettings(cwd, 'statusLine', { type: 'command', command: 'node /x/launcher.mjs' });
+    expect(result).toEqual({ changed: false, path: file, state: 'unparseable' });
     expect(fs.readFileSync(file, 'utf8')).toBe(before);
   });
 
@@ -105,11 +114,29 @@ describe('patchSettings', () => {
       const file = path.join(cwd, '.claude', 'settings.json');
       fs.writeFileSync(file, body);
       let result;
-      expect(() => { result = patchSettings(cwd, 'node /x/launcher.mjs'); },
+      expect(() => { result = patchSettings(cwd, 'statusLine', { type: 'command', command: 'node /x/launcher.mjs' }); },
         `body ${body} must not throw`).not.toThrow();
-      expect(result, `body ${body}`).toEqual({ changed: false, state: 'unparseable' });
+      expect(result, `body ${body}`).toEqual({ changed: false, path: file, state: 'unparseable' });
       expect(fs.readFileSync(file, 'utf8'), `body ${body} must be untouched`).toBe(body);
     }
+  });
+
+  it('refuses a projectDir whose basename is already .claude, writing nothing and nesting nothing', () => {
+    const cwd = path.join(root, 'p6', '.claude'); fs.mkdirSync(cwd, { recursive: true });
+    const result = patchSettings(cwd, 'statusLine', { type: 'command', command: 'node /x/launcher.mjs' });
+    expect(result.changed).toBe(false);
+    expect(result.state).toBe('nested-claude-dir');
+    expect(result.path).toBe(path.resolve(cwd));
+    expect(fs.existsSync(path.join(cwd, '.claude'))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, 'settings.json'))).toBe(false);
+  });
+
+  it('patches an arbitrary top-level key, not only statusLine, and it reads back', () => {
+    const cwd = path.join(root, 'p7'); fs.mkdirSync(cwd, { recursive: true });
+    const result = patchSettings(cwd, 'outputStyle', 'Signal');
+    expect(result.changed).toBe(true);
+    const j = JSON.parse(fs.readFileSync(result.path, 'utf8'));
+    expect(j.outputStyle).toBe('Signal');
   });
 });
 
@@ -162,5 +189,56 @@ describe('ensureGitignored', () => {
     fs.mkdirSync(path.join(cwd, '.git'), { recursive: true });
     expect(ensureGitignored(cwd).state).toBe('unknown');
     expect(fs.existsSync(path.join(cwd, '.gitignore'))).toBe(false);
+  });
+});
+
+describe('loadConfig fallback to the config dir', () => {
+  const originalConfigDir = process.env.CLAUDE_CONFIG_DIR;
+  let cwd, cfgDir;
+
+  beforeEach(() => {
+    cwd = path.join(root, 'lc-cwd'); fs.mkdirSync(cwd, { recursive: true });
+    cfgDir = path.join(root, 'lc-cfg'); fs.mkdirSync(cfgDir, { recursive: true });
+    process.env.CLAUDE_CONFIG_DIR = cfgDir;
+  });
+  afterEach(() => {
+    if (originalConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = originalConfigDir;
+  });
+
+  function writeProjectConfig(obj) {
+    fs.mkdirSync(path.join(cwd, '.superpowers'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, '.superpowers', 'statusline.json'), JSON.stringify(obj));
+  }
+  function writeConfigDirConfig(obj) {
+    fs.mkdirSync(path.join(cfgDir, 'superpowers'), { recursive: true });
+    fs.writeFileSync(path.join(cfgDir, 'superpowers', 'statusline.json'), JSON.stringify(obj));
+  }
+
+  it('prefers the project path when both exist', () => {
+    writeProjectConfig({ separator: '|' });
+    writeConfigDirConfig({ separator: '#' });
+    const cfg = loadConfig(cwd);
+    expect(cfg.separator).toBe('|');
+    expect(cfg.path).toBe(path.join(cwd, '.superpowers', 'statusline.json'));
+  });
+
+  it('falls back to the config dir when the project path is absent', () => {
+    writeConfigDirConfig({ separator: '#' });
+    const cfg = loadConfig(cwd);
+    expect(cfg.separator).toBe('#');
+    expect(cfg.path).toBe(path.join(cfgDir, 'superpowers', 'statusline.json'));
+  });
+
+  it('reports which path it used', () => {
+    writeProjectConfig({ separator: '|' });
+    expect(loadConfig(cwd).path).toBe(path.join(cwd, '.superpowers', 'statusline.json'));
+
+    fs.rmSync(path.join(cwd, '.superpowers', 'statusline.json'));
+    writeConfigDirConfig({ separator: '#' });
+    expect(loadConfig(cwd).path).toBe(path.join(cfgDir, 'superpowers', 'statusline.json'));
+
+    fs.rmSync(path.join(cfgDir, 'superpowers', 'statusline.json'));
+    expect(loadConfig(cwd).path).toBeNull();
   });
 });

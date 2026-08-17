@@ -15,26 +15,35 @@ function installLauncher(configRoot, sourcePath) {
 }
 
 /**
- * Add or update the statusLine block in <cwd>/.claude/settings.json.
+ * Add or update a top-level key in <projectDir>/.claude/settings.json.
+ *
+ * projectDir is the project root, not an arbitrary cwd: a projectDir whose
+ * basename is already '.claude' is refused with state 'nested-claude-dir'
+ * rather than joined into a '.claude/.claude/settings.json' the harness never
+ * reads. Every branch returns the absolute path involved, present or refused,
+ * so a caller never has to guess what was written.
  *
  * A present-but-unparseable file is left untouched and reported as
  * 'unparseable' rather than treated like an absent one. Overwriting it with a
- * freshly built {statusLine: ...} object would silently discard the user's
- * entire settings file (permissions, hooks, model, everything) on a single
- * JSON typo — one comma away from valid — while reporting changed: true as a
- * clean success. Refusing to act is correct when the existing content can't
- * be read: the caller can then tell the user their settings file has a
- * syntax error to fix first.
+ * freshly built object would silently discard the user's entire settings
+ * file (permissions, hooks, model, everything) on a single JSON typo — one
+ * comma away from valid — while reporting changed: true as a clean success.
+ * Refusing to act is correct when the existing content can't be read: the
+ * caller can then tell the user their settings file has a syntax error to
+ * fix first.
  */
-function patchSettings(cwd, command) {
-  const dir = path.join(cwd, '.claude');
+function patchSettings(projectDir, key, value) {
+  if (path.basename(projectDir) === '.claude') {
+    return { changed: false, path: path.resolve(projectDir), state: 'nested-claude-dir' };
+  }
+  const dir = path.join(projectDir, '.claude');
   const file = path.join(dir, 'settings.json');
   let raw = null;
   try { raw = fs.readFileSync(file, 'utf8'); } catch { raw = null; }
   let json = {};
   if (raw !== null) {
     let parsed;
-    try { parsed = JSON.parse(raw); } catch { return { changed: false, state: 'unparseable' }; }
+    try { parsed = JSON.parse(raw); } catch { return { changed: false, path: file, state: 'unparseable' }; }
     // JSON.parse succeeds on arrays, null, strings, numbers and booleans, so a
     // catch-only guard lets them through to the assignment below. `"str"` then
     // throws an uncaught TypeError, and `[]` accepts the property but
@@ -42,15 +51,15 @@ function patchSettings(cwd, command) {
     // landed. A settings file that is valid JSON but not an object is no more
     // safely overwritable than a malformed one: refuse both the same way.
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { changed: false, state: 'unparseable' };
+      return { changed: false, path: file, state: 'unparseable' };
     }
     json = parsed;
   }
-  if (json.statusLine && json.statusLine.command === command) return { changed: false };
-  json.statusLine = { type: 'command', command };
+  if (JSON.stringify(json[key]) === JSON.stringify(value)) return { changed: false, path: file };
+  json[key] = value;
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, JSON.stringify(json, null, 2) + '\n');
-  return { changed: true };
+  return { changed: true, path: file };
 }
 
 /**

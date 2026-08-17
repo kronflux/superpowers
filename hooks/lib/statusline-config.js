@@ -5,6 +5,7 @@
 // serves every project, so a rendering bug is fixed once instead of once per repo.
 import fs from 'fs';
 import path from 'path';
+import { configDir } from './config-dir.js';
 
 const SEGMENT_IDS = ['capabilities', 'delegation', 'plan', 'usage'];
 
@@ -14,14 +15,7 @@ const DEFAULT_CONFIG = Object.freeze({
   mode: 'widget',
 });
 
-/** Project statusline config, or defaults. Never throws. */
-function loadConfig(cwd) {
-  let raw;
-  try {
-    raw = JSON.parse(fs.readFileSync(path.join(cwd, '.superpowers', 'statusline.json'), 'utf8'));
-  } catch {
-    return { ...DEFAULT_CONFIG };
-  }
+function parseConfig(raw) {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_CONFIG };
 
   // An explicitly empty array is a real choice — every segment off — so it must
@@ -34,6 +28,29 @@ function loadConfig(cwd) {
   const mode = raw.mode === 'full' ? 'full' : DEFAULT_CONFIG.mode;
 
   return { segments, separator, mode };
+}
+
+/**
+ * Project statusline config, falling back to the user config dir when the
+ * project has none, and defaults when neither exists. Never throws. Returns
+ * the resolved config plus the absolute path it was read from, or null when
+ * neither candidate parsed and defaults were used.
+ */
+function loadConfig(cwd) {
+  const projectPath = path.join(cwd, '.superpowers', 'statusline.json');
+  const configDirPath = path.join(configDir(), 'superpowers', 'statusline.json');
+
+  for (const candidate of [projectPath, configDirPath]) {
+    let raw;
+    try {
+      raw = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+    } catch {
+      continue;
+    }
+    return { ...parseConfig(raw), path: candidate };
+  }
+
+  return { ...DEFAULT_CONFIG, path: null };
 }
 
 export { loadConfig, DEFAULT_CONFIG, SEGMENT_IDS };
