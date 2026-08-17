@@ -120,6 +120,20 @@ if [ -n "$conductor_line" ]; then
     session_context="${session_context}\n\n${conductor_escaped}"
 fi
 
+# Best-effort interrupted-plan probe: invokes a Node subprocess (this hook is bash and
+# cannot import ESM directly) that scans .superpowers/plans/*.tasks.json for a plan with
+# open tasks and prints one line naming it. No qualifying plan, or the probe failing for
+# any reason, must never break session start.
+plan_restore_line=""
+if command -v node >/dev/null 2>&1; then
+    plan_restore_line=$(node "${PLUGIN_ROOT}/hooks/lib/session-start-plan-restore.mjs" 2>/dev/null || true)
+fi
+
+if [ -n "$plan_restore_line" ]; then
+    plan_restore_escaped=$(escape_for_json "$plan_restore_line")
+    session_context="${session_context}\n\n${plan_restore_escaped}"
+fi
+
 # Output context injection as JSON.
 # Cursor hooks expect additional_context (snake_case).
 # Claude Code hooks expect hookSpecificOutput.additionalContext (nested).

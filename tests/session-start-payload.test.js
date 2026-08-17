@@ -95,6 +95,12 @@ function writeRouting(scratch, relDir) {
   fs.writeFileSync(path.join(dir, 'model-routing.json'), ROUTING_JSON);
 }
 
+function writePlanTasks(scratch, fileName, tasksJson) {
+  const dir = path.join(scratch, '.superpowers', 'plans');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, fileName), JSON.stringify(tasksJson));
+}
+
 describe('session-start context economy', () => {
   it('assembled payload <= 5232 bytes', () => {
     const scratch = fs.mkdtempSync(path.join(spTmpDir(), 'sp-payload-'));
@@ -222,6 +228,68 @@ describe('session-start routing candidate chain', () => {
       expect(ctx).toContain('.superpowers/model-routing.json');
       expect(ctx).not.toContain('docs/superpowers');
       expect(ctx).not.toContain('LEGACY CONFIG PATH');
+    });
+  });
+});
+
+describe('session-start interrupted-plan pointer', () => {
+  it('a plan with open tasks produces a line naming the plan and the open count', () => {
+    withScratch((scratch) => {
+      writePlanTasks(scratch, 'alpha.md.tasks.json', {
+        plan: '.superpowers/plans/alpha.md',
+        tasks: [{ status: 'completed' }, { status: 'pending' }, { status: 'in_progress' }],
+      });
+      const ctx = runHook(scratch);
+      expect(ctx).toContain('[plan] alpha: 2 open');
+    });
+  });
+
+  it('a plan with all tasks completed produces no line', () => {
+    withScratch((scratch) => {
+      writePlanTasks(scratch, 'beta.md.tasks.json', {
+        plan: '.superpowers/plans/beta.md',
+        tasks: [{ status: 'completed' }, { status: 'completed' }],
+      });
+      const ctx = runHook(scratch);
+      expect(ctx).not.toMatch(/\[plan\] \S+: \d+ open/);
+    });
+  });
+
+  it('an absent .superpowers/plans/ directory produces no line and no fault', () => {
+    withScratch((scratch) => {
+      const ctx = runHook(scratch);
+      expect(ctx).not.toMatch(/\[plan\] \S+: \d+ open/);
+    });
+  });
+
+  it('a malformed .tasks.json produces no line and no fault', () => {
+    withScratch((scratch) => {
+      const dir = path.join(scratch, '.superpowers', 'plans');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'gamma.md.tasks.json'), '{not valid json');
+      const ctx = runHook(scratch);
+      expect(ctx).not.toMatch(/\[plan\] \S+: \d+ open/);
+    });
+  });
+
+  // Two plans both carry open tasks: the pointer names one line, so this
+  // resolves to the most recently modified snapshot rather than listing both.
+  it('multiple plans with open tasks: only the most recently modified snapshot is named', () => {
+    withScratch((scratch) => {
+      writePlanTasks(scratch, 'older.md.tasks.json', {
+        plan: '.superpowers/plans/older.md',
+        tasks: [{ status: 'pending' }],
+      });
+      const dir = path.join(scratch, '.superpowers', 'plans');
+      const past = new Date(Date.now() - 60000);
+      fs.utimesSync(path.join(dir, 'older.md.tasks.json'), past, past);
+      writePlanTasks(scratch, 'newer.md.tasks.json', {
+        plan: '.superpowers/plans/newer.md',
+        tasks: [{ status: 'in_progress' }],
+      });
+      const ctx = runHook(scratch);
+      expect(ctx).toContain('[plan] newer: 1 open');
+      expect(ctx).not.toContain('[plan] older');
     });
   });
 });

@@ -43,6 +43,8 @@ Skills: `superpowers:<name>` via Skill tool. Detail: `references/routing-guide.m
 ## Skill Files
 
 Never Read a skill file to "check" it — invoke it via the Skill tool. Exception: `${CLAUDE_PLUGIN_ROOT}/skills/shared/*.md` are reference documents; Read/link them freely.
+
+A `[plan] name: N open` line here names a plan left mid-execution — decide whether to resume it.
 <!-- compact-core:end -->
 
 <SUBAGENT-STOP>
