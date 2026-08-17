@@ -96,6 +96,63 @@ describe('session-start context economy', () => {
   });
 });
 
+describe('using-superpowers compact core', () => {
+  const SKILL_MD = path.join(ROOT, 'skills', 'using-superpowers', 'SKILL.md');
+  const START_TAG = '<!-- compact-core:start -->';
+  const END_TAG = '<!-- compact-core:end -->';
+
+  // Mirrors the frontmatter-stripping awk in hooks/session-start, so this measures
+  // the same body the hook injects.
+  function bodyOf(src) {
+    const lines = src.split(/\r?\n/);
+    const out = [];
+    let inFrontmatter = false;
+    lines.forEach((line, i) => {
+      if (i === 0 && /^---\s*$/.test(line)) { inFrontmatter = true; return; }
+      if (inFrontmatter) { if (/^---\s*$/.test(line)) inFrontmatter = false; return; }
+      out.push(line);
+    });
+    return out.join('\n');
+  }
+
+  const src = fs.readFileSync(SKILL_MD, 'utf8');
+  const body = bodyOf(src);
+
+  it('has exactly one start delimiter and one end delimiter, start before end', () => {
+    // A moved or duplicated delimiter would silently make the core the whole
+    // document or empty while every other assertion here could still pass.
+    const starts = body.match(new RegExp(START_TAG.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || [];
+    const ends = body.match(new RegExp(END_TAG.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || [];
+    expect(starts.length).toBe(1);
+    expect(ends.length).toBe(1);
+    expect(body.indexOf(START_TAG)).toBeLessThan(body.indexOf(END_TAG));
+  });
+
+  function extractCore(text) {
+    const s = text.indexOf(START_TAG);
+    const e = text.indexOf(END_TAG);
+    return text.slice(s + START_TAG.length, e).trim();
+  }
+
+  it('the delimited core is <= 1200 bytes', () => {
+    expect(Buffer.byteLength(extractCore(body))).toBeLessThanOrEqual(1200);
+  });
+
+  it('the core is non-empty', () => {
+    expect(extractCore(body).length).toBeGreaterThan(0);
+  });
+
+  it('the core contains the override-order line and the Routing Guide table header', () => {
+    const core = extractCore(body);
+    expect(core).toContain('Override order: user instruction > project context file > skill > default.');
+    expect(core).toContain('|Situation|Skill|');
+  });
+
+  it('the core is strictly smaller than the full body', () => {
+    expect(Buffer.byteLength(extractCore(body))).toBeLessThan(Buffer.byteLength(body));
+  });
+});
+
 describe('session-start routing candidate chain', () => {
   it('legacy project routing config adds the migration-offer line', () => {
     withScratch((scratch) => {

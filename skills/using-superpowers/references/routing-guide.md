@@ -37,7 +37,7 @@ If the request is non-trivial AND `project-map.md` does not exist AND the projec
 
 ## Complexity Tiers (Entry Sequence pre-step)
 
-- **Micro** — typo fix, single rename, ≤1-line config change, zero behavioral ambiguity. Skip the entry sequence entirely; just do it. Stretching "simple" past this is the rationalization the Red Flags table rejects.
+- **Micro** — typo fix, single rename, ≤1-line config change, zero behavioral ambiguity. Skip the entry sequence entirely; just do it. Stretching "simple" past this is a default classification, not something your own judgment can override — per the override-order line, only a user instruction or project context file outranks the skill.
 - **Lightweight** — ALL FOUR hold, and you state in one sentence each why: scope ~2 files or fewer; no new condition/gate/trigger; no user-visible change; no migration/data-shape change. Skip brainstorming/planning/worktrees/parallel-dispatch; go straight to implementation; the single required gate is `verification-before-completion`; still invoke a dedicated implementation skill if one exists for the task.
 - **Full** — everything else. A **hard override** forces Full immediately regardless of scope: a new condition/gate/trigger, anything the user sees/experiences, an edit to a file other components depend on, or a new path/outcome that didn't exist before. Route: `superpowers:brainstorming` → `superpowers:writing-plans` → dispatch (subagent-driven-development or executing-plans).
 
