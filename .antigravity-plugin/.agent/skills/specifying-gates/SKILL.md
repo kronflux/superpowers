@@ -30,7 +30,7 @@ Load the task with `the task.md task list` and parse the `json:metadata` fence f
 
 ## The four questions
 
-Use `ask_question` — one question at a time per the brainstorming skill's rule.
+Use `ask_question`, one question per call, in order: Q2's answer gates whether the dispatch-brief follow-up is asked, which the batching rule in `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md` allows for a question whose answer changes what gets asked next.
 
 ### Q1 — Observable outcome
 

@@ -2,7 +2,7 @@
 
 Extended guidance moved out of `SKILL.md` to keep it concise, and referenced from its Process section.
 
-`SKILL.md` no longer carries a Key Principles list; it states each principle where the principle applies. Five of the six below appear there in substance — one question at a time, multiple choice preferred, YAGNI, explore alternatives, incremental validation. **"Be flexible" appears only here**, so this section is where that one lives rather than a duplicate of the skill.
+`SKILL.md` no longer carries a Key Principles list; it states each principle where the principle applies. Four of the five below appear there in substance — multiple choice preferred, YAGNI, explore alternatives, incremental validation. Question style (batching vs. asking alone) is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md`, not stated as a principle here. **"Be flexible" appears only here**, so this section is where that one lives rather than a duplicate of the skill.
 
 ## Design Quality
 
@@ -30,7 +30,6 @@ Extended guidance moved out of `SKILL.md` to keep it concise, and referenced fro
 
 ## Key Principles
 
-- **One question at a time** - Don't overwhelm with multiple questions
 - **Multiple choice preferred** - Easier to answer than open-ended when possible
 - **YAGNI ruthlessly** - Remove unnecessary features from all designs
 - **Explore alternatives** - Always propose 2-3 approaches before settling

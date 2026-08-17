@@ -15,7 +15,7 @@ Read `<cwd>/.superpowers/statusline.json`, the file `loadConfig()` in `hooks/lib
 
 ## 2. The interview
 
-Ask in order, options defaulted from step 1 on a re-run:
+Question sequencing follows `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md`. Mode, Segments, and Separator are independent, but `ask_question` takes one question per call — ask the three in order below, options defaulted from step 1 on a re-run:
 
 **Mode:**
 ```yaml
