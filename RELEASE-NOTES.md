@@ -1,5 +1,63 @@
 # Superpowers Release Notes
 
+## 7.18.0 — the output style installs itself, and rules out verbose prose
+
+### Output style
+
+- **The style is placed automatically.** SessionStart writes `output-styles/signal.md` into the
+  active config root when no file of that name is there, so the style Claude Code lists is
+  present without a skill being invoked. Previously the plugin shipped the file and never placed
+  it, which left `outputStyle` selectable only after running the skill by hand. An existing file
+  is never overwritten — once installed, its wording belongs to the operator, and a plugin update
+  that silently replaced it would discard that edit with no record. The copy runs inside the
+  SessionStart tiering subprocess rather than spawning a second Node process, and absorbs its own
+  faults so a failed write cannot alter the payload.
+- **Selecting the style is offered during `/onboard`**, not performed. Setting `outputStyle`
+  rewrites a settings file the operator owns, so it follows the same ask-then-write shape as
+  every other opt-in feature, including the case where a different style is already selected.
+- **Signal rules out verbose prose.** Its rules governed sentence and paragraph texture and
+  banned specific words, but nothing bounded how much reading a given answer cost, and Brevity
+  ranked below a "user intent" clause broad enough to license any expansion. A new Density
+  section defines verbosity as reading effort that buys no information — which a paragraph
+  carrying four bullets' worth of content incurs at any length — and requires each point be
+  stated once, supporting detail be offered rather than delivered, and an answer be sized to the
+  question asked.
+- **Structure replaces prose wherever an answer has parts.** Headers and bullets carry findings,
+  conditions, options and mappings, one idea each; **bold** marks the scan anchor so the bold
+  words alone carry the meaning; relationships are shown (`change risk → pre-merge review`)
+  rather than narrated. Prose is reserved for a single continuous argument. The pre-send check
+  converts any multi-point paragraph to bullets and verifies the bold-only read survives.
+- **The explain-fully override requires that the reader asked.** Judging a topic to be important
+  no longer grants it. Priority 3 now reads as answering the question in front of you rather than
+  the subject it belongs to.
+- The output-style skill no longer disclaims an ADHD-summary variant. Those requirements are what
+  the density and decidability rules exist to serve, so the disclaimer contradicted the style it
+  installs.
+
+### CodeGraph adapter
+
+- **The CodeGraph tool is selected by question shape.** `codegraph_impact` answers a blast-radius
+  question transitively in a few hundred bytes and resolves symbols reached only by reference
+  (`.map(fn)`), which grep cannot follow; `codegraph_callers` and `codegraph_callees` answer a
+  call question directly; `codegraph_search` locates a symbol whose name is not yet known.
+  `codegraph_explore` becomes the fallback — it returns tens of kilobytes whether or not the
+  answer is in them, and missed six of ten concept-shaped questions across two repositories
+  against six of six for locate-by-name on the same questions. Its own tool description
+  recommends it over `codegraph_search`, which is where the previous ordering came from.
+- The adapter states that a repository's `codegraph.json` governs scope, and that generated or
+  minified files admitted there carry enough symbols to dominate `codegraph_explore` ranking
+  while leaving `codegraph_search` unaffected.
+
+### Removed
+
+- **`docfork` is gone from the docs-MCP chain, the capability probe, and the statusline.** The
+  fallback tier is generic: any configured docs MCP follows the resolve-then-query shape, so
+  naming one unmaintained provider as the example bought nothing.
+- **The documentation-format conventions name no editor.** Every rule is unchanged and now stated
+  as a property of the markdown itself — what renders on GitHub, what grep and `ctx_search` can
+  see. Guards in `tests/conductor-removals.test.js` cover `docfork` and bare `obsidian` alongside
+  the existing `serena` check.
+
 ## 7.17.0 — skill semantics, routing, hook precision, and harness adaptation
 
 ### Safety gate
