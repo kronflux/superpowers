@@ -218,3 +218,68 @@ describe('commands/output-style.md', () => {
     expect(src).toMatch(/skill/i);
   });
 });
+
+// Task 4: output-contract.md shrinks to the delta once signal.md ships. These
+// assertions target specific rules known to have moved to the style, plus the
+// items the style cannot carry and must remain in the contract.
+
+const CONTRACT_PATH = path.join(ROOT, 'skills', 'shared', 'output-contract.md');
+const CLAUDE_MD_PATH = path.join(ROOT, 'CLAUDE.md');
+const AGENTS_MD_PATH = path.join(ROOT, 'AGENTS.md');
+
+function readContract() {
+  return fs.readFileSync(CONTRACT_PATH, 'utf8');
+}
+
+describe('output-contract.md shrinks to the delta (Task 4)', () => {
+  const MOVED_RULES = [
+    { name: 'forbidden-language hype example ("seamless")', pattern: /seamless/i },
+    { name: 'pre-send check ("announces what follows")', pattern: /announces what follows/i },
+    { name: 'forbidden closer ("hope this helps")', pattern: /hope this helps/i },
+  ];
+
+  it.each(MOVED_RULES)(
+    'moved rule ($name) lives only in signal.md, not in output-contract.md',
+    ({ pattern }) => {
+      expect(readStyle(), 'expected in signal.md').toMatch(pattern);
+      expect(readContract(), 'must not be restated in output-contract.md').not.toMatch(pattern);
+    },
+  );
+
+  it('still states the precedence rule: the style governs prose shape, the contract governs what it cannot reach', () => {
+    const content = readContract();
+    const idx = content.search(/## Precedence/i);
+    expect(idx, 'no Precedence section found').toBeGreaterThan(-1);
+    const nearby = content.slice(idx, idx + 400);
+    expect(nearby).toMatch(/style/i);
+    expect(nearby).toMatch(/govern/i);
+  });
+
+  it('still states the structured-returns carve-out for machine-consumed payloads', () => {
+    const content = readContract();
+    expect(content).toMatch(/structured return/i);
+    expect(content).toMatch(/schema/i);
+    expect(content).toMatch(/controller|subagent/i);
+  });
+
+  it('still states the requirement that dispatch briefs inline shape rules', () => {
+    const content = readContract();
+    const idx = content.search(/## Dispatch briefs/i);
+    expect(idx, 'no Dispatch briefs section found').toBeGreaterThan(-1);
+    const nearby = content.slice(idx, idx + 400);
+    expect(nearby).toMatch(/subagent-driven-development/);
+    expect(nearby).toMatch(/dispatching-parallel-agents/);
+    expect(nearby).toMatch(/inline/i);
+  });
+
+  it('CLAUDE.md points human-reader output shape at the installed style, not solely at output-contract.md', () => {
+    const src = fs.readFileSync(CLAUDE_MD_PATH, 'utf8');
+    expect(src).toMatch(/output-styles\/signal\.md/);
+  });
+
+  it('AGENTS.md mirrors CLAUDE.md byte-for-byte', () => {
+    const claudeMd = fs.readFileSync(CLAUDE_MD_PATH, 'utf8');
+    const agentsMd = fs.readFileSync(AGENTS_MD_PATH, 'utf8');
+    expect(agentsMd).toBe(claudeMd);
+  });
+});

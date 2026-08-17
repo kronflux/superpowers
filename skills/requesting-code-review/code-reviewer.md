@@ -133,7 +133,7 @@ Subagent (general-purpose):
 
 **Reviewer returns:** Assessment (verdict + fix first), Issues (Critical / Important / Minor), Recommendations, Strengths
 
-Ordering follows `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md`: the verdict and the single most important finding lead, because a reader who stops after the first two lines must still know whether this merges and what to fix. Findings are never truncated — every issue is reported, ranked by severity.
+Findings are ranked by severity and never truncated — every issue is reported — per `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md`. The verdict and the single most important finding lead, because a reader who stops after the first two lines must still know whether this merges and what to fix.
 
 ## Example Output
 

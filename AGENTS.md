@@ -117,11 +117,14 @@ manifests by the bump script.
 - **Commit messages** are owned by `skills/shared/git-hygiene.md`, alongside staging and history
   repair — banned classes, examples, and the reason each is banned. Stated there rather than here
   so it reaches every project using the plugin, not only this fork.
-- **Output shape** is owned by `skills/shared/output-contract.md`: the first-line/last-line
-  acceptance test, ranking, the never-invoke-time rule, questions, forbidden language, and the
-  pre-send check. `skills/token-efficiency/` keeps tool and context economics and defers response
-  shape to it — density and decidability are different objectives, and conflating them is what let
-  a compliant response be unusable.
+- **Output shape** for a human reader is owned by the installed output style,
+  `output-styles/signal.md`: the first-line/last-line acceptance test, voice, answer shape,
+  formatting, forbidden language, and the pre-send check. `skills/shared/output-contract.md`
+  holds what a style cannot reach — subagents, whose system prompt is their agent definition,
+  and the six non-Claude-Code harness overlays this fork ships — plus ranking, questions, and
+  the requirement that dispatch briefs inline shape rules. `skills/token-efficiency/` keeps
+  tool and context economics separate from either — density and decidability are different
+  objectives, and conflating them is what let a compliant response be unusable.
 - **Evidence** is owned by `skills/shared/evidence.md`: evidence before claims, reading-versus-
   running, verifying against the surface that actually runs, and the rule that evidence computed in
   a subagent or sandbox must be echoed into the transcript to exist at all.

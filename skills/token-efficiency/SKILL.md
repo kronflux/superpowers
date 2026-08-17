@@ -13,7 +13,7 @@ Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/rou
 
 ## Response Rules
 
-Response shape — ordering, ranking, questions, forbidden language, and the pre-send check — is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md` and is not restated here. That contract exists because density and decidability are different objectives: output can be dense, filler-free, and still impossible for the reader to act on.
+Response shape for a human reader — voice, answer shape, formatting, and forbidden language — is governed by the installed output style (`output-styles/signal.md`) and is not restated here. Ranking, questions, and the dispatch-brief requirement live in `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md`, the delta a style cannot reach (subagents, non-Claude-Code overlays). Density and decidability are different objectives: output can be dense, filler-free, and still impossible for the reader to act on.
 
 The one rule specific to token cost rather than readability: prefer structured output (JSON/YAML) when the result feeds a downstream step rather than a human reader.
 
