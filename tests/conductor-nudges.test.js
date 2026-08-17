@@ -301,9 +301,21 @@ describe('conductor-nudges', () => {
 });
 
 import { lspTip } from '../hooks/conductor-nudges.js';
+import { pluginForPath, extensionOf } from '../hooks/lib/lsp-plugins.js';
 
-describe('lspTip', () => {
-  const tip = lspTip('pyright');
+describe('lspTip: mapped but not installed', () => {
+  // 'app/main.py' resolves through pluginForPath (checked, not assumed) to
+  // pyright-lsp — a real mapping exists in hooks/lib/lsp-plugins.js.
+  const tip = lspTip('app/main.py');
+
+  it('sanity: pluginForPath maps this extension', () => {
+    expect(pluginForPath('app/main.py')).toBe('pyright-lsp');
+  });
+
+  it('states that a server exists and is not installed, not that none exists', () => {
+    expect(tip).toMatch(/exists.*not installed/i);
+    expect(tip).not.toMatch(/no language server (covers|is known)/i);
+  });
 
   it('does not upsell a plugin install', () => {
     expect(tip).not.toMatch(/\/plugin/);
@@ -311,16 +323,45 @@ describe('lspTip', () => {
     expect(tip).not.toMatch(/\binstall\b/i);
   });
 
-  it('still names the decline marker and the plugin', () => {
+  it('names the decline marker and the plugin', () => {
     expect(tip).toContain('.superpowers-no-lsp');
-    expect(tip).toContain('pyright');
+    expect(tip).toContain('pyright-lsp');
   });
 
-  it('still states that diagnostics never replace a verification gate', () => {
+  it('states that diagnostics never replace a verification gate', () => {
     expect(tip).toMatch(/NEVER replace a verification gate/);
   });
 
-  it('still names the source of the rule', () => {
+  it('names the source of the rule', () => {
     expect(tip).toContain('skills/shared/conductor/lsp.md');
+  });
+});
+
+describe('lspTip: no mapping at all', () => {
+  // 'notes.md' resolves through pluginForPath (checked, not assumed) to
+  // null — .md has no entry in hooks/lib/lsp-plugins.js.
+  const tip = lspTip('notes.md');
+
+  it('sanity: pluginForPath has no mapping for this extension', () => {
+    expect(extensionOf('notes.md')).toBe('.md');
+    expect(pluginForPath('notes.md')).toBeNull();
+  });
+
+  it('states that no server is known for this file type', () => {
+    expect(tip).toMatch(/no language server is known/i);
+  });
+
+  it('does not upsell a plugin install', () => {
+    expect(tip).not.toMatch(/\/plugin/);
+    expect(tip).not.toMatch(/marketplace/i);
+    expect(tip).not.toMatch(/\binstall\b/i);
+  });
+
+  it('names the decline marker', () => {
+    expect(tip).toContain('.superpowers-no-lsp');
+  });
+
+  it('states that diagnostics never replace a verification gate', () => {
+    expect(tip).toMatch(/NEVER replace a verification gate/);
   });
 });

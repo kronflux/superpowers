@@ -29,8 +29,17 @@ const TIPS = {
   middleware: 'Conductor: middleware is configured. Digest this failing output externally instead of re-reading it: `node scripts/middleware-exec.mjs --task summarize-test-failure --input-file <f>` (or pipe stdin). Announce the run and its token cost per skills/shared/conductor/routing.md.',
 };
 
-function lspTip(plugin) {
-  return `Conductor: no language server covers this file type, so edits here produce no diagnostics. Verification for these files rests entirely on the gates named in the plan's acceptance criteria. To silence this notice for this project, append "${plugin}" on its own line to \`.superpowers-no-lsp\` in the project root. Diagnostics are a fast first signal only - they NEVER replace a verification gate named in a plan's acceptance criteria (skills/shared/conductor/lsp.md).`;
+// Distinguishes "a server exists for this file type and is not installed"
+// from "no server is known for this file type" by asking pluginForPath
+// rather than assuming the caller already resolved one - the mapped case
+// names the plugin for the decline marker; the unmapped case has none to
+// name, so the marker instruction covers LSP notices generally instead.
+function lspTip(filePath) {
+  const plugin = pluginForPath(filePath);
+  if (plugin) {
+    return `Conductor: a language server exists for this file type (${plugin}) and is not installed, so edits here produce no diagnostics. Verification for these files rests entirely on the gates named in the plan's acceptance criteria. To silence this notice for this project, append "${plugin}" on its own line to \`.superpowers-no-lsp\` in the project root. Diagnostics are a fast first signal only - they NEVER replace a verification gate named in a plan's acceptance criteria (skills/shared/conductor/lsp.md).`;
+  }
+  return `Conductor: no language server is known for this file type, so edits here produce no diagnostics. Verification for these files rests entirely on the gates named in the plan's acceptance criteria. To silence LSP notices for this project, create an empty \`.superpowers-no-lsp\` in the project root. Diagnostics are a fast first signal only - they NEVER replace a verification gate named in a plan's acceptance criteria (skills/shared/conductor/lsp.md).`;
 }
 
 // Failure heuristic for Bash output: generic across vitest/pytest/cargo/tsc.
@@ -144,7 +153,7 @@ async function main() {
       text = TIPS[cls];
     } else if (isPost && tool_name === 'Edit') {
       const plugin = lspOfferFor(state, data.tool_input?.file_path);
-      if (plugin) { cls = 'lsp'; text = lspTip(plugin); }
+      if (plugin) { cls = 'lsp'; text = lspTip(data.tool_input?.file_path); }
     } else if (isPost && tool_name === 'Bash') {
       const out = responseText(data.tool_response);
       if (Buffer.byteLength(out) > MIN_OUTPUT_BYTES && FAIL_RE.test(out)) {
