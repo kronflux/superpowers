@@ -3,7 +3,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spTmpDir } from '../hooks/lib/sp-tmp.js';
+import { spTmp, spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 // Context economy: the SessionStart hook injects the full using-superpowers
 // SKILL.md into EVERY session. That payload is an always-on context cost and
@@ -52,6 +52,39 @@ function runHook(cwd) {
 function withScratch(fn) {
   const scratch = fs.mkdtempSync(path.join(spTmpDir(), 'sp-payload-'));
   try { return fn(scratch); } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+}
+
+// Runs the hook with an explicit stdin payload (or none, when `input` is
+// undefined) and returns the raw stdout string, unparsed — callers decide
+// whether they need the JSON-wrapped context or a bare `{}`.
+function runHookStdin(cwd, input) {
+  const opts = {
+    cwd,
+    env: {
+      ...process.env,
+      CLAUDE_PLUGIN_ROOT: ROOT,
+      HOME: cwd,
+      CLAUDE_CONFIG_DIR: cwd,
+      PATH: SANDBOX_PATH,
+      COPILOT_CLI: '',
+      CURSOR_PLUGIN_ROOT: '',
+    },
+  };
+  if (input !== undefined) opts.input = input;
+  return execSync(`bash "${HOOK}"`, opts).toString();
+}
+
+function ctxOf(raw) {
+  const parsed = JSON.parse(raw);
+  return parsed?.hookSpecificOutput?.additionalContext ?? raw;
+}
+
+function guardPath(sessionId, source) {
+  return spTmp(`session-start-${sessionId}-${source}.guard`);
+}
+
+function cleanupGuard(sessionId, source) {
+  try { fs.rmSync(guardPath(sessionId, source), { force: true }); } catch {}
 }
 
 const ROUTING_JSON = JSON.stringify({ schema: 2, mechanical: 'haiku', standard: 'sonnet', advanced: 'opus', frontier: 'off' });
@@ -181,6 +214,142 @@ describe('session-start routing candidate chain', () => {
       expect(ctx).toContain('.superpowers/model-routing.json');
       expect(ctx).not.toContain('docs/superpowers');
       expect(ctx).not.toContain('LEGACY CONFIG PATH');
+    });
+  });
+});
+
+describe('session-start event tiering', () => {
+  it('source: startup emits the full body', () => {
+    withScratch((scratch) => {
+      const sid = `t-startup-${Date.now()}`;
+      try {
+        const ctx = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'startup', session_id: sid })));
+        expect(ctx).toContain('## Entry Sequence');
+      } finally {
+        cleanupGuard(sid, 'startup');
+      }
+    });
+  });
+
+  it('source: clear emits the full body', () => {
+    withScratch((scratch) => {
+      const sid = `t-clear-${Date.now()}`;
+      try {
+        const ctx = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'clear', session_id: sid })));
+        expect(ctx).toContain('## Entry Sequence');
+      } finally {
+        cleanupGuard(sid, 'clear');
+      }
+    });
+  });
+
+  it('source: compact emits the core and not the Entry Sequence', () => {
+    withScratch((scratch) => {
+      const sid = `t-compact-${Date.now()}`;
+      try {
+        const ctx = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'compact', session_id: sid })));
+        expect(ctx).toContain('Override order: user instruction > project context file > skill > default.');
+        expect(ctx).toContain('|Situation|Skill|');
+        expect(ctx).not.toContain('## Entry Sequence');
+      } finally {
+        cleanupGuard(sid, 'compact');
+      }
+    });
+  });
+
+  it('absent stdin emits the full body', () => {
+    withScratch((scratch) => {
+      const ctx = ctxOf(runHookStdin(scratch, undefined));
+      expect(ctx).toContain('## Entry Sequence');
+    });
+  });
+
+  it('unparseable stdin emits the full body', () => {
+    withScratch((scratch) => {
+      const ctx = ctxOf(runHookStdin(scratch, 'not-json{{{'));
+      expect(ctx).toContain('## Entry Sequence');
+    });
+  });
+
+  it('unrecognised source value emits the full body', () => {
+    withScratch((scratch) => {
+      const sid = `t-unrec-${Date.now()}`;
+      // 'resume' is deliberately excluded from the SessionStart matcher, but
+      // an unrecognised source reaching the hook must still fail open.
+      const ctx = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'resume', session_id: sid })));
+      expect(ctx).toContain('## Entry Sequence');
+    });
+  });
+
+  it('<SUBAGENT-STOP> is absent from the emitted payload but present in SKILL.md', () => {
+    withScratch((scratch) => {
+      const sid = `t-stop-${Date.now()}`;
+      try {
+        const ctx = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'startup', session_id: sid })));
+        expect(ctx).not.toContain('SUBAGENT-STOP');
+      } finally {
+        cleanupGuard(sid, 'startup');
+      }
+    });
+    const skillSrc = fs.readFileSync(path.join(ROOT, 'skills', 'using-superpowers', 'SKILL.md'), 'utf8');
+    expect(skillSrc).toContain('<SUBAGENT-STOP>');
+  });
+});
+
+describe('session-start emission dedupe', () => {
+  it('a second invocation with the same session_id and source inside the window emits {}', () => {
+    withScratch((scratch) => {
+      const sid = `t-dedupe-${Date.now()}`;
+      try {
+        runHookStdin(scratch, JSON.stringify({ source: 'startup', session_id: sid }));
+        const second = JSON.parse(runHookStdin(scratch, JSON.stringify({ source: 'startup', session_id: sid })));
+        expect(second).toEqual({});
+      } finally {
+        cleanupGuard(sid, 'startup');
+      }
+    });
+  });
+
+  it('a different source for the same session still emits', () => {
+    withScratch((scratch) => {
+      const sid = `t-diffsrc-${Date.now()}`;
+      try {
+        runHookStdin(scratch, JSON.stringify({ source: 'startup', session_id: sid }));
+        const ctx = ctxOf(runHookStdin(scratch, JSON.stringify({ source: 'compact', session_id: sid })));
+        expect(ctx).toContain('Override order: user instruction > project context file > skill > default.');
+      } finally {
+        cleanupGuard(sid, 'startup');
+        cleanupGuard(sid, 'compact');
+      }
+    });
+  });
+
+  it('a clear invocation following a startup invocation emits the full body, not {}', () => {
+    withScratch((scratch) => {
+      const sid = `t-clearafter-${Date.now()}`;
+      try {
+        runHookStdin(scratch, JSON.stringify({ source: 'startup', session_id: sid }));
+        const raw = runHookStdin(scratch, JSON.stringify({ source: 'clear', session_id: sid }));
+        expect(JSON.parse(raw)).not.toEqual({});
+        expect(ctxOf(raw)).toContain('## Entry Sequence');
+      } finally {
+        cleanupGuard(sid, 'startup');
+        cleanupGuard(sid, 'clear');
+      }
+    });
+  });
+
+  it('the guard file path sits under spTmpDir()', () => {
+    withScratch((scratch) => {
+      const sid = `t-guardpath-${Date.now()}`;
+      try {
+        runHookStdin(scratch, JSON.stringify({ source: 'startup', session_id: sid }));
+        const guard = guardPath(sid, 'startup');
+        expect(guard.startsWith(spTmpDir())).toBe(true);
+        expect(fs.existsSync(guard)).toBe(true);
+      } finally {
+        cleanupGuard(sid, 'startup');
+      }
     });
   });
 });

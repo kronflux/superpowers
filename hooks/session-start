@@ -7,11 +7,46 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Read using-superpowers content (body only: the YAML frontmatter's
-# name/description are already system-prompt-resident via the skill listing,
-# so injecting them again would duplicate always-on context).
-using_superpowers_content=$(awk 'NR==1 && /^---[[:space:]]*$/ {fm=1; next} fm {if (/^---[[:space:]]*$/) fm=0; next} {print}' \
-    "${PLUGIN_ROOT}/skills/using-superpowers/SKILL.md" 2>&1 || echo "Error reading using-superpowers skill")
+# Read the SessionStart hook payload from stdin ({source, session_id, ...}).
+# execSync-style harnesses that supply no input close stdin immediately, so
+# this never blocks waiting for a terminal.
+hook_stdin=$(cat 2>/dev/null || true)
+
+# Tiering + dedupe decision (best-effort; requires node). sp-tmp.js is ESM,
+# so the guard file's path and freshness check live in a Node subprocess
+# rather than a bash reimplementation of spTmp()'s naming rule that could
+# drift from it. Node unavailable, or the decision script producing anything
+# other than "core"/"suppress", falls back to the full body with no dedupe —
+# today's behaviour.
+tier="full"
+if command -v node >/dev/null 2>&1; then
+    decision=$(printf '%s' "$hook_stdin" | node "${PLUGIN_ROOT}/hooks/lib/session-start-tiering.mjs" 2>/dev/null || true)
+    if [ "$decision" = "suppress" ]; then
+        printf '{}\n'
+        exit 0
+    elif [ "$decision" = "core" ]; then
+        tier="core"
+    fi
+fi
+
+# Read using-superpowers content. Full tier is the body only: the YAML
+# frontmatter's name/description are already system-prompt-resident via the
+# skill listing, so injecting them again would duplicate always-on context.
+# Core tier is the region between the compact-core delimiters: the routing
+# rules a compacting session still needs, without the Entry Sequence a
+# compaction has already performed.
+if [ "$tier" = "core" ]; then
+    using_superpowers_content=$(awk '/<!-- compact-core:start -->/{c=1; next} /<!-- compact-core:end -->/{c=0; next} c{print}' \
+        "${PLUGIN_ROOT}/skills/using-superpowers/SKILL.md" 2>&1 || echo "Error reading using-superpowers skill")
+else
+    using_superpowers_content=$(awk 'NR==1 && /^---[[:space:]]*$/ {fm=1; next} fm {if (/^---[[:space:]]*$/) fm=0; next} {print}' \
+        "${PLUGIN_ROOT}/skills/using-superpowers/SKILL.md" 2>&1 || echo "Error reading using-superpowers skill")
+fi
+
+# Strip the subagent-only guard block from the injected payload: a subagent
+# reading the skill through the Skill tool still needs it, but it costs bytes
+# in every SessionStart emission to guard a path a main session never takes.
+using_superpowers_content=$(printf '%s\n' "$using_superpowers_content" | awk '/<SUBAGENT-STOP>/{skip=1; next} /<\/SUBAGENT-STOP>/{skip=0; next} skip{next} {print}')
 
 # Escape string for JSON embedding using bash parameter substitution.
 # Each ${s//old/new} is a single C-level pass - orders of magnitude
