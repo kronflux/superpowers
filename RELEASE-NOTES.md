@@ -1,6 +1,6 @@
 # Superpowers Release Notes
 
-## Unreleased — skill semantics, routing, and two safety-gate holes
+## 7.17.0 — skill semantics, routing, hook precision, and harness adaptation
 
 ### Safety gate
 
@@ -66,6 +66,80 @@
   no directory is deleted.
 - Version ordering throughout is semantic, not lexical. With 7.4.0, 7.9.0, 7.15.0 and 7.16.0 on
   disk, collation order selects 7.15.0 and keeps selecting it after an upgrade.
+
+### Hooks stop making false claims
+
+- **The TDD reminder consults the working tree instead of the edit log.** It counted every source
+  file the session wrote inside a 30-minute rolling window, resolved against nothing, so read-only
+  analysis scripts written to `/tmp` produced "6 source file(s) modified without test changes"
+  three times over while the repository's tracked source was untouched — and the window re-reported
+  the same batch across later turns. The count is now the intersection of `git status --porcelain`
+  with the paths this session edited. A clean tree emits nothing regardless of how many files were
+  written; a file written and reverted to its committed bytes drops out; a git failure or a
+  non-repository directory stays silent rather than falling back to the old count. Untracked new
+  source files do count, since new code with no test is the signal the reminder exists for, so the
+  wording is "changed" rather than "modified".
+- **The language-server notice says a server is uninstalled rather than nonexistent.** `.py` maps to
+  `pyright-lsp`, so "no language server covers this file type" was false wherever it mattered most.
+  The two cases are now distinguished and named. The notice still names the decline marker, still
+  states that diagnostics never replace a verification gate, and still does not pitch an install.
+- **The middleware nudge no longer advises digesting output the agent already holds.** It fired on
+  any large failing command output, recommending an external digest of text already in the
+  transcript and frequently needed verbatim. A `PostToolUse` payload carries no truncation field, so
+  the nudge now requires the harness's in-band output-limit marker and stays silent without it —
+  already-in-context and unknown-truncation cannot be told apart, and silence is the safe direction.
+  This couples the hook to the current wording of that marker.
+
+### Session payload
+
+- **The model-routing notice is injected at the first subagent dispatch, not at session start.** It
+  was appended to every emission wherever a routing config existed, and after payload tiering it had
+  grown to roughly 46% of a compacted emission while being relevant only when dispatching. A
+  compacted emission with a canonical routing config is now byte-identical to one without: 2,455 B
+  either way, down from 3,731 B. Enforcement is untouched — the tier gates read the config directly,
+  and a session that never receives the notice still blocks a fence-less plan task. The legacy-config
+  migration line stays at session start under its own tag, since it reports a one-time configuration
+  decision rather than anything about dispatch.
+
+### Domain profiles
+
+- **A `verification` profile ships alongside the named greenfield default.** The precondition
+  vocabulary shipped with no worked example, leaving a repository owner three keys and nothing
+  showing what a real profile looks like. `verification` marks all three preconditions unmet and
+  suits embedded work, infrastructure with production blast radius, data migration, and regulated or
+  scientific code. `artifact-cheap-to-modify` is false because an artefact that cannot be modified at
+  all is not cheap to modify. Installing it puts `test-driven-development` and `systematic-debugging`
+  in conflict while both stay reachable and invokable; the only automatic effect is that their
+  advisory hint is dropped. An absent, unreadable or malformed file means greenfield, which is what
+  every existing repository already gets.
+
+### Harness adaptation
+
+This fork does not silence the harness; it removes the reason the harness has to speak. Both changes
+below stand on their own and would remain correct if the reminder they address disappeared.
+
+- **The native task list is restored at plan entry.** Multi-step work executed through
+  `subagent-driven-development` was tracked only in a plan file, leaving the harness's task list
+  empty — in 169 of 337 observed reminder emissions, correctly so, because nothing was tracked. The
+  controller now rebuilds the list from `<plan>.md.tasks.json` through the procedure `executing-plans`
+  already defines. With no `.tasks.json`, or outside a plan under execution, it creates nothing:
+  inventing a task the plan does not record is not tracking. A resumed or post-compaction entry that
+  already holds the tasks creates no duplicate.
+- **The per-task loop records its transitions on the task.** Updates clustered at pickup and
+  completion and went silent through dispatch, review and verification; across 705 measured intervals
+  the median gap was 1 assistant message and the maximum 161. The states the skill already names —
+  dispatched, implementer returned, under review, verifying — are now recorded as they occur. Issuing
+  an update with no real state change behind it is explicitly listed as something never to do, and a
+  genuinely atomic step spanning many messages is left alone.
+
+### Recorded, not fixed
+
+- **The lazy-catalog change was not shipped, and its blocker was never tested.** The source report
+  proposed replacing the eager skill catalog with a one-line pointer, conditional on first confirming
+  that lazy loading does not increase `ToolSearch` pressure inside subagents. That confirmation was
+  never run. The routing table was kept for an unrelated reason — payload tiering had already reduced
+  the compacted emission enough that the catalog was no longer the dominant cost — so the open
+  question stands rather than having been answered.
 
 ## 7.16.0 — hook precision, payload economics, and the output style
 
