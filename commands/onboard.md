@@ -197,7 +197,7 @@ One-line intro: this fork's conductor layer (`skills/shared/conductor/`) adapts 
 
 ### CodeGraph
 
-Pitch: repo-wide call-graph and blast-radius answers (`codegraph_explore`) for "how does X work" / "what calls Y" questions, instead of manual grep/Read sweeps.
+Pitch: repo-wide call-graph and blast-radius answers (`codegraph_impact`, `codegraph_callers`) for "what breaks if I change X" / "what calls Y" questions, instead of manual grep/Read sweeps.
 
 ```yaml
 AskUserQuestion:

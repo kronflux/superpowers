@@ -11,7 +11,7 @@ an error surfaced to the user. Mechanics per tool live in the adapter files in t
 
 | Job | Chain (first available wins) | Adapter |
 |---|---|---|
-| Macro discovery / flow tracing / blast-radius | CodeGraph `codegraph_explore` → context-mode search → native Grep/Read | [codegraph.md](codegraph.md) |
+| Macro discovery / flow tracing / blast-radius | CodeGraph, tool by question shape → context-mode search → native Grep/Read | [codegraph.md](codegraph.md) |
 | Symbol-precise edit (rename, replace body, references) | CodeGraph blast-radius → context-mode search → native Edit | [codegraph.md](codegraph.md) |
 | Post-edit fast signal | LSP diagnostics, THEN the project's own gate — see below | [lsp.md](lsp.md) |
 | External framework/API docs | Context7 → other docs MCP → ctx_fetch_and_index / web | [context7.md](context7.md) |
