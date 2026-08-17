@@ -108,6 +108,15 @@ a ledger file, not only in todos.
 - `git clean -fdx` will destroy the ledger (it's git-ignored scratch); if
   that happens, recover from `git log`.
 
+**Carried-constraints list.** Maintain a running list, in the same ledger file, of constraints
+established by completed tasks that later tasks must not violate — a naming decision, a schema
+shape, an interface signature, an invariant a task's Acceptance Criteria locked in. Append to it
+when a task's review confirms the constraint, alongside the ledger's completion line. Re-emit
+the current list, verbatim, into every dispatched brief from that point on — a task brief that
+does not carry it is the mechanism by which a later task silently violates something an earlier
+task established, which is a task-ordering defect, not a review-catchable one: the reviewer sees
+only the task it was dispatched for and has no way to know a constraint exists upstream.
+
 ## Task Persistence Sync
 
 After marking each task completed via `TaskUpdate`, update the `.tasks.json` file to stay in sync:

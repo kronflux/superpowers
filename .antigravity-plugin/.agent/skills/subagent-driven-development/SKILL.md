@@ -14,11 +14,11 @@ Execute plan by dispatching a fresh implementer subagent per task, a task review
 **Narration:** between tool calls, narrate at most one short line — the
 ledger and the tool results carry the record.
 
-**Continuous execution:** Do not pause to check in with your human partner between tasks. Execute all tasks from the plan without stopping. The only reasons to stop are: BLOCKED status you cannot resolve, ambiguity that genuinely prevents progress, or all tasks complete. "Should I continue?" prompts and progress summaries waste their time — they asked you to execute the plan, so execute it.
+**Continuous execution:** Do not pause to check in between tasks; execute all tasks from the plan without stopping. Stop only for an unresolved BLOCKED status, ambiguity that genuinely prevents progress, or completion. "Should I continue?" prompts and progress summaries waste their time — they asked you to execute the plan, so execute it.
 
 ## Adapter Link
 
-Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. `review-package` and `task-brief` analysis go through `ctx_execute_file` (discovery job).
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. `review-package` and `task-brief` analysis go through `ctx_execute_file`.
 
 ## When to Use
 
@@ -88,21 +88,18 @@ digraph process {
 
 ## Pre-Flight Plan Review
 
-Before dispatching Task 1, scan the plan once for conflicts:
+Before dispatching Task 1, scan the plan once for conflicts: tasks that contradict each other
+or the plan's Global Constraints, or anything the plan explicitly mandates that the review
+rubric treats as a defect (an assertion-free test, verbatim duplication of a logic block).
 
-- tasks that contradict each other or the plan's Global Constraints
-- anything the plan explicitly mandates that the review rubric treats as a
-  defect (a test that asserts nothing, verbatim duplication of a logic block)
-
-Present everything you find to your human partner as one batched question —
-each finding beside the plan text that mandates it, asking which governs —
-before execution begins, not one interrupt per discovery mid-plan. If the
-scan is clean, proceed without comment. The review loop remains the net for
+Present every finding as one batched question to your human partner — finding beside the plan
+text that mandates it, asking which governs — before execution begins, not one interrupt per
+discovery mid-plan. If clean, proceed without comment. The review loop remains the net for
 conflicts that only emerge from implementation.
 
 ## Model Selection
 
-See [references/controller-operations.md](references/controller-operations.md#model-selection) — Model-tier selection by role, turn-count economics, and task-complexity signals. For mechanical vs. symbol-refactor vs. review dispatch decisions, see `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/middleware.md`'s Dispatch matrix.
+See [references/controller-operations.md](references/controller-operations.md#model-selection) — Model-tier selection by role, turn-count economics, task-complexity. Mechanical/symbol-refactor/review dispatch: `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/middleware.md`'s Dispatch matrix.
 
 ## Handling Implementer Status
 
@@ -110,22 +107,17 @@ See [references/controller-operations.md](references/controller-operations.md#ha
 
 ## Response Shape in Dispatches
 
-A subagent's system prompt is its agent definition, not this session's output style or
-`output-contract.md` — measured across 49,895 subagent turns, "Output Style" appears 0 times
-and `output-contract` appears once. Every prompt this skill constructs inlines the shape
-rules directly: see
-[references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#response-shape-in-dispatches)
-for the required report structure, status line, evidence-quoting, and structured-return
-rules.
+A subagent's system prompt is its agent definition, not this session's output style — across
+49,895 subagent turns, "Output Style" appears 0 times. Every prompt this skill constructs
+inlines the shape rules directly. Report structure, status line, evidence, return format:
+[references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#response-shape-in-dispatches).
 
 ## Handling Reviewer ⚠️ Items
 
-The task reviewer may report "⚠️ Cannot verify from diff" items — requirements
-that live in unchanged code or span tasks. These do not block the rest of the
-review, but you must resolve each one yourself before marking the task
-complete: you hold the plan and cross-task context the reviewer
-lacks. If you confirm an item is a real gap, treat it as a failed spec
-review — send it back to the implementer and re-review.
+The task reviewer may report "⚠️ Cannot verify from diff" items — requirements in unchanged
+code or spanning tasks. These don't block the rest of the review, but you must resolve each
+yourself before marking the task complete — you hold plan and cross-task context the reviewer
+lacks. A confirmed gap is a failed spec review: send it back to the implementer and re-review.
 
 ## Constructing Reviewer Prompts
 
@@ -133,7 +125,10 @@ See [references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#co
 
 ## File Handoffs
 
-See [references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#file-handoffs) — Handing task briefs, reports, and review packages over as files.
+**The implementer writes its full report to a file as its final action and returns only a
+short status; the orchestrator reads that file, never re-prompts the agent for it** — an idle
+implementer costs a round trip to reconstruct, and a returned message is compressed where a
+file is not. Full contract: [references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#file-handoffs).
 
 ## Dispatching with Metadata
 
@@ -143,16 +138,19 @@ See [references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#di
 
 Dispatch multiple implementers in one message ONLY when every pair of tasks has provably disjoint
 `files` sets in metadata AND verify commands are side-effect independent. Anything riskier: worktree
-isolation per implementer, or sequential dispatch. (Upstream red-flags parallel implementers because
-of workspace conflicts — these guardrails are the answer to that objection, not an exemption from it.)
+isolation per implementer, or sequential dispatch — these guardrails answer the workspace-conflict
+objection to parallel implementers, not an exemption from it.
 
 ## E2E Process Hygiene
 
-See [references/controller-operations.md](references/controller-operations.md#e2e-process-hygiene) — Background-service cleanup snippets for E2E/service tasks (Unix and Windows).
+See [references/controller-operations.md](references/controller-operations.md#e2e-process-hygiene) — Background-service cleanup snippets for E2E/service tasks.
 
 ## Durable Progress
 
-See [references/controller-operations.md](references/controller-operations.md#durable-progress) — Progress-ledger file, resume-after-compaction, and recovery.
+**The orchestrator maintains a running carried-constraints list in the ledger and re-emits it
+into every dispatched brief** — a later task silently violating an earlier task's constraint
+is a task-ordering defect. Progress-ledger file, resume-after-compaction, recovery, and the
+carried-constraints list: [references/controller-operations.md](references/controller-operations.md#durable-progress).
 
 ## Task Persistence Sync
 

@@ -53,23 +53,12 @@ fresh reviewer's gate. When drawing task boundaries: fold setup,
 configuration, scaffolding, and documentation steps into the task whose
 deliverable needs them; split only where a reviewer could meaningfully
 reject one task while approving its neighbor. Each task ends with an
-independently testable deliverable.
-
-**Scope test:**
-1. Can it be verified independently? (if no → too small)
-2. Does it touch more than one concern? (if yes → too big)
-3. Would it get its own commit? (if no → merge with adjacent task)
-
-See `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` for the full granularity guide.
+independently testable deliverable. Scope test and full granularity guide:
+`${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md`.
 
 ## Bite-Sized Task Granularity
 
-**Each step is one action (2-5 minutes):**
-- "Write the failing test" - step
-- "Run it to make sure it fails" - step
-- "Implement the minimal code to make the test pass" - step
-- "Run the tests and make sure they pass" - step
-- "Commit" - step
+Each step is one action (2-5 minutes). Worked step list: `references/plan-authoring.md` → "Bite-Sized Task Granularity".
 
 ## Plan Document Header
 
@@ -225,7 +214,7 @@ Run gate-detection on EVERY task. The keyword buckets, the trigger rule (real ga
 
 #### the task.md task list description — full structured body, not a summary
 
-**Hard rule.** Every the task.md task list `description` MUST contain, verbatim, the same **Goal / Files / Acceptance Criteria / Verify** sections you wrote into the plan `.md` for that task. Do NOT condense into a one-sentence summary. Do NOT move the AC to "see the plan doc". Do NOT omit `**Verify:**`. The description MUST end with the `json:metadata` code fence. (Rationale + post-the task.md task list self-check: `references/native-task-mechanics.md`.)
+**Hard rule.** Every the task.md task list `description` MUST contain, verbatim, the same **Goal / Files / Acceptance Criteria / Verify / Assumptions / Carried constraints** sections you wrote into the plan `.md` for that task — `None` is a valid value for the last two, omission is not. Do NOT condense into a one-sentence summary. Do NOT move the AC to "see the plan doc". Do NOT omit `**Verify:**`. The description MUST end with the `json:metadata` code fence. (Rationale + post-the task.md task list self-check: `references/native-task-mechanics.md`.)
 
 ```yaml
 the task.md task list:
@@ -240,6 +229,10 @@ the task.md task list:
     [From task's Acceptance Criteria]
 
     **Verify:** [From task's Verify line]
+
+    **Assumptions:** [From task's Assumptions section, or `None`]
+
+    **Carried constraints:** [From task's Carried constraints section, or `None`]
 
     **Steps:**
     [Key actions from task's Steps — abbreviated]

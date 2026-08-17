@@ -19,6 +19,14 @@ Every TaskCreate description MUST follow this structure:
 
 **Verify:** `exact command to run` → expected output summary
 
+**Assumptions — verify before relying:**
+- [Anything this task depends on that the plan author did not verify. State `None` if every dependency was verified.]
+
+**Carried constraints:**
+- [Constraints established by earlier tasks that this task must not violate. State `None` if no earlier task established one.]
+
+Both are required, not optional: an optional section gets skipped exactly when it matters most, and requiring an explicit `None` forces the author to assert there are no unverified assumptions or carried constraints rather than to forget the question was there.
+
 ### Optional Sections (include when relevant)
 
 **Context:** Why this task exists, what depends on it, architectural notes.
@@ -86,6 +94,10 @@ TaskCreate:
 
     **Verify:** `./zoo.sh status <tag>` + `cat logs/<tag>.jsonl | tail -1`
 
+    **Assumptions — verify before relying:** None.
+
+    **Carried constraints:** None.
+
     ```json:metadata
     {"files": [], "verifyCommand": "./zoo.sh status v0.1.15 && cat logs/v0.1.15.jsonl | tail -1", "acceptanceCriteria": ["Fresh instance spun up from scratch", "Sonnet subagent dispatched with its briefing", "JIT event captured in notification_message", "Manager scrape shows the event"], "userGate": true, "tags": ["user-gate", "verification"]}
     ```
@@ -108,6 +120,10 @@ TaskCreate:
     - [ ] --jit override bypasses the prompt (backwards compat)
 
     **Verify:** Read the Pre-flight Step 2 section and confirm AskUserQuestion block with 3 JIT options
+
+    **Assumptions — verify before relying:** Assumes the 3 most recent JIT messages are already parsed into a list available to the prompt step — not verified against the current Pre-flight implementation.
+
+    **Carried constraints:** None.
 
     ```json:metadata
     {"files": [".claude/commands/hame-optimal-cycle-inspection.md"], "verifyCommand": "grep -A 20 'Step 2' .claude/commands/hame-optimal-cycle-inspection.md", "acceptanceCriteria": ["AskUserQuestion with 3 JIT options", "SOC + schedule parsed from selection", "--jit override bypasses prompt"]}
