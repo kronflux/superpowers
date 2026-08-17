@@ -46,6 +46,17 @@ function lspTip(filePath) {
 const FAIL_RE = /\bFAIL(ED)?\b|\b[1-9]\d* (failed|errors?)\b|\bError[:\s]|Traceback \(most recent/;
 const MIN_OUTPUT_BYTES = 2048;
 
+// A PostToolUse tool_response for Bash carries only stdout/stderr/interrupted/
+// isImage - no separate field marks whether the text is complete or a
+// preview. What it DOES carry, verbatim, is whatever the harness returned to
+// the agent: when output exceeds the harness's own size threshold, that text
+// is replaced with an "Output too large (...). Full output saved to: <path>"
+// preview rather than the full content. That marker is the only reliable
+// in-band signal that the agent does NOT already have this output in full;
+// its absence means the failing text already sits in the agent's context
+// verbatim, and advising an external digest would just re-derive it.
+const TRUNCATED_RE = /\bOutput too large\b[\s\S]{0,200}\bFull output saved to\b/i;
+
 function statePath(sessionId) {
   return spTmp(`conductor-${spSafe(sessionId)}`);
 }
@@ -156,7 +167,7 @@ async function main() {
       if (plugin) { cls = 'lsp'; text = lspTip(data.tool_input?.file_path); }
     } else if (isPost && tool_name === 'Bash') {
       const out = responseText(data.tool_response);
-      if (Buffer.byteLength(out) > MIN_OUTPUT_BYTES && FAIL_RE.test(out)) {
+      if (Buffer.byteLength(out) > MIN_OUTPUT_BYTES && FAIL_RE.test(out) && TRUNCATED_RE.test(out)) {
         cls = 'middleware';
         text = TIPS.middleware;
       }

@@ -74,14 +74,31 @@ describe('conductor-nudges', () => {
     expect(second).toEqual({});
   });
 
-  it('nudges middleware only on large failing Bash output', () => {
+  it('nudges middleware only on large failing Bash output the agent does not already have in full', () => {
     seedState({ middleware: true });
     const big = 'FAIL tests/x.test.js\n' + 'assertion detail line\n'.repeat(200);
+    const truncated = 'FAIL tests/x.test.js\nOutput too large (128.4KB). Full output saved to: /tmp/x.txt\n\n'
+      + 'Preview (first 2KB): ' + 'assertion detail line\n'.repeat(200);
     const small = 'FAIL quick';
     const bigPass = 'all tests passed\n' + 'ok line\n'.repeat(200);
     expect(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: small, stderr: '' } })).toEqual({});
     expect(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: bigPass, stderr: '' } })).toEqual({});
-    expect(ctx(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: big, stderr: '' } }))).toMatch(/summarize-test-failure/);
+    // Already returned to the agent in full - the advice would only re-derive
+    // what is already in context, so this stays silent.
+    expect(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: big, stderr: '' } })).toEqual({});
+    // Truncated: the agent only has a preview, so the nudge still fires.
+    expect(ctx(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: truncated, stderr: '' } }))).toMatch(/summarize-test-failure/);
+    expect(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: truncated, stderr: '' } })).toEqual({});
+  });
+
+  it('stays silent on large failing output with no truncation marker, even repeatedly', () => {
+    // The ambiguous case this hook cannot resolve any further collapses into
+    // the same "already in full" default: without the truncation marker there
+    // is no signal distinguishing a genuinely complete Bash result from one
+    // truncated by some other mechanism this payload does not surface.
+    seedState({ middleware: true });
+    const big = 'FAIL tests/x.test.js\n' + 'assertion detail line\n'.repeat(200);
+    expect(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: big, stderr: '' } })).toEqual({});
     expect(run({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_response: { stdout: big, stderr: '' } })).toEqual({});
   });
 
@@ -279,7 +296,11 @@ describe('conductor-nudges', () => {
     });
     const middlewareOut = run({
       hook_event_name: 'PostToolUse', tool_name: 'Bash',
-      tool_response: { stdout: 'FAIL tests/x.test.js\n' + 'assertion detail line\n'.repeat(200), stderr: '' },
+      tool_response: {
+        stdout: 'FAIL tests/x.test.js\nOutput too large (128.4KB). Full output saved to: /tmp/x.txt\n\n'
+          + 'Preview (first 2KB): ' + 'assertion detail line\n'.repeat(200),
+        stderr: '',
+      },
     });
     // codegraph and codegraph-init share one dispatch branch that always
     // prefers codegraph-init when both caps are true, so reaching the
