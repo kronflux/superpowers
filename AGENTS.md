@@ -131,11 +131,34 @@ manifests by the bump script.
 
 ## Releases
 
-- Bump every manifest with `scripts/bump-version.sh <version>` — it rewrites all 7 manifests
-  (incl. `.kimi-plugin/plugin.json`). **Never hand-bump a version;** drift is caught by
-  `tests/version-consistency.test.js`.
-- Add a `RELEASE-NOTES.md` entry for the new version.
-- Tag the release.
+**A GitHub Release is required, not optional.** The marketplace resolves plugin updates from
+releases; a pushed tag alone does not make a new version installable. A release cycle that stops
+at the tag ships nothing to any user.
+
+Run these in order. Every step, every time.
+
+1. `npm test` green, and `npm run compile-hooks` produces no diff in `hooks/*.json`.
+2. `scripts/bump-version.sh <version>` — rewrites all 7 manifests (incl. `.kimi-plugin/plugin.json`).
+   **Never hand-bump a version;** drift is caught by `tests/version-consistency.test.js`.
+   Re-run `npm test` afterwards.
+3. Turn the `## Unreleased — …` heading(s) in `RELEASE-NOTES.md` into one `## <version> — <title>`
+   section. Bullets state the behaviour change and its measured justification, not the tasks done.
+4. Commit `chore: release <version> — <title>` staging the 7 manifests and `RELEASE-NOTES.md`.
+5. `git tag -a v<version> -m "<version> — <title>"`.
+6. `git push origin main && git push origin v<version>`.
+7. **Create the release:**
+   ```bash
+   awk '/^## <version> /{f=1;next} /^## /{f=0} f' RELEASE-NOTES.md > /tmp/notes.md
+   gh release create v<version> --repo kronflux/superpowers \
+     --title "v<version> — <title>" --notes-file /tmp/notes.md
+   ```
+8. `gh release list --repo kronflux/superpowers` — confirm the new version carries `Latest`.
+   GitHub marks the most recently *created* release as latest, so backfilling an older release
+   after a newer one steals the badge; fix with `gh release edit v<version> --latest`.
+
+**Always pass `--repo kronflux/superpowers`.** This checkout has an `upstream` remote pointing at
+`obra/superpowers`, and `gh` with no default resolves to the parent — a bare `gh release list`
+silently reports upstream's releases as if they were this fork's.
 
 ## Contributing upstream
 
