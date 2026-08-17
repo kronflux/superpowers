@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawnSync } from 'child_process';
+import { spawnSync, execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,6 +11,20 @@ const HOOK = path.resolve(__dirname, '../hooks/context-engine.js');
 
 function tmpDir() {
   return fs.mkdtempSync(path.join(spTmpDir(), 'sp-ce-'));
+}
+
+// A real repository, not a stub .git directory: the cleanup tests below
+// need `git ls-files` to answer tracked-vs-untracked for real.
+function initRepo() {
+  const cwd = tmpDir();
+  execFileSync('git', ['init', '-q'], { cwd });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd });
+  return cwd;
+}
+
+function runHook(cwd) {
+  return spawnSync('node', [HOOK], { input: JSON.stringify({ cwd }), encoding: 'utf8' });
 }
 
 describe('ensureGitignored (shared helper)', () => {
@@ -69,5 +83,67 @@ describe('context-engine hook', () => {
     expect(res.status).toBe(0);
     expect(JSON.parse(res.stdout || '{}')).toEqual({});
     expect(fs.existsSync(path.join(dir, 'context-snapshot.json'))).toBe(false);
+  });
+});
+
+describe('context-engine snapshot relocation', () => {
+  let dir;
+  beforeEach(() => { dir = initRepo(); });
+  afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+  function legacySnapshot() {
+    return path.join(dir, 'context-snapshot.json');
+  }
+  function schemaBody() {
+    return JSON.stringify({ generated_at: new Date().toISOString(), git_hash: 'deadbeef' });
+  }
+
+  it('writes the snapshot under .superpowers/, not the project root', () => {
+    const res = runHook(dir);
+    expect(res.status).toBe(0);
+    expect(JSON.parse(res.stdout || '{}')).toEqual({});
+    expect(fs.existsSync(path.join(dir, '.superpowers', 'context-snapshot.json'))).toBe(true);
+    expect(fs.existsSync(legacySnapshot())).toBe(false);
+  });
+
+  it('creates no .gitignore', () => {
+    runHook(dir);
+    expect(fs.existsSync(path.join(dir, '.gitignore'))).toBe(false);
+  });
+
+  it('deletes an untracked root-level snapshot matching the schema', () => {
+    fs.writeFileSync(legacySnapshot(), schemaBody());
+    runHook(dir);
+    expect(fs.existsSync(legacySnapshot())).toBe(false);
+  });
+
+  it('leaves a tracked root-level snapshot in place', () => {
+    fs.writeFileSync(legacySnapshot(), schemaBody());
+    execFileSync('git', ['add', 'context-snapshot.json'], { cwd: dir });
+    runHook(dir);
+    expect(fs.existsSync(legacySnapshot())).toBe(true);
+  });
+
+  it('leaves a root-level file in place when it does not parse as JSON', () => {
+    fs.writeFileSync(legacySnapshot(), '{not json');
+    runHook(dir);
+    expect(fs.readFileSync(legacySnapshot(), 'utf8')).toBe('{not json');
+  });
+
+  it('leaves a root-level file in place when it parses but lacks git_hash', () => {
+    const body = JSON.stringify({ generated_at: new Date().toISOString() });
+    fs.writeFileSync(legacySnapshot(), body);
+    runHook(dir);
+    expect(fs.readFileSync(legacySnapshot(), 'utf8')).toBe(body);
+  });
+
+  it('still emits {} when the cleanup path throws', () => {
+    // A bare JSON literal parses cleanly but is not an object, so the
+    // `in` check below the parse throws — proving the outer guard in
+    // main() protects the {} contract rather than cleanup being unreachable.
+    fs.writeFileSync(legacySnapshot(), 'null');
+    const res = runHook(dir);
+    expect(res.status).toBe(0);
+    expect(JSON.parse(res.stdout || '{}')).toEqual({});
   });
 });

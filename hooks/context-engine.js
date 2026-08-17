@@ -7,19 +7,20 @@
  *   - Blast radius: which tracked files reference each changed file
  *   - Recent commit history and change statistics
  *
- * Writes context-snapshot.json to the project root (read later by session-start).
- * Idempotently adds context-snapshot.json to .gitignore via the shared helper.
+ * Writes context-snapshot.json under <cwd>/.superpowers/, which is already
+ * gitignored. Also removes a root-level context-snapshot.json left by an
+ * older version of this hook, when it can confirm that file is this
+ * plugin's own untracked snapshot.
  * Fails silently on any error — never blocks session start. Always emits {}.
  *
  * Input:  stdin JSON with { cwd, ... } (falls back to process.cwd())
  * Output: stdout {} always
  */
 
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { ensureGitignored } from './lib/gitignore.js';
 import { configDir } from './lib/config-dir.js';
 import { sweep, sweepWorkspaces } from './lib/tmp-reaper.js';
 
@@ -46,6 +47,37 @@ function run(cmd, cwd) {
     return execSync(cmd, { encoding: 'utf8', timeout: TIMEOUT_MS, cwd }).trim();
   } catch {
     return '';
+  }
+}
+
+// Deletes a root-level context-snapshot.json left by a version of this hook
+// that wrote there instead of under .superpowers/. Only removes the file
+// when both guards hold: it parses as JSON containing this plugin's schema
+// (generated_at and git_hash), and `git ls-files --error-unmatch` reports
+// it untracked (exit status 1). Any other outcome — unreadable file, JSON
+// that doesn't parse, a missing field, the file being tracked, or the git
+// check itself failing to run — leaves the file in place.
+function cleanupLegacySnapshot(cwd) {
+  const legacyPath = path.join(cwd, 'context-snapshot.json');
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
+  } catch {
+    return;
+  }
+  if (!('generated_at' in data) || !('git_hash' in data)) return;
+
+  const check = spawnSync(
+    'git',
+    ['ls-files', '--error-unmatch', 'context-snapshot.json'],
+    { cwd, encoding: 'utf8', timeout: TIMEOUT_MS }
+  );
+  if (check.status !== 1) return;
+
+  try {
+    fs.unlinkSync(legacyPath);
+  } catch {
+    // Silently ignore — never block session start
   }
 }
 
@@ -181,13 +213,20 @@ async function main() {
   };
 
   try {
+    const snapshotDir = path.join(cwd, '.superpowers');
+    fs.mkdirSync(snapshotDir, { recursive: true });
     fs.writeFileSync(
-      path.join(cwd, 'context-snapshot.json'),
+      path.join(snapshotDir, 'context-snapshot.json'),
       JSON.stringify(snapshot, null, 2)
     );
-    ensureGitignored(cwd, ['context-snapshot.json']);
   } catch {
     // Silently ignore write errors — never block session start
+  }
+
+  try {
+    cleanupLegacySnapshot(cwd);
+  } catch {
+    // Silently ignore cleanup errors — never block session start
   }
 
   process.stdout.write('{}');
