@@ -1,6 +1,6 @@
 # Context7 Adapter (live-docs provider chain)
 
-Applies when the session `[conductor]` line lists `context7` or `docfork`.
+Applies when the session `[conductor]` line lists `context7`.
 
 ## When to fetch live docs
 
@@ -21,9 +21,9 @@ dependency-management (checking a changed API's current signature).
    - `query-docs` with `libraryId` (the exact ID from the resolve step, e.g.
      `/vercel/next.js` or `/vercel/next.js/v14.3.0-canary.87`) and `query` (single-concept
      lookup string).
-2. **Any other configured docs MCP** — `docfork` is the known example; the pattern is
-   generic. Follow the same shape (resolve/identify the library, then query its docs) using
-   whatever tool names that MCP exposes.
+2. **Any other configured docs MCP** — the pattern is generic. Follow the same shape
+   (resolve/identify the library, then query its docs) using whatever tool names that MCP
+   exposes.
 3. **`ctx_fetch_and_index`** when context-mode is active (fetch the doc page, index it, then
    `ctx_search` the relevant section); **native web fetch** when context-mode is inactive.
 

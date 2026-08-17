@@ -11,7 +11,7 @@ import { spTmp } from './sp-tmp.js';
 import { probe } from './capability-registry.js';
 
 const CAP_CODES = {
-  codegraph: 'cg', context7: 'c7', docfork: 'df', middleware: 'mw', lsp: 'lsp',
+  codegraph: 'cg', context7: 'c7', middleware: 'mw', lsp: 'lsp',
 };
 
 /** Compact a token count: 1_500_000 -> "1.5M", 2500 -> "2.5k". */

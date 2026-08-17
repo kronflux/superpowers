@@ -12,7 +12,7 @@ describe('capability-registry', () => {
   it('returns exactly the five live capabilities, all absent, in an empty dir', () => {
     const caps = probe(tmp, { home: tmp, env: { PATH: '', HOME: tmp } });
     expect(Object.keys(caps).sort()).toEqual(
-      ['codegraph', 'context7', 'docfork', 'lsp', 'middleware'].sort());
+      ['codegraph', 'context7', 'lsp', 'middleware'].sort());
     for (const v of Object.values(caps)) expect(v.status).toBe(STATUS.ABSENT);
   });
 

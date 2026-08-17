@@ -195,7 +195,6 @@ function probe(cwd = process.cwd(), opts = {}) {
       status: st(mcpConfigured('context7', cwd, home, env)),
       declined: exists(path.join(cwd, '.superpowers-no-context7')),
     },
-    docfork: { status: st(mcpConfigured('docfork', cwd, home, env)) },
     middleware: {
       // Same candidate chain as scripts/middleware-exec.mjs resolveConfig():
       // project -> active config root -> legacy home. Omitting the config-root

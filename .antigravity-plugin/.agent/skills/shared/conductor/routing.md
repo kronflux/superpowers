@@ -14,7 +14,7 @@ an error surfaced to the user. Mechanics per tool live in the adapter files in t
 | Macro discovery / flow tracing / blast-radius | CodeGraph `codegraph_explore` → context-mode search → native Grep/Read | [codegraph.md](codegraph.md) |
 | Symbol-precise edit (rename, replace body, references) | CodeGraph blast-radius → context-mode search → native Edit | [codegraph.md](codegraph.md) |
 | Post-edit fast signal | LSP diagnostics, THEN the project's own gate — see below | [lsp.md](lsp.md) |
-| External framework/API docs | Context7 → other docs MCP (e.g. docfork) → ctx_fetch_and_index / web | [context7.md](context7.md) |
+| External framework/API docs | Context7 → other docs MCP → ctx_fetch_and_index / web | [context7.md](context7.md) |
 | Output handling (logs, tests, terminal dumps) | context-mode (unchanged contract) | [context-mode-adapter.md](context-mode-adapter.md) |
 | Mechanical subagent work (log digests, boilerplate) | middleware-exec → Claude mechanical tier → existing methodology | [middleware.md](middleware.md) |
 | Memory / ADR persistence | filesystem, per the authoring contract | [doc-format.md](doc-format.md) |

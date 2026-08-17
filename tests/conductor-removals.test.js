@@ -78,12 +78,21 @@ describe('conductor removals', () => {
     expect(hits).toEqual([]);
   });
 
-  it('no operational file references obsidian-cli or basic-memory', () => {
-    // Bare "Obsidian" is allowed: doc-format.md legitimately explains that its
-    // callout vocabulary renders in both GitHub and Obsidian. The tooling names
-    // are what must not come back.
+  it('no operational file references obsidian or basic-memory', () => {
+    // The authoring conventions in doc-format.md are stated as properties of the
+    // markdown itself — what renders on GitHub, what grep and ctx_search can see —
+    // so no operational surface names the editor they were compared against.
     const hits = scanFiles()
-      .filter((f) => /obsidian-cli|basic[ _-]?memory/i.test(fs.readFileSync(f, 'utf8')))
+      .filter((f) => /obsidian|basic[ _-]?memory/i.test(fs.readFileSync(f, 'utf8')))
+      .map((f) => path.relative(ROOT, f));
+    expect(hits).toEqual([]);
+  });
+
+  it('no operational file references docfork', () => {
+    // The docs-MCP fallback tier is generic: any configured docs MCP follows the
+    // resolve-then-query shape. Naming one unmaintained provider as the example
+    // is what the capability probe and the adapter no longer do.
+    const hits = scanFiles().filter((f) => /docfork/i.test(fs.readFileSync(f, 'utf8')))
       .map((f) => path.relative(ROOT, f));
     expect(hits).toEqual([]);
   });
