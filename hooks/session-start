@@ -134,6 +134,20 @@ if [ -n "$plan_restore_line" ]; then
     session_context="${session_context}\n\n${plan_restore_escaped}"
 fi
 
+# Best-effort plugin version staleness probe: invokes a Node subprocess (this hook is bash and
+# cannot import ESM directly) that compares CLAUDE_PLUGIN_ROOT's version segment against the
+# newest version directory under the marketplace cache. A match, an unreadable cache, or a path
+# that doesn't parse as a version prints nothing; must never break session start.
+staleness_line=""
+if command -v node >/dev/null 2>&1; then
+    staleness_line=$(node "${PLUGIN_ROOT}/hooks/lib/session-start-version-staleness.mjs" 2>/dev/null || true)
+fi
+
+if [ -n "$staleness_line" ]; then
+    staleness_escaped=$(escape_for_json "$staleness_line")
+    session_context="${session_context}\n\n${staleness_escaped}"
+fi
+
 # Output context injection as JSON.
 # Cursor hooks expect additional_context (snake_case).
 # Claude Code hooks expect hookSpecificOutput.additionalContext (nested).
