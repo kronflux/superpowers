@@ -96,3 +96,17 @@ Done!
 - Controller does more prep work (extracting all tasks upfront)
 - Review loops add iterations
 - But catches issues early (cheaper than debugging later)
+
+## Integration
+
+**Required workflow skills:**
+- **.agent/skills/using-git-worktrees/SKILL.md** - Ensures isolated workspace (creates one or verifies existing)
+- **.agent/skills/writing-plans/SKILL.md** - Creates the plan this skill executes
+- **.agent/skills/requesting-code-review/SKILL.md** - Code review template for the final whole-branch review
+- **.agent/skills/finishing-a-development-branch/SKILL.md** - Complete development after all tasks
+
+**Subagents should use:**
+- **.agent/skills/test-driven-development/SKILL.md** - Subagents follow TDD for each task
+
+**Alternative workflow:**
+- **.agent/skills/executing-plans/SKILL.md** - Use for parallel session instead of same-session execution

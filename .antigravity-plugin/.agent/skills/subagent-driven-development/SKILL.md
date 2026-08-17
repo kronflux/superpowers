@@ -108,6 +108,16 @@ See [references/controller-operations.md](references/controller-operations.md#mo
 
 See [references/controller-operations.md](references/controller-operations.md#handling-implementer-status) — Handling DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED implementer statuses.
 
+## Response Shape in Dispatches
+
+A subagent's system prompt is its agent definition, not this session's output style or
+`output-contract.md` — measured across 49,895 subagent turns, "Output Style" appears 0 times
+and `output-contract` appears once. Every prompt this skill constructs inlines the shape
+rules directly: see
+[references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#response-shape-in-dispatches)
+for the required report structure, status line, evidence-quoting, and structured-return
+rules.
+
 ## Handling Reviewer ⚠️ Items
 
 The task reviewer may report "⚠️ Cannot verify from diff" items — requirements
@@ -205,14 +215,4 @@ See [references/example-and-advantages.md](references/example-and-advantages.md#
 
 ## Integration
 
-**Required workflow skills:**
-- **.agent/skills/using-git-worktrees/SKILL.md** - Ensures isolated workspace (creates one or verifies existing)
-- **.agent/skills/writing-plans/SKILL.md** - Creates the plan this skill executes
-- **.agent/skills/requesting-code-review/SKILL.md** - Code review template for the final whole-branch review
-- **.agent/skills/finishing-a-development-branch/SKILL.md** - Complete development after all tasks
-
-**Subagents should use:**
-- **.agent/skills/test-driven-development/SKILL.md** - Subagents follow TDD for each task
-
-**Alternative workflow:**
-- **.agent/skills/executing-plans/SKILL.md** - Use for parallel session instead of same-session execution
+See [references/example-and-advantages.md](references/example-and-advantages.md#integration) — Required, subagent, and alternative workflow skills this skill integrates with.

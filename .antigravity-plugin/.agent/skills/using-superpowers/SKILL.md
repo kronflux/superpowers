@@ -6,6 +6,8 @@ description: Use when starting any conversation - establishes how to find and us
 <!-- compact-core:start -->
 Override order: user instruction > project context file > skill > default.
 
+**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+
 ## Complexity Tiers
 
 Classify before the Entry Sequence (criteria: `references/routing-guide.md`): **Micro** (typo/rename/1-line, zero ambiguity) skips entry entirely; **Lightweight** (bounded scope, no new gate, no user-visible change, no migration) skips straight to implementation with one gate (`verification-before-completion`); **Full** (everything else, incl. any hard override) runs `brainstorming` → `writing-plans` → dispatch. Anything you have to think about is not micro.
@@ -41,6 +43,8 @@ Skills: `.agent/skills/<name>/SKILL.md` via view_file on the SKILL.md. Detail: `
 ## Skill Files
 
 Never Read a skill file to "check" it — invoke it via view_file on the SKILL.md. Exception: `${CLAUDE_PLUGIN_ROOT}/skills/shared/*.md` are reference documents; Read/link them freely.
+
+A `[plan] name: N open` line here names a plan left mid-execution — decide whether to resume it.
 <!-- compact-core:end -->
 
 <SUBAGENT-STOP>
@@ -48,8 +52,6 @@ If you were dispatched as a subagent to execute a specific task, ignore this ski
 </SUBAGENT-STOP>
 
 ## The Rule
-
-**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
 
 **Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
 

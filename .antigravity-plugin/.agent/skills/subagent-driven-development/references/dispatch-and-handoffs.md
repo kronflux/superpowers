@@ -2,6 +2,24 @@
 
 Reference for the `subagent-driven-development` skill. See [SKILL.md](../SKILL.md) for the execution flow.
 
+## Response Shape in Dispatches
+
+A dispatched subagent's system prompt is its agent definition, not the controlling session's
+output style, and it does not read `output-contract.md` unless the dispatch tells it to.
+Every implementer, reviewer, and fix-dispatch prompt states these rules inline:
+
+- **Report structure.** Name what the report file must contain, in order — see
+  [implementer-prompt.md](../implementer-prompt.md#report-format) and
+  [task-reviewer-prompt.md](../task-reviewer-prompt.md#output-format) for the two shapes this
+  skill already dispatches.
+- **A status line is required.** The subagent's return opens with the verdict —
+  `DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT` for an implementer, the
+  spec-compliance verdict for a reviewer — before any other content.
+- **Evidence is quoted, not summarised.** The command and its decisive output line, or the
+  file:line reference, not "tests passed" or "looks fine."
+- **A structured return follows its schema, not prose.** The status contract in the two
+  templates above is the subagent's final message verbatim — no narration wrapped around it.
+
 ## Constructing Reviewer Prompts
 
 Per-task reviews are task-scoped gates; the broad review happens once, at the final whole-branch review.
