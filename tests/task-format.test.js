@@ -184,6 +184,52 @@ describe('tier re-assessment — decision point, not a re-route', () => {
   });
 });
 
+describe('routing-guide.md — skill preconditions (Task 4)', () => {
+  const idx = routingGuide.indexOf('## Skill Preconditions');
+
+  it('has a Skill Preconditions section', () => {
+    expect(idx).toBeGreaterThan(-1);
+  });
+
+  const section = idx > -1 ? routingGuide.slice(idx, idx + 1600) : '';
+
+  it('names the closed three-value vocabulary and the domain-profile file', () => {
+    expect(section).toMatch(/artifact-cheap-to-modify/);
+    expect(section).toMatch(/execution-safe/);
+    expect(section).toMatch(/failure-is-cheap/);
+    expect(section).toMatch(/\.superpowers\/domain-profile\.json/);
+  });
+
+  it('states an absent profile means every precondition holds', () => {
+    expect(section).toMatch(/absent file means all three hold/i);
+  });
+
+  it('requires naming the conflict and getting explicit acknowledgement before proceeding', () => {
+    expect(section).toMatch(/name the conflict/i);
+    expect(section).toMatch(/require.{0,20}(the )?user.{0,20}(explicit )?acknowledg/i);
+    expect(section).toMatch(/before proceeding|before continuing/i);
+  });
+
+  it('states the skill stays fully invokable and is never suppressed or re-routed', () => {
+    expect(section).toMatch(/never suppresses the skill/i);
+    expect(section).toMatch(/remains fully invokable/i);
+    expect(section).toMatch(/do not silently skip the skill/i);
+  });
+
+  it('nowhere claims the skill becomes unavailable or unroutable', () => {
+    // A positive claim would read "the skill (is|becomes|stays) unavailable/
+    // unroutable/removed/hidden/inaccessible" — distinct from a negated
+    // claim like "does not become unreachable", which is required above.
+    expect(section).not.toMatch(/\bskill\s+(is|becomes|stays)\s+(unavailable|unroutable|removed|hidden|inaccessible)\b/i);
+  });
+
+  it('scopes the only suppression to the skill-activator hint filter, not routing', () => {
+    expect(section).toMatch(/hooks\/skill-activator\.js/);
+    expect(section).toMatch(/drops that one-line nudge|drops.{0,20}hint/i);
+    expect(section).toMatch(/not routing itself|not routing\b/i);
+  });
+});
+
 describe('SKILL.md byte budget', () => {
   it('no SKILL.md exceeds the 12,288 B budget', () => {
     const files = findSkillFiles(path.join(ROOT, 'skills'));

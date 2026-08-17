@@ -64,6 +64,14 @@ The session-start hook injects a context-mode-active flag. When active, data-pro
 
 Read `project-map.md` to orient without re-globbing known files; when you need a file's actual content, Read it directly. If the session-start hook injected `<project-map-stale>`: with git, `git diff --name-only <map_hash> HEAD`, re-read only changed files, update their Key Files entries and the map header; without git, re-read files newer than the map's timestamp and refresh the header.
 
+## Skill Preconditions
+
+A skill's frontmatter may declare `preconditions:` — a subset of `artifact-cheap-to-modify`, `execution-safe`, `failure-is-cheap` — naming what it assumes about the codebase it runs against. A repository states which of those hold in `.superpowers/domain-profile.json`; an absent file means all three hold, which is what every project already behaved like before this existed.
+
+**An unmet precondition never suppresses the skill or removes it from routing.** When a matched skill declares a precondition the repository's profile marks unmet, name the conflict explicitly and require the user's explicit acknowledgement before proceeding — do not silently skip the skill and do not silently proceed as if the assumption held. A repository where running tests risks hardware damage still needs `test-driven-development` for a genuine bug: state that the profile marks `execution-safe: false`, that TDD assumes it, and wait for acknowledgement before continuing — the skill remains fully invokable throughout, and does not become unreachable.
+
+The only place an unmet precondition suppresses anything is the advisory hint the prompt-submit hook offers before a skill is even invoked: `hooks/skill-activator.js` drops that one-line nudge for a skill whose precondition fails. That hint is a suggestion offered before routing runs, not routing itself, and dropping it changes nothing about whether the skill can be invoked.
+
 ## Routing Table Elaboration
 
 - `.agent/skills/premise-check/SKILL.md` — work may not need to exist at all; run before brainstorming or planning.

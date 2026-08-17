@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
-import { capInjection, INJECTION_CAP_BYTES, LABEL_MIN_SCORE, renderMatch } from '../hooks/skill-activator.js';
+import { capInjection, INJECTION_CAP_BYTES, LABEL_MIN_SCORE, renderMatch, filterUnmetPreconditions } from '../hooks/skill-activator.js';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -138,6 +138,73 @@ describe('renderMatch severity calibration', () => {
   it('omits the label for an unknown priority', () => {
     expect(renderMatch({ skill: 'x', priority: 'bogus', score: 99 }))
       .toBe('  - superpowers:x');
+  });
+});
+
+describe('skill-activator precondition filtering', () => {
+  // systematic-debugging declares execution-safe + failure-is-cheap in its
+  // frontmatter (Task 4). A repository whose domain-profile.json marks
+  // execution-safe: false must lose the hint for that skill specifically —
+  // the routing table and the skill itself are untouched by this filter.
+  it('drops the hint for a skill with an unmet precondition', () => {
+    const scratch = fs.mkdtempSync(path.join(spTmpDir(), 'sp-activator-domain-'));
+    try {
+      fs.mkdirSync(path.join(scratch, '.superpowers'), { recursive: true });
+      fs.writeFileSync(
+        path.join(scratch, '.superpowers', 'domain-profile.json'),
+        JSON.stringify({ 'execution-safe': false }),
+      );
+      const out = run({
+        prompt: "I can't figure out why this keeps crashing with a broken exception.",
+        cwd: scratch,
+      });
+      const json = JSON.parse(out);
+      if (json.hookSpecificOutput) {
+        expect(json.hookSpecificOutput.additionalContext).not.toContain('superpowers:systematic-debugging');
+      } else {
+        expect(json).toEqual({});
+      }
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('still emits the hint for the same skill when preconditions are met (no domain-profile.json)', () => {
+    const scratch = fs.mkdtempSync(path.join(spTmpDir(), 'sp-activator-domain-'));
+    try {
+      const out = run({
+        prompt: "I can't figure out why this keeps crashing with a broken exception.",
+        cwd: scratch,
+      });
+      const json = JSON.parse(out);
+      expect(json.hookSpecificOutput.additionalContext).toContain('superpowers:systematic-debugging');
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('filterUnmetPreconditions keeps a match whose skill declares no preconditions', () => {
+    const matches = [{ skill: 'brainstorming', priority: 'high', score: 5 }];
+    expect(filterUnmetPreconditions(matches, '/nonexistent/cwd')).toEqual(matches);
+  });
+
+  it('filterUnmetPreconditions drops only the match whose precondition is unmet', () => {
+    const scratch = fs.mkdtempSync(path.join(spTmpDir(), 'sp-activator-domain-'));
+    try {
+      fs.mkdirSync(path.join(scratch, '.superpowers'), { recursive: true });
+      fs.writeFileSync(
+        path.join(scratch, '.superpowers', 'domain-profile.json'),
+        JSON.stringify({ 'failure-is-cheap': false }),
+      );
+      const matches = [
+        { skill: 'test-driven-development', priority: 'critical', score: 5 },
+        { skill: 'brainstorming', priority: 'high', score: 5 },
+      ];
+      const kept = filterUnmetPreconditions(matches, scratch);
+      expect(kept.map((m) => m.skill)).toEqual(['brainstorming']);
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
 

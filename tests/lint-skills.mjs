@@ -2,6 +2,7 @@
 // Usage: node tests/lint-skills.mjs [skills/<name> ...]  (default: all skills/*)
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { PRECONDITIONS } from "../hooks/lib/domain-profile.js";
 
 const BLOCKED = [
   /\bcurl\b/i, /\bwget\b/i, /\bWebFetch\b/, /fetch\(['"]http/i,
@@ -41,6 +42,24 @@ function descriptionBytes(fm) {
   return Buffer.byteLength(v.trim());
 }
 
+const PRECONDITION_VALUES = new Set(PRECONDITIONS);
+
+// Parses an optional `preconditions:` YAML list from a frontmatter block.
+// Returns null when the key is absent, otherwise the raw list of values
+// (validated by the caller against the closed vocabulary).
+function preconditionsList(fm) {
+  const lines = fm.split(/\r?\n/);
+  const i = lines.findIndex((l) => /^preconditions:/.test(l));
+  if (i === -1) return null;
+  const values = [];
+  for (let j = i + 1; j < lines.length; j++) {
+    const m = lines[j].match(/^\s*-\s*(.+?)\s*$/);
+    if (!m) break;
+    values.push(m[1].trim());
+  }
+  return values;
+}
+
 function lintDir(dir) {
   const md = join(dir, "SKILL.md");
   if (!existsSync(md)) return { dir, errors: [`missing SKILL.md`], warnings: [] };
@@ -57,6 +76,12 @@ function lintDir(dir) {
     else {
       const db = descriptionBytes(fm[1]);
       if (db > DESCRIPTION_BUDGET) errors.push(`description ${db}B > ${DESCRIPTION_BUDGET}B budget`);
+    }
+    const preconditions = preconditionsList(fm[1]);
+    if (preconditions) {
+      for (const v of preconditions) {
+        if (!PRECONDITION_VALUES.has(v)) errors.push(`unknown preconditions value: ${v}`);
+      }
     }
   }
 

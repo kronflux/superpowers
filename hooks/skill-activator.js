@@ -28,10 +28,12 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { configDir, userCandidates } from './lib/config-dir.js';
+import { loadDomainProfile, skillDeclaredPreconditions, hasUnmetPrecondition } from './lib/domain-profile.js';
 
 // Resolve hooks directory from this script's location
 const __filename = fileURLToPath(import.meta.url);
 const HOOKS_DIR = path.dirname(__filename);
+const SKILLS_ROOT = path.join(HOOKS_DIR, '..', 'skills');
 
 // Load skill rules
 let RULES = [];
@@ -184,6 +186,22 @@ function matchSkills(prompt) {
   });
 
   return matches.slice(0, 3);
+}
+
+/**
+ * Drops a matched skill's advisory hint when the repository's domain
+ * profile (`.superpowers/domain-profile.json` under `cwd`) marks one of
+ * that skill's declared preconditions unmet. This is the only place a
+ * precondition suppresses anything — routing itself never does. An
+ * unreadable or malformed profile, or a skill declaring none, keeps the
+ * hint.
+ */
+function filterUnmetPreconditions(matches, cwd) {
+  const profile = loadDomainProfile(cwd);
+  return matches.filter((m) => {
+    const declared = skillDeclaredPreconditions(SKILLS_ROOT, m.skill);
+    return !hasUnmetPrecondition(declared, profile);
+  });
 }
 
 /**
@@ -643,7 +661,7 @@ async function main() {
     }
 
     // Run all pipelines independently
-    const matches = matchSkills(prompt);
+    const matches = filterUnmetPreconditions(matchSkills(prompt), cwd);
     const keywords = extractKeywords(prompt);
     const memoryEntries = searchSessionLog(cwd, keywords);
     const knownIssueEntries = searchKnownIssues(cwd, keywords);
@@ -696,6 +714,7 @@ if (isMain) {
 
 export {
   matchSkills,
+  filterUnmetPreconditions,
   buildContext,
   isMicroTask,
   extractKeywords,
