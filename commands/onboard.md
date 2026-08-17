@@ -185,6 +185,38 @@ One-line intro: third-party marketplaces do NOT auto-update by default, so new `
 
 4. **No** → write nothing.
 
+## Feature 5: Signal Output Style
+
+One-line intro: an output style loads into the system prompt and shapes every answer without any skill being invoked; Signal is this plugin's shipped style, and it governs answer shape, density, and forbidden language.
+
+SessionStart already places `signal.md` in the config root's `output-styles/` directory, so the file exists whether or not this feature is accepted. Only selection is asked about here — selecting a style rewrites a settings file the operator owns.
+
+1. **Detect.** Read `outputStyle` from the settings files in precedence order (project `.claude/settings.local.json`, project `.claude/settings.json`, then the user-level file in the active config root). Then:
+   - already `Signal` → tell the user, write nothing, move on.
+   - set to something else → name the current value in the question; the operator is replacing their own selection.
+   - absent → ask.
+
+2. **Ask:**
+
+   ```yaml
+   AskUserQuestion:
+     question: "Select the Signal output style? It shapes every response - answer first, no filler, structure over prose. Replaces any current selection."
+     header: "Output style"
+     options:
+       - label: "Yes, user-global (recommended)"
+         description: "Sets outputStyle to Signal in the user-level settings file. Applies to every project."
+       - label: "Yes, this project only"
+         description: "Sets outputStyle to Signal in the project's .claude/settings.json."
+       - label: "No"
+         description: "Nothing is written. The style file stays available and selectable later via /config or /superpowers:output-style."
+   ```
+
+3. **Yes** → set `outputStyle` to `Signal` in the chosen file. Read-merge-write; never drop other keys. Re-read to confirm, and report the absolute path written.
+
+4. **No** → write nothing. Do not re-offer.
+
+**A style takes effect for new sessions.** Say so rather than implying the current session changes.
+
 ## Conductor integrations
 
 One-line intro: this fork's conductor layer (`skills/shared/conductor/`) adapts its behavior to optional external tools — CodeGraph (macro discovery), LSP (post-edit diagnostics), Context7 (live docs), and a middleware-exec provider. None of them is required; each adapter falls back to native tools when its capability is absent.

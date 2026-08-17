@@ -7,7 +7,7 @@ description: "Installs the shipped Signal output style (output-styles/signal.md)
 
 Installs `output-styles/signal.md` — this plugin's shipped answer-shape style — as a Claude Code output style, then points `outputStyle` at it in a settings file the operator chooses. An installed style is loaded into the system prompt and reaches the model on every turn without any skill being invoked; a shared contract document like `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md` only reaches the model when a skill reads it.
 
-**One style ships.** Signal is the only maintained preset. This skill does not build a custom-style interview branch and does not offer or write ASD-STE100, ADHD-summary, or ELI5 variants.
+**One style ships.** Signal is the only maintained preset. Its rules already carry ASD-STE100 plain-language principles and the density and decidability requirements that make output usable to a reader who cannot parse a wall of text. This skill installs that one style; it does not run a custom-style interview.
 
 ## 1. Determine the scope — ask before writing
 
@@ -77,4 +77,4 @@ State, in every branch, the absolute path of the style document (written, or "al
 
 - **Never inject the style, or any part of it, at `SessionStart`.** The entire value of an installed style over a `SessionStart` payload is that it costs nothing per turn once installed; injecting its content back in at `SessionStart` reproduces the exact per-turn token cost this skill exists to avoid — the same cost Anthropic's own `explanatory-output-style` plugin warns about in its own README by injecting anyway. This skill writes files and patches settings; it does not touch any hook, and no hook should be added on its behalf.
 - **Never replace an existing `outputStyle` without the confirmation in step 2.**
-- **Never build the ASD-STE100 / ADHD-summary / ELI5 interview branch.** One style ships.
+- **Never run a custom-style interview.** One style ships; Signal already carries those requirements.

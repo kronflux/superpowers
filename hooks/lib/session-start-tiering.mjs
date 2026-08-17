@@ -4,8 +4,15 @@
 // one of "full", "core", or "suppress" to stdout, and performs the dedupe
 // guard file write itself. Any internal fault prints "full" — session-start
 // must never fail to emit a payload.
+//
+// It also places the shipped output style in the config root. That runs here
+// rather than as its own hook because this process already starts on every
+// SessionStart, and a second Node spawn would cost more than the copy.
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { spTmp } from './sp-tmp.js';
+import { ensureStylePresent } from './output-style-install.js';
 
 const DEDUPE_WINDOW_MS = 60000;
 const RECOGNISED_SOURCES = new Set(['startup', 'clear', 'compact']);
@@ -56,6 +63,11 @@ function main() {
   try { fs.writeFileSync(guardPath, String(Date.now())); } catch { /* best-effort */ }
   process.stdout.write(tier);
 }
+
+// Runs before the tier decision so a suppressed emission still gets the style.
+// ensureStylePresent absorbs its own faults and returns a status; nothing here
+// reads it, because a failed copy is not a reason to alter the payload.
+ensureStylePresent(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
 
 try {
   main();
