@@ -1,6 +1,8 @@
 # Superpowers Release Notes
 
-## Unreleased — output style and config surface
+## 7.16.0 — hook precision, payload economics, and the output style
+
+### Output style and config surface
 
 - **Response shape ships as a native output style.** `output-styles/signal.md` is installed by the
   new `superpowers:output-style` skill into `<configDir()>/output-styles/`, and the selection is
@@ -45,7 +47,7 @@
   native tool it replaced. The echo belongs to `mksglu/context-mode` and is not configurable from
   this plugin.
 
-## Unreleased — session payload economics
+### Session payload economics
 
 - **A compaction no longer re-injects the whole skill document.** `hooks/session-start` reads the
   SessionStart `source` field and emits one of two tiers: the full body on `startup` and `clear`,
@@ -84,7 +86,7 @@
   `generated_at` and `git_hash` **and** git reports it untracked; a tracked file is left alone,
   since staging a deletion the operator did not ask for is worse than the clutter.
 
-## Unreleased — hook precision
+### Hook precision
 
 - **Ask-tier git patterns match one shell segment at a time and honour pathspec scope.** Across 58
   real permission prompts in one operator's hook logs, 38 were false positives, the largest class
@@ -124,6 +126,20 @@
   and hint-to-invocation conversion are recorded, because the planned suppression engine rested on
   an estimate the transcripts did not support: measured conversion was 0% across 389,029 records,
   and the skill the report named as 54% of hints was 5%.
+
+### Repository layout
+
+- **`docs/` holds committed documentation only.** Plans and specs are produced by *using*
+  superpowers rather than placed by a developer, so they move to the gitignored `.superpowers/`
+  tree with the rest of a session's working state. `docs/superpowers/` and `docs/plans/` are gone;
+  the three developer-placed files under the former move up one level, which removes the collision
+  between that path and the local `.superpowers/` tree. The legacy
+  `docs/superpowers/model-routing.json` and `workflow.json` fallbacks stay readable for projects
+  that still have them — only this repository's own copies were deleted.
+- **The worktree path policy test drops three assertions** against a dated design spec and plan.
+  Those documents no longer change, so a string being absent from them proved nothing about
+  current behaviour; the six assertions against the two live skills are the coverage that can
+  still fail.
 
 ## 7.15.0 — output and evidence contracts
 
