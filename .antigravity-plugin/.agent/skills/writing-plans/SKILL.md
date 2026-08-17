@@ -116,46 +116,14 @@ permissions, crypto, or data access boundaries — triggers pre-implementation s
 
 **Verify:** `exact test command` → expected output
 
-**Steps:**
-
-- [ ] **Step 1: Write the failing test**
-
-```python
-def test_specific_behavior():
-    result = function(input)
-    assert result == expected
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: FAIL with "function not defined"
-
-- [ ] **Step 3: Write minimal implementation**
-
-```python
-def function(input):
-    return expected
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/path/test.py src/path/file.py
-git commit -m "feat: add specific feature"
-```
+**Steps:** content is bound to this task's `modelTier` — `mechanical` shows complete, runnable code; `standard`/`advanced`/`frontier` state requirements, exact-signature interfaces, and verification obligations, implementation excluded. Both worked forms: `references/plan-authoring.md` → "Step Content by Tier".
 ````
 
 Commit steps stage explicit paths only — `${CLAUDE_PLUGIN_ROOT}/skills/shared/git-hygiene.md` is the contract; never write `git add -A` or `git add .` into a plan step.
 
 ## No Placeholders
 
-Every step must contain the actual content an engineer needs; placeholder or hand-wave content is a **plan failure**. Full banned-patterns list (TBD/TODO, vague "add error handling", "write tests for the above" without code, "similar to Task N", describe-without-show, undefined-symbol references): `references/plan-authoring.md` → "No Placeholders".
+Placeholder or hand-wave content is a **plan failure at every tier**: TBD/TODO, vague "add error handling", "write tests for the above" without code, "similar to Task N", and undefined-symbol references. Describe-without-show is a failure only at `mechanical` — `standard`/`advanced`/`frontier` steps describe requirements and interfaces without code by design. Full list: `references/plan-authoring.md` → "No Placeholders".
 
 ## Self-Review
 
@@ -243,7 +211,7 @@ the task.md task list:
   activeForm: "Implementing [Component Name]"
 ```
 
-**`modelTier`** — `"mechanical"` | `"standard"` | `"advanced"` | `"frontier"`; `"advanced"` is the default ceiling, escalation **stops at `advanced`**. `"frontier"` is gated, 2x cost, needs per-task approval before `the task.md task list`. Full definitions and the offer contract: `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md`, `references/plan-authoring.md` → "Frontier offers".
+**`modelTier`** — `"mechanical"` | `"standard"` | `"advanced"` | `"frontier"`; `"advanced"` is the default ceiling, escalation **stops at `advanced`**. `"frontier"` is gated, 2x cost, needs per-task approval before `the task.md task list`. Full definitions and the offer contract: `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md`, `references/plan-authoring.md` → "Frontier offers". **Invariant:** a task's step format is bound to the `modelTier` recorded here — changing the tier after the plan is written requires rewriting that task's steps. Escalation is up-only and stops at `advanced`, so a task is never dispatched below the tier its steps were written for.
 
 ### Native task mechanics
 

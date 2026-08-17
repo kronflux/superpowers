@@ -4,13 +4,80 @@ Detail moved out of `SKILL.md` to keep the core lean. Referenced from the "File 
 
 ## No Placeholders
 
-Every step must contain the actual content an engineer needs. These are **plan failures** — never write them:
+Every step must contain the actual content an engineer needs. These are **plan failures at every `modelTier`** — never write them:
 - "TBD", "TODO", "implement later", "fill in details"
 - "Add appropriate error handling" / "add validation" / "handle edge cases"
 - "Write tests for the above" (without actual test code)
 - "Similar to Task N" (repeat the code — the engineer may be reading tasks out of order)
-- Steps that describe what to do without showing how (code blocks required for code steps)
 - References to types, functions, or methods not defined in any task
+
+**One item is tier-conditional.** "Steps that describe what to do without showing how" is a plan failure only at `mechanical`, where code blocks are required for code steps. At `standard`, `advanced`, and `frontier` describing without showing is the required form — see "Step Content by Tier" below.
+
+## Step Content by Tier
+
+A task's step content is bound to the `modelTier` in its `json:metadata`. Changing the tier after the plan is written requires rewriting that task's steps — escalation is up-only and stops at `advanced`, so a task is never dispatched below the tier its steps were written for.
+
+**`mechanical` — complete, runnable code, unchanged from today:**
+
+````markdown
+- [ ] **Step 1: Write the failing test**
+
+```python
+def test_specific_behavior():
+    result = function(input)
+    assert result == expected
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `pytest tests/path/test.py::test_name -v`
+Expected: FAIL with "function not defined"
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+def function(input):
+    return expected
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `pytest tests/path/test.py::test_name -v`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add tests/path/test.py src/path/file.py
+git commit -m "feat: add specific feature"
+```
+````
+
+**`standard`, `advanced`, `frontier` — requirements, interfaces with exact signatures, and verification obligations; implementation excluded:**
+
+````markdown
+- [ ] **Step 1: Define the retry policy**
+
+Requirements: retry a failed upstream call up to 3 times with exponential
+backoff (base 200ms), give up and raise `UpstreamRetryExhausted` on the
+4th failure, and never retry a 4xx response.
+
+Interfaces:
+- Produces: `retry_with_backoff(fn: Callable[[], Response], max_attempts: int = 3) -> Response`
+- Raises: `UpstreamRetryExhausted(attempts: int, last_error: Exception)`
+
+- [ ] **Step 2: Verify**
+
+`pytest tests/path/test_retry.py -v` — covers exhaustion, a 4xx short-circuit,
+and backoff timing within tolerance.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add tests/path/test_retry.py src/path/retry.py
+git commit -m "feat: add exponential-backoff retry for upstream calls"
+```
+````
 
 ## File Structure
 

@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 // Task 6 (skill-semantics-routing): Assumptions and Carried constraints become
 // required task-brief sections, and implementer reports become durable file
 // artefacts the orchestrator reads instead of re-eliciting.
+//
+// Task 3 (skill-semantics-routing): plan step content is bound to the task's
+// modelTier, and the tier-to-step-format invariant is stated.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -24,6 +27,10 @@ const controllerOps = fs.readFileSync(
   'utf8'
 );
 const sddCombined = [sdd, dispatchHandoffs, controllerOps].join('\n');
+const planAuthoring = fs.readFileSync(
+  path.join(ROOT, 'skills/writing-plans/references/plan-authoring.md'),
+  'utf8'
+);
 
 function requiredSectionsBlock(text) {
   const start = text.indexOf('### Required Sections');
@@ -87,6 +94,48 @@ describe('subagent-driven-development — report files as durable artefacts', ()
     expect(sddCombined).toMatch(/carried-constraints list/i);
     expect(sddCombined).toMatch(/re-emit/i);
     expect(sddCombined).toMatch(/(each|every) (dispatched )?brief/i);
+  });
+});
+
+describe('writing-plans — step content conditional on modelTier', () => {
+  const writingPlansAndReference = writingPlans + '\n' + planAuthoring;
+
+  it('states the complete-code requirement for mechanical', () => {
+    expect(writingPlansAndReference).toMatch(/`mechanical`[\s\S]{0,120}complete,? runnable code/i);
+  });
+
+  it('states the requirements-and-interfaces form for standard, advanced, and frontier, with implementation excluded', () => {
+    expect(writingPlansAndReference).toMatch(/`standard`\/`advanced`\/`frontier`|standard.{0,10}advanced.{0,10}frontier/i);
+    expect(writingPlansAndReference).toMatch(/requirements/i);
+    expect(writingPlansAndReference).toMatch(/exact-signature interfaces|interfaces with exact signatures/i);
+    expect(writingPlansAndReference).toMatch(/verification obligations/i);
+    expect(writingPlansAndReference).toMatch(/implementation[\s\S]{0,40}excluded/i);
+  });
+
+  it('states the tier-to-step-format invariant', () => {
+    const idx = writingPlans.indexOf('**Invariant:**');
+    expect(idx).toBeGreaterThan(-1);
+    const block = writingPlans.slice(idx, idx + 400);
+    expect(block).toMatch(/step format is bound to the `modelTier`/);
+    expect(block).toMatch(/rewriting that task's steps/);
+    expect(block).toMatch(/stops at `advanced`/);
+  });
+});
+
+describe('No Placeholders — tier-conditional carve-out', () => {
+  it('keeps TBD/TODO and the other banned patterns as failures at every tier', () => {
+    expect(writingPlans).toMatch(/plan failure at every tier/);
+    expect(planAuthoring).toMatch(/plan failures at every `modelTier`/);
+    for (const pattern of [/TBD/, /TODO/, /appropriate error handling/i, /write tests for the above/i, /similar to Task N/i]) {
+      expect(planAuthoring).toMatch(pattern);
+    }
+    expect(planAuthoring).toMatch(/not defined in any task/);
+  });
+
+  it('carves out describe-without-show only, and only for non-mechanical tiers', () => {
+    expect(writingPlans).toMatch(/Describe-without-show is a failure only at `mechanical`/);
+    expect(planAuthoring).toMatch(/failure only at `mechanical`/);
+    expect(planAuthoring).toMatch(/describing without showing is the required form/i);
   });
 });
 
