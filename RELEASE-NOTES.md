@@ -1,5 +1,44 @@
 # Superpowers Release Notes
 
+## Unreleased — session payload economics
+
+- **A compaction no longer re-injects the whole skill document.** `hooks/session-start` reads the
+  SessionStart `source` field and emits one of two tiers: the full body on `startup` and `clear`,
+  and a delimited compact core on `compact`. One measured session carried 403 compaction
+  boundaries against 602 payload emissions — on the order of 1.4M tokens spent re-injecting a
+  document that never changed, at the point where context is scarcest. `/clear` deliberately
+  receives the full body: it wipes the conversation and the user begins new work, so a cleared
+  session that skipped the Entry Sequence would lose the fresh-project gate and the memory reads.
+  Absent, unparseable or unrecognised `source` also emits the full body, so a harness that does
+  not supply the field behaves exactly as before.
+- **A repeat emission for the same session and source is suppressed.** Emissions ran at roughly
+  1.5 per compaction. A marker under the `sp/` temp root collapses the excess; a `clear` deletes
+  that marker before writing its own, so the emission replacing a wiped context is never the one
+  that gets suppressed.
+- **The payload sheds its coercive framing.** The `<EXTREMELY-IMPORTANT>` block and the Red Flags
+  table are gone, replaced by one line: `Override order: user instruction > project context file >
+  skill > default.` Both asserted that the agent had no choice but to invoke a skill; across
+  389,029 transcript records skills were invoked zero times, so the framing produced conflict with
+  project context files rather than compliance. The document falls from 5,185 B to 3,807 B, and a
+  compaction now receives 3,511 characters where it received 5,226.
+- **`<SUBAGENT-STOP>` is no longer injected.** It stays in the file for a subagent that opens the
+  skill through the Skill tool, but the payload reaches 45 of 49,895 subagent turns, so injecting
+  it cost every main session ~110 B to guard a path taken 0.09% of the time.
+- **Shared-document citations resolve.** 62 citations across 32 skills named `skills/shared/...`
+  as a bare relative path, unresolvable by an agent that does not know where the plugin is
+  installed. All are now anchored to `${CLAUDE_PLUGIN_ROOT}`, and `tests/lint-skills.mjs` fails on
+  a reintroduced bare citation.
+- **The questioning rule is stated once.** `brainstorming` required one question per message,
+  `token-efficiency` required batching, and `statusline` did neither. `skills/shared/output-contract.md`
+  now holds the single rule — batch independent unknowns, ask alone only when the answer changes
+  what gets asked next — and the others defer to it.
+- **`context-snapshot.json` moves into `.superpowers/`.** The plugin wrote it to the root of every
+  project and then appended it to that project's `.gitignore` to hide what it had just written.
+  Inside an already-ignored directory neither is necessary, and the `.gitignore` write is gone. A
+  root-level file left by an earlier version is removed only when it parses as JSON carrying both
+  `generated_at` and `git_hash` **and** git reports it untracked; a tracked file is left alone,
+  since staging a deletion the operator did not ask for is worse than the clutter.
+
 ## Unreleased — hook precision
 
 - **Ask-tier git patterns match one shell segment at a time and honour pathspec scope.** Across 58
