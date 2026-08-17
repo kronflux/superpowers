@@ -8,37 +8,39 @@ Override order: user instruction > project context file > skill > default.
 
 ## Complexity Tiers
 
-Micro (typo/1-line): skip entry. Lightweight (bounded, no new gate/visible/migration): one gate, `verification-before-completion`. Full (else, incl hard override): `brainstorming` → `writing-plans` → dispatch.
+Classify before the Entry Sequence (criteria: `references/routing-guide.md`): **Micro** (typo/rename/1-line, zero ambiguity) skips entry entirely; **Lightweight** (bounded scope, no new gate, no user-visible change, no migration) skips straight to implementation with one gate (`verification-before-completion`); **Full** (everything else, incl. any hard override) runs `brainstorming` → `writing-plans` → dispatch. Anything you have to think about is not micro.
 
 ## Routing Guide
 
+Skills: `superpowers:<name>` via Skill tool. Detail: `references/routing-guide.md`.
+
 |Situation|Skill|
 |---|---|
-|Maybe unneeded|premise-check|
-|Unclear options|deliberation|
-|New behavior|brainstorming|
-|Define gates|specifying-gates|
-|Verify gates|checking-gates|
-|Same session|subagent-driven-development|
-|New session|executing-plans|
-|Risky work|using-git-worktrees|
-|Bug/test|systematic-debugging|
-|Completion|verification-before-completion|
-|Branch merge|finishing-a-development-branch|
-|Code review|requesting-/receiving-code-review|
-|Parallel|dispatching-parallel-agents|
-|Cross-session|context-management|
-|Recurring|error-recovery|
-|Restructure|refactoring|
-|Perf|performance-investigation|
-|Deps/CVEs|dependency-management|
-|UI/frontend|frontend-design|
-|CLAUDE.md|claude-md-creator|
-|Data tool|routing.md (auto)|
+|Work may be unnecessary|premise-check|
+|Unclear decision space|deliberation → brainstorming|
+|New behavior/architecture|brainstorming → writing-plans|
+|Define acceptance gates|specifying-gates|
+|Verify acceptance gates|checking-gates|
+|Plan execution, same session|subagent-driven-development|
+|Plan execution, new session|executing-plans|
+|Risky work, isolation|using-git-worktrees|
+|Bug or test failure|systematic-debugging → test-driven-development|
+|Completion claim|verification-before-completion|
+|Branch integration|finishing-a-development-branch|
+|Code review (incl. security)|requesting- / receiving-code-review|
+|Independent parallel tasks|dispatching-parallel-agents|
+|Cross-session state|context-management|
+|Recurring error→fix|error-recovery|
+|Restructure, same behavior|refactoring|
+|Performance issues|performance-investigation|
+|Deps, CVEs, migrations|dependency-management|
+|UI/frontend work|frontend-design|
+|CLAUDE.md/AGENTS.md work|claude-md-creator|
+|Data-work tool selection|routing.md (auto)|
 
 ## Skill Files
 
-Invoke via the Skill tool, never Read to check; `skills/shared/*.md` are references.
+Never Read a skill file to "check" it — invoke it via the Skill tool. Exception: `skills/shared/*.md` are reference documents; Read/link them freely.
 <!-- compact-core:end -->
 
 <SUBAGENT-STOP>
@@ -59,8 +61,6 @@ Then follow the skill exactly. If it has a checklist, create a todo per item. Do
 2. **Fresh project gate:** creation intent (build/create/make/implement/scaffold/set up/write/generate/develop/start) + no `project-map.md`/`.superpowers-no-projectmap` at root → pause, give the pitch in routing-guide.md, wait; decline writes the marker — never re-offer.
 3. Memory: read `state.md`, `known-issues.md`, `project-map.md` if present; decision-heavy session end → `[saved]` entry via `superpowers:context-management`; `<project-map-stale>` → refresh per routing-guide.md.
 4. Route via the table.
-
-Full tier criteria and routing detail: `references/routing-guide.md`.
 
 ## Skill Priority
 

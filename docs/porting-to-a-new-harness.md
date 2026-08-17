@@ -446,7 +446,7 @@ skill and the harness's tool-mapping reference. `GEMINI.md`
 does this with two `@`-includes (`@./skills/using-superpowers/SKILL.md` and
 `@./skills/using-superpowers/references/<harness>-tools.md`); the harness loads
 them raw, frontmatter and all, and `SKILL.md` already carries its own
-`<EXTREMELY-IMPORTANT>` block internally. If your harness has no include syntax,
+override-order line and routing rules internally. If your harness has no include syntax,
 inline the content into the instructions file instead. Gemini ships **no**
 "already loaded, don't re-invoke" preamble — for an `@`-include harness the
 content is the active instruction set, not a skill the model would re-load. If

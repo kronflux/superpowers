@@ -134,8 +134,8 @@ describe('using-superpowers compact core', () => {
     return text.slice(s + START_TAG.length, e).trim();
   }
 
-  it('the delimited core is <= 1200 bytes', () => {
-    expect(Buffer.byteLength(extractCore(body))).toBeLessThanOrEqual(1200);
+  it('the delimited core is <= 2048 bytes', () => {
+    expect(Buffer.byteLength(extractCore(body))).toBeLessThanOrEqual(2048);
   });
 
   it('the core is non-empty', () => {
