@@ -66,9 +66,6 @@ describe('block-dangerous-commands', () => {
   });
 
   it('still blocks rm -rf /etc (regression guard: no quote stripping)', () => {
-    // rm-system has no ["']? quote tolerance (unlike rm-home/rm-home-var),
-    // so a quoted "/etc" is outside this pattern's coverage independent of
-    // heredoc stripping; the unquoted form is the guard for this change.
     const r = checkCommand('rm -rf /etc');
     expect(r.blocked).toBe(true);
     expect(r.pattern.id).toBe('rm-system');
@@ -83,6 +80,78 @@ describe('block-dangerous-commands', () => {
     expect(r.blocked).toBe(true);
     expect(r.pattern.id).toBe('git-reset-hard');
   });
+});
+
+describe('quote-tolerant DENY patterns', () => {
+  const MUST_BLOCK = [
+    // rm-root: bare root and root glob, unquoted and quoted.
+    ['rm -rf /', 'rm-root'],
+    ['rm -rf "/"', 'rm-root'],
+    ["rm -rf '/'", 'rm-root'],
+    ['rm -rf /*', 'rm-root'],
+    ['rm -rf "/*"', 'rm-root'],
+    // rm-system: system directories, unquoted and quoted.
+    ['rm -rf /etc', 'rm-system'],
+    ['rm -rf "/etc"', 'rm-system'],
+    ["rm -rf '/etc'", 'rm-system'],
+    ['rm -rf /usr', 'rm-system'],
+    ['rm -rf "/usr"', 'rm-system'],
+    // rm-cwd: current-directory targets, unquoted and quoted.
+    ['rm -rf .', 'rm-cwd'],
+    ['rm -rf "."', 'rm-cwd'],
+    ["rm -rf '.'", 'rm-cwd'],
+    ['rm -rf ./', 'rm-cwd'],
+    ['rm -rf "./"', 'rm-cwd'],
+    ['rm -rf *', 'rm-cwd'],
+    ['rm -rf "*"', 'rm-cwd'],
+    ['rm -rf ./*', 'rm-cwd'],
+    ['rm -rf "./*"', 'rm-cwd'],
+    // dd-disk and mkfs: quoted device path.
+    ['dd if=/dev/zero of=/dev/sda', 'dd-disk'],
+    ['dd if=/dev/zero of="/dev/sda"', 'dd-disk'],
+    ['mkfs.ext4 /dev/sda', 'mkfs'],
+    ['mkfs.ext4 "/dev/sda"', 'mkfs'],
+    // cat-env: quoted .env path.
+    ['cat .env', 'cat-env'],
+    ['cat ".env"', 'cat-env'],
+    ["cat '.env'", 'cat-env'],
+    // rm-home / rm-home-var: existing quote tolerance still holds.
+    ['rm -rf ~', 'rm-home'],
+    ['rm -rf "~"', 'rm-home'],
+    ['rm -rf $HOME', 'rm-home-var'],
+    ['rm -rf "$HOME"', 'rm-home-var'],
+  ];
+  for (const [cmd, id] of MUST_BLOCK) {
+    it(`blocks: ${cmd}`, () => {
+      const r = checkCommand(cmd);
+      expect(r.blocked).toBe(true);
+      expect(r.pattern.id).toBe(id);
+    });
+  }
+
+  it('blocks git checkout "." at the strict tier (quoted pathspec)', () => {
+    const r = checkCommand('git checkout "."', 'strict');
+    expect(r.blocked).toBe(true);
+    expect(r.pattern.id).toBe('git-checkout-dot');
+  });
+
+  it('blocks git checkout . at the strict tier (unquoted regression guard)', () => {
+    const r = checkCommand('git checkout .', 'strict');
+    expect(r.blocked).toBe(true);
+    expect(r.pattern.id).toBe('git-checkout-dot');
+  });
+
+  const MUST_NOT_BLOCK = [
+    'rm -rf ./build',
+    'rm -rf node_modules',
+    'rm -f /tmp/scratch.txt',
+    'rm -rf "$PWD/dist"',
+  ];
+  for (const cmd of MUST_NOT_BLOCK) {
+    it(`does not block ordinary work: ${cmd}`, () => {
+      expect(checkCommand(cmd).blocked).toBe(false);
+    });
+  }
 });
 
 describe('protect-secrets', () => {
