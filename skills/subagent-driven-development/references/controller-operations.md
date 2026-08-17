@@ -167,3 +167,24 @@ After marking each task completed via `TaskUpdate`, update the `.tasks.json` fil
 4. Write the file back
 
 This ensures cross-session resume works correctly. Without this, a new session loading `.tasks.json` would see completed tasks as `"pending"`.
+
+## Task State Transitions
+
+`status` stays `in_progress` across the whole body of a task; what moves is which part of the
+loop the controller is in. Record each move with `TaskUpdate`, setting `activeForm` to the
+state now in effect:
+
+| Loop event | `activeForm` |
+|---|---|
+| Implementer subagent dispatched | Implementing Task N — implementer running |
+| Implementer report read | Implementing Task N — building the review package |
+| Task reviewer dispatched | Reviewing Task N |
+| Reviewer verdict read | Verifying Task N against its acceptance criteria |
+
+Each row is a state the loop genuinely enters, so recording it states something true about the
+work, and a reader can act on the difference: a stalled `Reviewing Task 4` and a stalled
+`Verifying Task 4` call for different interventions.
+
+A step that is genuinely atomic and runs long — one implementer working through a large task —
+passes through none of these, and gets no update. Silence is the accurate report of a state
+that has not changed.

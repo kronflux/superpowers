@@ -149,6 +149,10 @@ carried-constraints list: [references/controller-operations.md](references/contr
 
 See [references/controller-operations.md](references/controller-operations.md#task-persistence-sync) — Restoring the native task list from .tasks.json at entry; syncing it back after each the task.md task list.
 
+## Task State Transitions
+
+See [references/controller-operations.md](references/controller-operations.md#task-state-transitions) — Recording dispatch, implementer return, review and verification on the task as each occurs.
+
 ## Prompt Templates
 
 - [implementer-prompt.md](implementer-prompt.md) - Dispatch implementer subagent
@@ -188,6 +192,8 @@ See [references/example-and-advantages.md](references/example-and-advantages.md#
 - Move to next task while the review has open Critical/Important issues
 - Re-dispatch a task the progress ledger already marks complete — check
   the ledger (and `git log`) after any compaction or resume
+- Issue a `the task.md task list` with no real state change behind it — an update
+  restating where the loop already was is not tracking
 
 **If subagent asks questions:**
 - Answer clearly and completely
