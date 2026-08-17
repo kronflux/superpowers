@@ -425,18 +425,32 @@ function getUncommittedPaths(cwd) {
 }
 
 /**
+ * Session-edited paths, expressed relative to cwd in git's own format, that
+ * git also reports dirty. Both the TDD reminder and the commit reminder
+ * derive their counts from this intersection rather than from the edit log
+ * alone, so a path written and then reverted to its committed bytes, or
+ * written outside the repository, never contributes to either count. A git
+ * failure or a non-repository cwd yields no dirty paths at all, so both
+ * reminders go silent rather than falling back to an edit-log count.
+ */
+function getUncommittedSessionPaths(cwd, editedPaths, dirtyPaths) {
+  const dirty = dirtyPaths || getUncommittedPaths(cwd);
+  const base = path.resolve(cwd || '.');
+  const edited = new Set(
+    (editedPaths || []).map(p =>
+      path.relative(base, path.resolve(p)).split(path.sep).join('/')
+    )
+  );
+  return dirty.filter(d => edited.has(d));
+}
+
+/**
  * Count of dirty paths that this session also edited. Scoping to session
  * edits keeps a reminder about the operator's own work from counting a
  * working tree another agent left dirty.
  */
 function getUncommittedSessionCount(cwd, editedPaths, dirtyPaths) {
-  const dirty = dirtyPaths || getUncommittedPaths(cwd);
-  const edited = new Set(
-    (editedPaths || []).map(p =>
-      path.relative(path.resolve(cwd || '.'), path.resolve(p)).split(path.sep).join('/')
-    )
-  );
-  return dirty.filter(d => edited.has(d)).length;
+  return getUncommittedSessionPaths(cwd, editedPaths, dirtyPaths).length;
 }
 
 /**
@@ -456,21 +470,33 @@ function generateReminders(edits, cwd) {
   if (edits.length === 0) return reminders;
 
   const editedPaths = [...new Set(edits.map(e => e.filePath))];
-  const sourceFiles = editedPaths.filter(p => isSourceFile(p, cwd));
-  const testFiles = editedPaths.filter(isTestFile);
+  const dirtyPaths = getUncommittedPaths(cwd);
+  const dirtySessionPaths = getUncommittedSessionPaths(cwd, editedPaths, dirtyPaths);
 
-  // TDD reminder: source files changed without corresponding tests
-  const untestedSources = sourceFiles.filter(src => !isTestFile(src));
-  if (untestedSources.length > 0 && testFiles.length === 0) {
+  // TDD reminder: non-test source files this session both edited and left
+  // dirty in git, with no dirty test file alongside them. Deriving from git
+  // status (via dirtySessionPaths above) rather than the edit log means a
+  // clean tree never fires this regardless of how many Write/Edit calls the
+  // session made, and a file written then reverted to its committed bytes
+  // drops out once its diff disappears. Untracked (newly created) source
+  // files count the same as modified ones — new code with no test coverage
+  // is the same "behavior changed, tests didn't" signal — so the wording
+  // says "changed" rather than "modified" to match what is counted.
+  const dirtySourceFiles = dirtySessionPaths.filter(p => {
+    const abs = path.join(cwd || '.', p);
+    return isSourceFile(abs, cwd) && !isTestFile(p);
+  });
+  const dirtyTestFiles = dirtySessionPaths.filter(isTestFile);
+  if (dirtySourceFiles.length > 0 && dirtyTestFiles.length === 0) {
     reminders.push(
-      `TDD reminder: ${untestedSources.length} source file(s) modified without test changes. ` +
+      `TDD reminder: ${dirtySourceFiles.length} source file(s) changed without test changes. ` +
       `Consider running tests or invoking TDD workflow if behavior changed.`
     );
   }
 
   // Commit reminder: only files this session touched and left dirty.
   if (editedPaths.length >= 5) {
-    const uncommittedCount = getUncommittedSessionCount(cwd, editedPaths);
+    const uncommittedCount = dirtySessionPaths.length;
     if (uncommittedCount >= 5) {
       reminders.push(
         `Commit reminder: ${uncommittedCount} files with uncommitted changes. ` +
@@ -677,6 +703,7 @@ export {
   getRecentEdits,
   getUncommittedPaths,
   getUncommittedSessionCount,
+  getUncommittedSessionPaths,
   guardFile,
   isRealUserMessage,
   isSourceFile,

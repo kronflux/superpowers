@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
-import { checkForwardCommitment, evaluatePayload, isSourceFile, getUncommittedSessionCount, parsePorcelainPath } from '../hooks/stop-reminders.js';
+import {
+  checkForwardCommitment,
+  evaluatePayload,
+  isSourceFile,
+  getUncommittedSessionCount,
+  generateReminders,
+  parsePorcelainPath,
+} from '../hooks/stop-reminders.js';
 
 // Task 4: guard against a turn that announces work and does none.
 // run() exercises the pure detector directly — no transcript file needed,
@@ -255,5 +264,108 @@ describe('parsePorcelainPath', () => {
 
   it('handles a rename with a modified flag', () => {
     expect(parsePorcelainPath('RM x.py -> y.py')).toBe('y.py');
+  });
+});
+
+describe('TDD reminder: derived from the working tree', () => {
+  function initRepo(dir) {
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+  }
+
+  function commitAll(dir, message) {
+    execFileSync('git', ['add', '-A'], { cwd: dir });
+    execFileSync('git', ['commit', '-q', '-m', message], { cwd: dir });
+  }
+
+  function newRepo(prefix) {
+    const repo = fs.mkdtempSync(path.join(spTmpDir(), prefix));
+    initRepo(repo);
+    fs.writeFileSync(path.join(repo, 'README.md'), 'seed\n');
+    commitAll(repo, 'seed');
+    return repo;
+  }
+
+  function editEntry(filePath) {
+    return { filePath, timestamp: new Date().toISOString(), sessionId: null };
+  }
+
+  const tddLine = (reminders) => reminders.find((r) => /TDD reminder/.test(r));
+
+  it('is the operator repro: a clean tree emits no TDD reminder regardless of how many files the session wrote', () => {
+    const repo = newRepo('sp-tdd-clean-');
+    // Edit log records 6 Write calls; none of these files were ever actually
+    // created on disk, so `git status --porcelain` reports nothing for them.
+    const edits = Array.from({ length: 6 }, (_, i) => editEntry(path.join(repo, `probe${i}.py`)));
+    const reminders = generateReminders(edits, repo);
+    expect(tddLine(reminders)).toBeUndefined();
+  });
+
+  it('emits no reminder for writes outside the repository', () => {
+    const repo = newRepo('sp-tdd-outside-');
+    const outside = fs.mkdtempSync(path.join(spTmpDir(), 'sp-tdd-scratch-'));
+    fs.writeFileSync(path.join(outside, 'scratch.py'), 'print(1)\n');
+    const edits = [editEntry(path.join(outside, 'scratch.py'))];
+    const reminders = generateReminders(edits, repo);
+    expect(tddLine(reminders)).toBeUndefined();
+  });
+
+  it('emits no reminder for a .md-only diff', () => {
+    const repo = newRepo('sp-tdd-md-');
+    fs.writeFileSync(path.join(repo, 'README.md'), 'seed\nmore\n');
+    const edits = [editEntry(path.join(repo, 'README.md'))];
+    const reminders = generateReminders(edits, repo);
+    expect(tddLine(reminders)).toBeUndefined();
+  });
+
+  it('emits the reminder with the correct count for a modified tracked source file', () => {
+    const repo = newRepo('sp-tdd-modified-');
+    fs.writeFileSync(path.join(repo, 'a.py'), 'x = 1\n');
+    fs.writeFileSync(path.join(repo, 'b.py'), 'y = 1\n');
+    commitAll(repo, 'add sources');
+    fs.writeFileSync(path.join(repo, 'a.py'), 'x = 2\n');
+    fs.writeFileSync(path.join(repo, 'b.py'), 'y = 2\n');
+    const edits = [editEntry(path.join(repo, 'a.py')), editEntry(path.join(repo, 'b.py'))];
+    const reminders = generateReminders(edits, repo);
+    expect(tddLine(reminders)).toMatch(/2 source file\(s\)/);
+  });
+
+  it('counts an untracked, newly created source file (this fork\'s decision: creation counts)', () => {
+    const repo = newRepo('sp-tdd-created-');
+    fs.writeFileSync(path.join(repo, 'new_module.py'), 'z = 1\n');
+    const edits = [editEntry(path.join(repo, 'new_module.py'))];
+    const reminders = generateReminders(edits, repo);
+    const line = tddLine(reminders);
+    expect(line).toMatch(/1 source file\(s\)/);
+    // Wording matches what is counted: "changed" covers both a newly
+    // created file and a modified one, so it is not misdescribed as "modified".
+    expect(line).toMatch(/changed/);
+    expect(line).not.toMatch(/modified/);
+  });
+
+  it('emits nothing on a git failure rather than falling back to the edit-log count', () => {
+    const nonexistentCwd = path.join(spTmpDir(), 'sp-tdd-does-not-exist-' + process.pid);
+    const edits = Array.from({ length: 6 }, (_, i) => editEntry(path.join(nonexistentCwd, `probe${i}.py`)));
+    const reminders = generateReminders(edits, nonexistentCwd);
+    expect(tddLine(reminders)).toBeUndefined();
+  });
+
+  it('emits nothing in a non-repository cwd', () => {
+    const notARepo = fs.mkdtempSync(path.join(spTmpDir(), 'sp-tdd-not-a-repo-'));
+    const edits = Array.from({ length: 4 }, (_, i) => editEntry(path.join(notARepo, `probe${i}.py`)));
+    const reminders = generateReminders(edits, notARepo);
+    expect(tddLine(reminders)).toBeUndefined();
+  });
+
+  it('a file written and then reverted to its committed content is not counted', () => {
+    const repo = newRepo('sp-tdd-reverted-');
+    fs.writeFileSync(path.join(repo, 'a.py'), 'x = 1\n');
+    commitAll(repo, 'add source');
+    fs.writeFileSync(path.join(repo, 'a.py'), 'x = 999\n'); // edited
+    fs.writeFileSync(path.join(repo, 'a.py'), 'x = 1\n'); // reverted back to committed bytes
+    const edits = [editEntry(path.join(repo, 'a.py'))];
+    const reminders = generateReminders(edits, repo);
+    expect(tddLine(reminders)).toBeUndefined();
   });
 });
