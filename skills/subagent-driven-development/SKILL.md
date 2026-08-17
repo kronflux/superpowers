@@ -64,12 +64,12 @@ digraph process {
         "Mark task complete in todo list and progress ledger" [shape=box];
     }
 
-    "Read plan, note context and global constraints, create todos" [shape=box];
+    "Read plan, note context and global constraints, restore the task list" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer subagent (../requesting-code-review/code-reviewer.md)" [shape=box];
     "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
-    "Read plan, note context and global constraints, create todos" -> "Dispatch implementer subagent (./implementer-prompt.md)";
+    "Read plan, note context and global constraints, restore the task list" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
     "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
     "Answer questions, provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
@@ -88,14 +88,7 @@ digraph process {
 
 ## Pre-Flight Plan Review
 
-Before dispatching Task 1, scan the plan once for conflicts: tasks that contradict each other
-or the plan's Global Constraints, or anything the plan explicitly mandates that the review
-rubric treats as a defect (an assertion-free test, verbatim duplication of a logic block).
-
-Present every finding as one batched question to your human partner — finding beside the plan
-text that mandates it, asking which governs — before execution begins, not one interrupt per
-discovery mid-plan. If clean, proceed without comment. The review loop remains the net for
-conflicts that only emerge from implementation.
+See [references/controller-operations.md](references/controller-operations.md#pre-flight-plan-review) — Scanning the plan for internal conflicts and batching them as one question before Task 1.
 
 ## Model Selection
 
@@ -154,7 +147,7 @@ carried-constraints list: [references/controller-operations.md](references/contr
 
 ## Task Persistence Sync
 
-See [references/controller-operations.md](references/controller-operations.md#task-persistence-sync) — Syncing .tasks.json after each TaskUpdate for cross-session resume.
+See [references/controller-operations.md](references/controller-operations.md#task-persistence-sync) — Restoring the native task list from .tasks.json at entry; syncing it back after each TaskUpdate.
 
 ## Prompt Templates
 

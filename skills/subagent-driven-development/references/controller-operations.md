@@ -2,6 +2,17 @@
 
 Reference for the `subagent-driven-development` skill. See [SKILL.md](../SKILL.md) for the execution flow.
 
+## Pre-Flight Plan Review
+
+Before dispatching Task 1, scan the plan once for conflicts: tasks that contradict each other
+or the plan's Global Constraints, or anything the plan explicitly mandates that the review
+rubric treats as a defect (an assertion-free test, verbatim duplication of a logic block).
+
+Present every finding as one batched question to your human partner — finding beside the plan
+text that mandates it, asking which governs — before execution begins, not one interrupt per
+discovery mid-plan. If clean, proceed without comment. The review loop remains the net for
+conflicts that only emerge from implementation.
+
 ## Model Selection
 
 Use the least powerful model that can handle each role to conserve cost and increase speed.
@@ -118,6 +129,35 @@ task established, which is a task-ordering defect, not a review-catchable one: t
 only the task it was dispatched for and has no way to know a constraint exists upstream.
 
 ## Task Persistence Sync
+
+`<plan-path>.tasks.json` is the plan's durable task record; the native task list is the
+harness's live view of it. Both describe the same real work, and both are kept true to it —
+never maintained to make a tool look recently used.
+
+### Restoring the task list at entry
+
+Run this before dispatching Task 1, and again on any resume or post-compaction re-entry,
+following the procedure [executing-plans Step 0](../../executing-plans/SKILL.md#step-0-load-persisted-tasks)
+already defines:
+
+1. Call `TaskList`.
+2. Locate `<plan-path>.tasks.json`, or glob for the matching `.tasks.json` when the exact
+   name is absent.
+3. For each task in that file the native list does not hold, call `TaskCreate` with the full
+   `description` (including the `json:metadata` fence), then restore `blockedBy` through
+   `TaskUpdate`.
+
+Recreate only what the native list does not already hold — a resumed or post-compaction entry
+that already carries the plan's tasks creates no duplicate. With no `.tasks.json` for the plan,
+the rebuild creates nothing: a task the plan does not record has no source, and inventing one
+is not tracking. Outside a plan under execution this step does not run at all, and creates no
+task.
+
+Multi-step work that lives only in a plan file is visible to nothing but the controller holding
+it. The restored list is what makes it legible to the operator and to any session that resumes
+the plan.
+
+### Syncing after each status change
 
 After marking each task completed via `TaskUpdate`, update the `.tasks.json` file to stay in sync:
 
