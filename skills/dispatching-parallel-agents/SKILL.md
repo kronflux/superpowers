@@ -121,6 +121,24 @@ Do NOT use the Skill tool. Your only job is the task described above.
 Return: Summary of what you found and what you fixed.
 ```
 
+## Response Shape in the Prompt
+
+A dispatched agent's system prompt is its agent definition — it never receives the calling
+session's output style and essentially never reads `output-contract.md` on its own. Measured
+across 49,895 subagent turns, "Output Style" appears 0 times and `output-contract` appears
+once. Every prompt built from the structure above inlines these rules directly, rather than
+pointing the agent at either document:
+
+- **Report structure.** Name what the return must contain, in order — not just "return a
+  summary."
+- **A status line is required.** The first line of the return names the outcome (fixed,
+  blocked, needs-context) before any narrative.
+- **Evidence is quoted, not summarised.** The agent pastes the failing/passing command and
+  its decisive output line; "tests pass now" is not evidence.
+- **A structured return follows its schema, not prose.** If the return feeds the controller's
+  next step (see Native Task Integration below), give the schema explicitly — a structured
+  return is not wrapped in explanatory prose.
+
 ## Common Mistakes
 
 **❌ Too broad:** "Fix all the tests" - agent gets lost

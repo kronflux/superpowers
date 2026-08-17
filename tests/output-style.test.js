@@ -283,3 +283,49 @@ describe('output-contract.md shrinks to the delta (Task 4)', () => {
     expect(agentsMd).toBe(claudeMd);
   });
 });
+
+// Task 5: neither output-contract.md nor the installed style reaches a subagent's
+// system prompt, so the two dispatch skills must inline shape rules into every
+// brief they construct. Assertions target the measured justification (0 of
+// 49,895 subagent turns) and the four named shape-rule expectations.
+
+const SDD_SKILL_PATH = path.join(ROOT, 'skills', 'subagent-driven-development', 'SKILL.md');
+const SDD_HANDOFFS_PATH = path.join(
+  ROOT,
+  'skills',
+  'subagent-driven-development',
+  'references',
+  'dispatch-and-handoffs.md',
+);
+const DPA_SKILL_PATH = path.join(ROOT, 'skills', 'dispatching-parallel-agents', 'SKILL.md');
+
+describe('dispatch skills inline shape rules into briefs (Task 5)', () => {
+  it('subagent-driven-development/SKILL.md states the measured justification and instructs inlining', () => {
+    const src = fs.readFileSync(SDD_SKILL_PATH, 'utf8');
+    expect(src, 'measured turn count not cited').toMatch(/49,895/);
+    expect(src, 'measured zero-occurrence finding not cited').toMatch(/\b0\b.{0,40}Output Style|Output Style.{0,40}\b0\b/is);
+    expect(src, 'no instruction to inline shape rules').toMatch(/inline/i);
+  });
+
+  it('subagent-driven-development reference states the four required shape-rule expectations', () => {
+    const src = fs.readFileSync(SDD_HANDOFFS_PATH, 'utf8');
+    const idx = src.search(/## Response Shape in Dispatches/i);
+    expect(idx, 'no Response Shape in Dispatches section found').toBeGreaterThan(-1);
+    const section = src.slice(idx, idx + 1500);
+    expect(section, 'report structure not required').toMatch(/report structure/i);
+    expect(section, 'status line not required').toMatch(/status line/i);
+    expect(section, 'evidence-quoting not required').toMatch(/quoted, not summaris/i);
+    expect(section, 'structured-return schema not required').toMatch(/schema, not prose/i);
+  });
+
+  it('dispatching-parallel-agents/SKILL.md states the measured justification and the four shape-rule expectations', () => {
+    const src = fs.readFileSync(DPA_SKILL_PATH, 'utf8');
+    expect(src, 'measured turn count not cited').toMatch(/49,895/);
+    expect(src, 'measured zero-occurrence finding not cited').toMatch(/\b0\b.{0,40}Output Style|Output Style.{0,40}\b0\b/is);
+    expect(src, 'no instruction to inline shape rules').toMatch(/inline/i);
+    expect(src, 'report structure not required').toMatch(/report structure/i);
+    expect(src, 'status line not required').toMatch(/status line/i);
+    expect(src, 'evidence-quoting not required').toMatch(/quoted, not summaris/i);
+    expect(src, 'structured-return schema not required').toMatch(/schema, not prose|schema explicitly/i);
+  });
+});

@@ -108,6 +108,16 @@ See [references/controller-operations.md](references/controller-operations.md#mo
 
 See [references/controller-operations.md](references/controller-operations.md#handling-implementer-status) — Handling DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED implementer statuses.
 
+## Response Shape in Dispatches
+
+A subagent's system prompt is its agent definition, not this session's output style or
+`output-contract.md` — measured across 49,895 subagent turns, "Output Style" appears 0 times
+and `output-contract` appears once. Every prompt this skill constructs inlines the shape
+rules directly: see
+[references/dispatch-and-handoffs.md](references/dispatch-and-handoffs.md#response-shape-in-dispatches)
+for the required report structure, status line, evidence-quoting, and structured-return
+rules.
+
 ## Handling Reviewer ⚠️ Items
 
 The task reviewer may report "⚠️ Cannot verify from diff" items — requirements
