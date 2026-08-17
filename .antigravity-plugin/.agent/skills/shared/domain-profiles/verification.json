@@ -1,0 +1,5 @@
+{
+  "artifact-cheap-to-modify": false,
+  "execution-safe": false,
+  "failure-is-cheap": false
+}

@@ -8,6 +8,7 @@ import {
   skillDeclaredPreconditions,
   hasUnmetPrecondition,
 } from '../hooks/lib/domain-profile.js';
+import { filterUnmetPreconditions } from '../hooks/skill-activator.js';
 import { spTmpDir } from '../hooks/lib/sp-tmp.js';
 
 // Task 4 (skill-semantics-routing): a skill declares preconditions in its
@@ -89,6 +90,76 @@ describe('skillDeclaredPreconditions', () => {
     const skillsRoot = path.join(ROOT, 'skills');
     expect(() => skillDeclaredPreconditions(skillsRoot, 'no-such-skill')).not.toThrow();
     expect(skillDeclaredPreconditions(skillsRoot, 'no-such-skill')).toEqual([]);
+  });
+});
+
+describe('the shipped verification domain profile', () => {
+  const PROFILE_DOC = path.join(ROOT, 'skills', 'shared', 'domain-profiles.md');
+  const TEMPLATE = path.join(ROOT, 'skills', 'shared', 'domain-profiles', 'verification.json');
+  const SKILLS_ROOT = path.join(ROOT, 'skills');
+
+  function installTemplate(scratch) {
+    fs.mkdirSync(path.join(scratch, '.superpowers'), { recursive: true });
+    fs.copyFileSync(TEMPLATE, path.join(scratch, '.superpowers', 'domain-profile.json'));
+  }
+
+  it('declares only keys the loader recognises', () => {
+    const parsed = JSON.parse(fs.readFileSync(TEMPLATE, 'utf8'));
+    expect(Object.keys(parsed).length).toBeGreaterThan(0);
+    for (const key of Object.keys(parsed)) expect(PRECONDITIONS).toContain(key);
+  });
+
+  it('copied into a repository, marks all three preconditions unmet through the real loader', () => {
+    withScratch((scratch) => {
+      installTemplate(scratch);
+      const profile = loadDomainProfile(scratch);
+      expect(profile['execution-safe']).toBe(false);
+      expect(profile['failure-is-cheap']).toBe(false);
+      expect(profile['artifact-cheap-to-modify']).toBe(false);
+    });
+  });
+
+  it('puts test-driven-development and systematic-debugging in conflict, and nothing else', () => {
+    withScratch((scratch) => {
+      installTemplate(scratch);
+      const profile = loadDomainProfile(scratch);
+      for (const name of ['test-driven-development', 'systematic-debugging']) {
+        expect(hasUnmetPrecondition(skillDeclaredPreconditions(SKILLS_ROOT, name), profile)).toBe(true);
+      }
+      expect(hasUnmetPrecondition(skillDeclaredPreconditions(SKILLS_ROOT, 'brainstorming'), profile)).toBe(false);
+    });
+  });
+
+  it('costs the conflicting skill its advisory hint and leaves every other hint standing', () => {
+    withScratch((scratch) => {
+      installTemplate(scratch);
+      const matches = [
+        { skill: 'test-driven-development', priority: 'critical', score: 5 },
+        { skill: 'systematic-debugging', priority: 'critical', score: 5 },
+        { skill: 'brainstorming', priority: 'high', score: 5 },
+        { skill: 'writing-plans', priority: 'high', score: 5 },
+      ];
+      expect(filterUnmetPreconditions(matches, scratch).map((m) => m.skill))
+        .toEqual(['brainstorming', 'writing-plans']);
+    });
+  });
+
+  it('is documented as the same profile the template ships', () => {
+    const doc = fs.readFileSync(PROFILE_DOC, 'utf8');
+    const block = [...doc.matchAll(/```json\r?\n([\s\S]*?)```/g)]
+      .map((m) => m[1])
+      .find((b) => b.includes('execution-safe'));
+    expect(block, 'domain-profiles.md carries no fenced JSON profile').toBeTruthy();
+    expect(JSON.parse(block)).toEqual(JSON.parse(fs.readFileSync(TEMPLATE, 'utf8')));
+  });
+
+  it('reaches no hook but the advisory-hint filter', () => {
+    const hooksDir = path.join(ROOT, 'hooks');
+    const consumers = fs
+      .readdirSync(hooksDir)
+      .filter((n) => n.endsWith('.js'))
+      .filter((n) => /lib\/domain-profile\.js/.test(fs.readFileSync(path.join(hooksDir, n), 'utf8')));
+    expect(consumers).toEqual(['skill-activator.js']);
   });
 });
 
