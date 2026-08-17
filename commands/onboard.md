@@ -94,29 +94,33 @@ AskUserQuestion:
 
 On any non-skip answer:
 
-1. **Resolve the real script paths before writing anything.** If `CLAUDE_PLUGIN_ROOT` is set in this session's environment, the scripts live under `${CLAUDE_PLUGIN_ROOT}/hooks/examples/`. Otherwise look under `~/.claude/plugins/cache/superpowers-dev/superpowers/<version>/hooks/examples/` (Windows: `%USERPROFILE%\.claude\plugins\cache\superpowers-dev\superpowers\<version>\hooks\examples\`) — list the parent directory to find the installed `<version>`. Verify `post-task-complete-revalidate.sh` (and, if selected, `stop-revalidate-user-gates.sh`) actually exist at the resolved path. If no location resolves, tell the user the install path could not be found and stop this feature without writing anything.
+1. **Resolve the plugin root, then install the version-stable launcher.** If `CLAUDE_PLUGIN_ROOT` is set in this session's environment, that is the plugin root. Otherwise look under `~/.claude/plugins/cache/superpowers-dev/superpowers/<version>/` (Windows: `%USERPROFILE%\.claude\plugins\cache\superpowers-dev\superpowers\<version>\`) — list the parent directory to find the installed `<version>`. Verify `hooks/examples/post-task-complete-revalidate.sh` (and, if selected, `hooks/examples/stop-revalidate-user-gates.sh`) actually exist under it. If no location resolves, tell the user the install path could not be found and stop this feature without writing anything.
 
-2. **Dedupe check spans every settings scope.** Before adding an entry for a given script, check whether a hook `command` referencing that script's filename is already registered in ANY of: the project's `.claude/settings.json`, the project's `.claude/settings.local.json`, or the user's `~/.claude/settings.json`. If it is already registered anywhere, do not add it again — report which file already covers it and move on to the next hook (or to the `EnterPlanMode` step if both hooks are already covered).
+   Call `installGateLauncher(configRoot, pluginRoot)` from `hooks/lib/gate-launcher-install.js`. `configRoot` is `CLAUDE_CONFIG_DIR` if set, else `~/.claude`. This copies the launcher, its resolver, and a fallback copy of both gate scripts to `<configRoot>/`, outside the versioned plugin directory, and returns the launcher's absolute path (`<configRoot>/superpowers-gate-launcher.sh`) — that path, not any path containing `<version>`, is what gets registered below. The launcher resolves the real gate script at run time (`installed_plugins.json`, then a version-sorted cache scan, then its own fallback copy), so a later plugin update never orphans the registration.
 
-3. **Merge into the project's `.claude/settings.json`, never overwrite.** Read the file first (resolve a symlink to the real target). Diff-and-confirm per Ground rules if it already exists. Append each new hook entry into the matching array (`hooks.PostToolUse` for the per-task hook, matcher `TaskUpdate`; `hooks.Stop` for the stop hook, no matcher), creating only the missing keys, and write the full merged result back. If an object with the same matcher already exists in that array, push the new command into its `hooks` sub-array instead of creating a sibling matcher object. If the file does not exist, create it containing only the hooks structure being added. Registration shapes (substitute the resolved path from step 1 for `<resolved-path>`):
+2. **Migrate an existing version-pinned registration before deduping.** For each of the project's `.claude/settings.json`, the project's `.claude/settings.local.json`, and the user's `~/.claude/settings.json`: if the file exists, call `migrateGateHookCommand(settingsPath, launcherPath)` from the same module. It rewrites any hook `command` that still points at `hooks/examples/post-task-complete-revalidate.sh` or `hooks/examples/stop-revalidate-user-gates.sh` inside a versioned plugin path to invoke the launcher instead (`bash "<launcherPath>" <script-name>`), leaving every other key untouched, and reports `{changed, path}` (or `state: 'unparseable'`, which per Ground rules means stop and show the diff rather than write). Report each file it actually changed to the user. A settings file with no pinned entry is untouched and not reported.
+
+3. **Dedupe check spans every settings scope.** Before adding an entry for a given script, check whether a hook `command` referencing that script's filename is already registered in ANY of the same three files. If it is already registered anywhere (including by the migration in step 2), do not add it again — report which file already covers it and move on to the next hook (or to the `EnterPlanMode` step if both hooks are already covered).
+
+4. **Merge into the project's `.claude/settings.json`, never overwrite.** Read the file first (resolve a symlink to the real target). Diff-and-confirm per Ground rules if it already exists. Append each new hook entry into the matching array (`hooks.PostToolUse` for the per-task hook, matcher `TaskUpdate`; `hooks.Stop` for the stop hook, no matcher), creating only the missing keys, and write the full merged result back. If an object with the same matcher already exists in that array, push the new command into its `hooks` sub-array instead of creating a sibling matcher object. If the file does not exist, create it containing only the hooks structure being added. Registration shapes (substitute the launcher path from step 1 for `<launcher-path>`):
 
    ```json
    { "hooks": { "PostToolUse": [ { "matcher": "TaskUpdate",
      "hooks": [ { "type": "command",
-       "command": "bash \"<resolved-path>/post-task-complete-revalidate.sh\"" } ] } ] } }
+       "command": "bash \"<launcher-path>\" post-task-complete-revalidate.sh" } ] } ] } }
    ```
 
    ```json
    { "hooks": { "Stop": [
      { "hooks": [ { "type": "command",
-       "command": "bash \"<resolved-path>/stop-revalidate-user-gates.sh\"" } ] } ] } }
+       "command": "bash \"<launcher-path>\" stop-revalidate-user-gates.sh" } ] } ] } }
    ```
 
-   Windows note (from `hooks/examples/README.md`): if `bash` is not on `PATH` when hooks run, invoke Git Bash explicitly instead of the bare `bash` command, e.g. `"command": "\"C:\\Program Files\\Git\\bin\\bash.exe\" \"<resolved-path>\\post-task-complete-revalidate.sh\""`.
+   Windows note (from `hooks/examples/README.md`): if `bash` is not on `PATH` when hooks run, invoke Git Bash explicitly instead of the bare `bash` command, e.g. `"command": "\"C:\\Program Files\\Git\\bin\\bash.exe\" \"<launcher-path>\" post-task-complete-revalidate.sh"`.
 
-4. **Also deny `EnterPlanMode` (pcvelz precedent).** The gate-check flow (`skills/checking-gates/SKILL.md`, `skills/specifying-gates/SKILL.md`) forbids plan-mode detours; block it at the permissions layer too. Merge `{"permissions": {"deny": ["EnterPlanMode"]}}` into the same project `.claude/settings.json` — append `"EnterPlanMode"` to an existing `permissions.deny` array (skip if already present), or create the array if absent. Same read-merge-write, same diff-and-confirm if the file already exists.
+5. **Also deny `EnterPlanMode` (pcvelz precedent).** The gate-check flow (`skills/checking-gates/SKILL.md`, `skills/specifying-gates/SKILL.md`) forbids plan-mode detours; block it at the permissions layer too. Merge `{"permissions": {"deny": ["EnterPlanMode"]}}` into the same project `.claude/settings.json` — append `"EnterPlanMode"` to an existing `permissions.deny` array (skip if already present), or create the array if absent. Same read-merge-write, same diff-and-confirm if the file already exists.
 
-5. **Confirm the write.** Re-read `.claude/settings.json`, verify the new entries parse and are present, and report the confirmed absolute path back to the user.
+6. **Confirm the write.** Re-read `.claude/settings.json`, verify the new entries parse and are present, and report the confirmed absolute path back to the user.
 
 ## Feature 3: Commit Strategy
 
