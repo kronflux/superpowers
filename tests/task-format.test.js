@@ -9,6 +9,10 @@ import { fileURLToPath } from 'node:url';
 //
 // Task 3 (skill-semantics-routing): plan step content is bound to the task's
 // modelTier, and the tier-to-step-format invariant is stated.
+//
+// Task 5 (skill-semantics-routing): a Lightweight classification is
+// re-checked at verification-before-completion and escalation is a decision
+// point, never a silent re-route or a de-escalation.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -29,6 +33,14 @@ const controllerOps = fs.readFileSync(
 const sddCombined = [sdd, dispatchHandoffs, controllerOps].join('\n');
 const planAuthoring = fs.readFileSync(
   path.join(ROOT, 'skills/writing-plans/references/plan-authoring.md'),
+  'utf8'
+);
+const routingGuide = fs.readFileSync(
+  path.join(ROOT, 'skills/using-superpowers/references/routing-guide.md'),
+  'utf8'
+);
+const verificationBeforeCompletion = fs.readFileSync(
+  path.join(ROOT, 'skills/verification-before-completion/SKILL.md'),
   'utf8'
 );
 
@@ -136,6 +148,39 @@ describe('No Placeholders — tier-conditional carve-out', () => {
     expect(writingPlans).toMatch(/Describe-without-show is a failure only at `mechanical`/);
     expect(planAuthoring).toMatch(/failure only at `mechanical`/);
     expect(planAuthoring).toMatch(/describing without showing is the required form/i);
+  });
+});
+
+describe('routing-guide.md — escalation triggers', () => {
+  it('names all four escalation triggers', () => {
+    const idx = routingGuide.indexOf('### Escalation triggers');
+    expect(idx).toBeGreaterThan(-1);
+    const block = routingGuide.slice(idx, idx + 900);
+    expect(block).toMatch(/scope grows past two files/i);
+    expect(block).toMatch(/new condition, gate, or trigger/i);
+    expect(block).toMatch(/user-visible change/i);
+    expect(block).toMatch(/migration or data-shape change/i);
+  });
+});
+
+describe('tier re-assessment — decision point, not a re-route', () => {
+  it('names verification-before-completion as where the re-check runs', () => {
+    expect(routingGuide).toMatch(/`verification-before-completion` runs the re-check/);
+    expect(verificationBeforeCompletion).toMatch(/Tier Escalation Check/);
+    expect(verificationBeforeCompletion).toMatch(/routing-guide\.md/);
+  });
+
+  it('states escalation as a decision point: stop, report, ask — not an automatic re-route', () => {
+    const combined = routingGuide + '\n' + verificationBeforeCompletion;
+    expect(combined).toMatch(/decision point, not a re-route/i);
+    expect(combined).toMatch(/reports? which condition failed/i);
+    expect(combined).toMatch(/asks? whether to continue/i);
+  });
+
+  it('excludes de-escalation: escalation is one-directional', () => {
+    const combined = routingGuide + '\n' + verificationBeforeCompletion;
+    expect(combined).toMatch(/one-directional/i);
+    expect(combined).toMatch(/nothing de-escalates|never re-classified back down/i);
   });
 });
 

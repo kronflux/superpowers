@@ -138,6 +138,16 @@ Do not claim success based on operation success alone. Verify the **outcome refl
 3. Run: a command that shows the observable difference.
 4. Verify: output contains the expected difference — not just that the operation completed.
 
+## Tier Escalation Check (Lightweight tasks)
+
+If the task was classified Lightweight (`${CLAUDE_PLUGIN_ROOT}/skills/using-superpowers/references/routing-guide.md` → "Complexity Tiers"), this gate is also where its classification is re-checked — it fires at the moment the true scope of the work is known, which no earlier checkpoint does. Before claiming completion, check the four escalation triggers (`routing-guide.md` → "Escalation triggers"): scope past two files, a new condition/gate/trigger, a user-visible change, a migration.
+
+**If none fired:** proceed with the rest of this gate as normal.
+
+**If any fired:** stop. This is a decision point, not a re-route — do not silently continue, and do not route back to `superpowers:brainstorming` on your own. Report which condition failed and what changed since classification, then ask whether to continue as-is with the gates the new condition requires, or to stop and re-plan through the Full route.
+
+Escalation is one-directional. A task that has triggered escalation is never re-classified back down to Lightweight.
+
 ## Self-Consistency Verification (optional)
 
 When the verification reasoning is non-trivial (multi-step inference, ambiguous evidence, configuration changes) AND the `superpowers:self-consistency-reasoner` skill is installed, apply multi-path reasoning before declaring the verdict: generate 3 independent reasoning paths (what the evidence proves / what it does not prove / alternative explanations), take the majority verdict, and if there is no majority do not claim completion — state what additional evidence is needed. If the skill is not installed, apply the standard Gate Function.

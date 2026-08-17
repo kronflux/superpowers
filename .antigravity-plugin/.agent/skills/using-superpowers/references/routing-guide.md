@@ -41,6 +41,21 @@ If the request is non-trivial AND `project-map.md` does not exist AND the projec
 - **Lightweight** — ALL FOUR hold, and you state in one sentence each why: scope ~2 files or fewer; no new condition/gate/trigger; no user-visible change; no migration/data-shape change. Skip brainstorming/planning/worktrees/parallel-dispatch; go straight to implementation; the single required gate is `verification-before-completion`; still invoke a dedicated implementation skill if one exists for the task.
 - **Full** — everything else. A **hard override** forces Full immediately regardless of scope: a new condition/gate/trigger, anything the user sees/experiences, an edit to a file other components depend on, or a new path/outcome that didn't exist before. Route: `.agent/skills/brainstorming/SKILL.md` → `.agent/skills/writing-plans/SKILL.md` → dispatch (subagent-driven-development or executing-plans).
 
+### Escalation triggers
+
+The four Lightweight conditions are checked once, before the Entry Sequence — they are not re-checked automatically. Work discovered mid-task can invalidate the classification anyway; the same four conditions, restated as observable failures, are the escalation triggers:
+
+- Scope grows past two files.
+- A new condition, gate, or trigger appears that wasn't in the original description.
+- A user-visible change emerges where none was expected.
+- A migration or data-shape change surfaces.
+
+**`verification-before-completion` runs the re-check**, since it already fires at the moment the true scope of the work is known — no earlier checkpoint has that information.
+
+**Escalation produces a decision point, not a re-route.** Routing a Lightweight task back to `brainstorming` from the verification gate would send an agent to requirements-gathering after the work is already done, which is absurd. Instead, on a trigger firing, the agent stops, reports which condition failed and what changed, and asks whether to continue as-is with the added gates the new condition requires, or to stop and re-plan through the Full route. It does not silently pick either.
+
+Escalation is one-directional: a task can move from Lightweight toward Full-level scrutiny, never the reverse. Nothing de-escalates a task once a trigger has fired.
+
 ## Context-Mode Detection
 
 The session-start hook injects a context-mode-active flag. When active, data-processing work in routed skills is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job and follow its chain; state-probes, mutations, and file writes stay native. When inactive, use native tools.
