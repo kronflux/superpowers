@@ -14,7 +14,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { configDir } from '../lib/config-dir.js';
-import { splitSegments } from '../lib/command-segments.js';
+import { splitSegments, stripHeredocs } from '../lib/command-segments.js';
 import { isAllowed } from '../lib/ask-allowlist.js';
 
 const SAFETY_LEVEL = 'high';
@@ -117,10 +117,26 @@ function log(data) {
   } catch {}
 }
 
+// Patterns match against the command with heredoc bodies removed: a heredoc
+// body is stdin data, never argv, so a dangerous string quoted inside one
+// (a commit message, a test fixture, documentation) cannot be the command
+// that runs and must not trip the gate. If stripping throws, matching falls
+// back to the raw command so a genuine block is never lost to a stripping
+// fault. Quotes are left intact — several patterns below deliberately match
+// a quoted operand (`rm -rf "$HOME"`) — so a dangerous command quoted as an
+// argument to a harmless one, e.g. `echo "git reset --hard"`, still matches.
+// That is the conservative side of the tradeoff: blocking a harmless mention
+// costs a false positive, allowing it risks a false negative.
 function checkCommand(cmd, safetyLevel = SAFETY_LEVEL) {
   const threshold = LEVELS[safetyLevel] || 2;
+  let scanned = cmd;
+  try {
+    scanned = stripHeredocs(cmd);
+  } catch {
+    scanned = cmd;
+  }
   for (const p of PATTERNS) {
-    if (LEVELS[p.level] <= threshold && p.regex.test(cmd)) {
+    if (LEVELS[p.level] <= threshold && p.regex.test(scanned)) {
       return { blocked: true, pattern: p };
     }
   }

