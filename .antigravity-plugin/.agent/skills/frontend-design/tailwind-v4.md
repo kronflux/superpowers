@@ -1,6 +1,6 @@
 # Tailwind CSS v4 Reference
 
-_Version: 4.x — Last updated: April 2026. If this stamp is >12 months old or a v5 release exists, fetch https://tailwindcss.com/docs before scaffolding (fetch per `.agent/skills/skills/SKILL.md/shared/conductor/context-mode-adapter.md` — ctx_fetch_and_index when context-mode active; or context7 query-docs; native fetch when inactive)._
+_Version: 4.x — Last updated: April 2026. If this stamp is >12 months old or a v5 release exists, fetch https://tailwindcss.com/docs before scaffolding (fetch per `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/context-mode-adapter.md` — ctx_fetch_and_index when context-mode active; or context7 query-docs; native fetch when inactive)._
 
 **Why this file exists:** Training data is biased toward Tailwind v3 patterns. Reading this file before any Tailwind work overrides that bias with verified v4 patterns.
 

@@ -154,7 +154,7 @@ After all questions answered:
 
 3. **Sync `.tasks.json`.** Update the task entry's description and metadata, set `lastUpdated`.
 
-   Do NOT route metadata writes through `ctx_execute` — ctx sandboxes discard their FS. Use native TaskUpdate / file write; mutations always stay native per `skills/shared/conductor/routing.md`.
+   Do NOT route metadata writes through `ctx_execute` — ctx sandboxes discard their FS. Use native TaskUpdate / file write; mutations always stay native per `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md`.
 
 4. **Announce:** "Specification locked. Returning control to executing-plans to run the gate."
 
@@ -173,4 +173,4 @@ Control returns to `superpowers:executing-plans`. The agent reads the updated ta
 
 - **Invoked from:** `superpowers:executing-plans` (automatic), `/specify-gate` slash command (manual).
 - **Returns to:** `superpowers:executing-plans`.
-- **References:** `superpowers:skills/shared/task-format-reference.md` for metadata schema.
+- **References:** `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` for metadata schema.

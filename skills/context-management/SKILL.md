@@ -7,7 +7,7 @@ description: 'Persists durable state across sessions via state.md; generates pro
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. This skill's writes (`state.md`, `session-log.md`, `project-map.md`) and git state-probes (`git rev-parse`, `git init`) always stay native — `ctx_execute*` discard their sandbox filesystem. Searching `session-log.md` / `project-map.md` is a discovery job.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. This skill's writes (`state.md`, `session-log.md`, `project-map.md`) and git state-probes (`git rev-parse`, `git init`) always stay native — `ctx_execute*` discard their sandbox filesystem. Searching `session-log.md` / `project-map.md` is a discovery job.
 
 **Overlap with context-mode session memory:** context-mode auto-capture and this skill's curated files are distinct layers with different owners and lifetimes. See [The Four Memory Layers](#the-four-memory-layers) for the authoritative contract — which layer holds what, and when to query each.
 

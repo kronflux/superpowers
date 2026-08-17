@@ -9,7 +9,7 @@ The `metadata` parameter on the task.md task list is accepted but **not returned
 - Cross-session resume can parse it from .tasks.json
 - Subagent dispatch can extract it for implementer prompts
 
-See `skills/shared/task-format-reference.md` for the full metadata schema.
+See `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` for the full metadata schema.
 
 ## the task.md task list description — why the full body, and the self-check
 

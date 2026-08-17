@@ -9,7 +9,7 @@ This skill transforms generic AI-generated UIs into production-grade, visually d
 
 ## Scope Gate — Before Anything Else
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain; inspecting these config files is a discovery job.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain; inspecting these config files is a discovery job.
 
 1. Check: does the project already have a design system, component library, or style guide?
    - Look for: `tailwind.config`, `theme.ts/js`, `tokens.json`, `design-system/`, `styles/`, existing component library (shadcn, MUI, Chakra, etc.)

@@ -22,7 +22,7 @@ description: Use when implementation is complete, all tests pass, and you need t
 
 Run the project's full test suite (`npm test` / `cargo test` / `pytest` / `go test ./...`).
 
-Verification commands follow the output-handling job in `skills/shared/conductor/routing.md`; evidence handling per `skills/shared/evidence.md`.
+Verification commands follow the output-handling job in `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md`; evidence handling per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`.
 
 **If tests fail**, report the failures and stop — the menu comes after a green suite:
 
@@ -108,7 +108,7 @@ git merge <feature-branch>
 <test command>
 ```
 
-The merged-result verification follows the same output-handling job; evidence handling per `skills/shared/evidence.md`.
+The merged-result verification follows the same output-handling job; evidence handling per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`.
 
 If tests fail on the merged result: stop, leave the worktree and branch in
 place, and investigate — nothing has been pushed, so the merge is local

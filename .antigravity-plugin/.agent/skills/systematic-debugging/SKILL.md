@@ -60,7 +60,7 @@ You MUST complete each phase before proceeding to the next.
    - Read stack traces completely
    - Note line numbers, file paths, error codes
    - On large failing-test output with middleware configured, run `summarize-test-failure`
-     per `skills/shared/conductor/middleware.md` for a 5-line digest instead of manually
+     per `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/middleware.md` for a 5-line digest instead of manually
      scanning the full dump
 
 2. **Reproduce Consistently**
@@ -97,7 +97,7 @@ You MUST complete each phase before proceeding to the next.
 
    Worked example (multi-layer CI → build → signing pipeline): see `multi-component-example.md` in this directory.
 
-   Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery and blast-radius → `codegraph.md`); surface the layer-by-layer evidence in-transcript regardless.
+   Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery and blast-radius → `codegraph.md`); surface the layer-by-layer evidence in-transcript regardless.
 
 5. **Trace Data Flow**
 

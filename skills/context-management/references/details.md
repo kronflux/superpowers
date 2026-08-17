@@ -6,7 +6,7 @@ Overflow detail split out of `../SKILL.md` to keep the core skill under the size
 
 **Step 1 — Extract keywords.** Take the 2-3 most distinctive nouns from the task description. Avoid generic words ("fix", "update", "file") — use domain nouns ("hook", "auth", "deploy", "staleness").
 
-**Step 2 — Search each keyword individually first.** Per `superpowers:skills/shared/conductor/context-mode-adapter.md`, route the search via `ctx_search`/`ctx_execute_file` over `session-log.md` when context-mode is active; when inactive, use native grep (native fallback):
+**Step 2 — Search each keyword individually first.** Per `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/context-mode-adapter.md`, route the search via `ctx_search`/`ctx_execute_file` over `session-log.md` when context-mode is active; when inactive, use native grep (native fallback):
 ```bash
 grep -i "<keyword1>" session-log.md | tail -20
 grep -i "<keyword2>" session-log.md | tail -20
@@ -42,7 +42,7 @@ Read any matching `[saved]` entries and ask: does the new decision *directly con
 
 **Offering when ambiguous:** `docs/` exists but no `docs/adr/` precedent → offer once, e.g. *"Want this design captured as an ADR under `docs/adr/`? A short, committable file distilled from the spec."* Declined → skip silently, do not re-offer in the same session.
 
-**Writing:** follow `skills/shared/conductor/doc-format.md` Authoring conventions for filename, frontmatter, and links. The ADR distills the approved design — decision, options considered, consequences — it is not a copy of the full spec.
+**Writing:** follow `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/doc-format.md` Authoring conventions for filename, frontmatter, and links. The ADR distills the approved design — decision, options considered, consequences — it is not a copy of the full spec.
 
 ## What belongs in a [saved] entry vs state.md, and hard limits
 

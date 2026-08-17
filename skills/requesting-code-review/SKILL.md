@@ -11,7 +11,7 @@ Dispatch a code reviewer subagent to catch issues before they cascade. The revie
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. The review scope is derived from `git diff`, which stays native. Evidence handling per `skills/shared/evidence.md`.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. The review scope is derived from `git diff`, which stays native. Evidence handling per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`.
 
 ## When to Request Review
 
@@ -67,7 +67,7 @@ Dispatch review subagents via the Task tool. **Never set the subagent type to Ba
 
 **Detecting presence:** the named agents are resolvable when `agents/code-reviewer.md` and `agents/red-team.md` ship with this plugin and the harness registers them. If a dispatch to a named agent returns an "unknown agent" / unresolved error, treat it as absent and re-dispatch via the `general-purpose` fallback.
 
-**Evidence:** per `skills/shared/evidence.md`. Each review surfaces its `AC: ... PROVEN BY ...` lines and merge-readiness verdict as text in this conversation.
+**Evidence:** per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`. Each review surfaces its `AC: ... PROVEN BY ...` lines and merge-readiness verdict as text in this conversation.
 
 ## Security Review (Built-In)
 

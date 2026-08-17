@@ -9,7 +9,7 @@ Maintain a project-level error→solution mapping to avoid rediscovering known p
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Searching `known-issues.md` is a discovery job; the existence check (state-probe) and entry writes always stay native (`ctx_execute*` discard their sandbox filesystem).
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Searching `known-issues.md` is a discovery job; the existence check (state-probe) and entry writes always stay native (`ctx_execute*` discard their sandbox filesystem).
 
 Note: partial overlap with context-mode auto-memory — context-mode's FTS5 session memory captures tool outputs automatically and is queryable via `ctx_search`; this skill's `known-issues.md` is the durable, human-curated error→solution record. They are complementary, not redundant: use `ctx_search` for what happened this/last session, `known-issues.md` for the canonical recurring-issue catalog.
 

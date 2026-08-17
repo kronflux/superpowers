@@ -22,7 +22,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 - Gitignored and local by default. Do NOT commit plans, specs, or `.tasks.json` unless your human partner explicitly asks — they are working artifacts, not project deliverables.
 - (User preferences for plan location override this default)
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery → `codegraph.md`; external docs → `context7.md`).
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain (macro discovery → `codegraph.md`; external docs → `context7.md`).
 
 ## Scope Check
 
@@ -60,7 +60,7 @@ independently testable deliverable.
 2. Does it touch more than one concern? (if yes → too big)
 3. Would it get its own commit? (if no → merge with adjacent task)
 
-See `skills/shared/task-format-reference.md` for the full granularity guide.
+See `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` for the full granularity guide.
 
 ## Bite-Sized Task Granularity
 
@@ -162,7 +162,7 @@ git commit -m "feat: add specific feature"
 ```
 ````
 
-Commit steps stage explicit paths only — `skills/shared/git-hygiene.md` is the contract; never write `git add -A` or `git add .` into a plan step.
+Commit steps stage explicit paths only — `${CLAUDE_PLUGIN_ROOT}/skills/shared/git-hygiene.md` is the contract; never write `git add -A` or `git add .` into a plan step.
 
 ## No Placeholders
 
@@ -221,7 +221,7 @@ For each plan task, create a native task. Embed metadata as a `json:metadata` fe
 
 #### User-Thrown Gates — detection + tagging
 
-Run gate-detection on EVERY task. The keyword buckets, the trigger rule (real gate vs. bare verb), and the tagging steps — set `"userGate": true`, append `"user-gate"` to `tags`, set `"requiresUserSpecification": true` when the HOW is vague, add the NON-SKIPPABLE banner, declare `requireEvidenceTokens` axes — plus the AC / per-task-isolation self-checks are in `references/user-gate-tagging.md`. Do NOT ask gate questions during write-plan; a vague HOW routes to `/specify-gate` via `requiresUserSpecification: true`. Full schema (six gate keys): `skills/shared/task-format-reference.md` → "User-Thrown Gates".
+Run gate-detection on EVERY task. The keyword buckets, the trigger rule (real gate vs. bare verb), and the tagging steps — set `"userGate": true`, append `"user-gate"` to `tags`, set `"requiresUserSpecification": true` when the HOW is vague, add the NON-SKIPPABLE banner, declare `requireEvidenceTokens` axes — plus the AC / per-task-isolation self-checks are in `references/user-gate-tagging.md`. Do NOT ask gate questions during write-plan; a vague HOW routes to `/specify-gate` via `requiresUserSpecification: true`. Full schema (six gate keys): `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` → "User-Thrown Gates".
 
 #### the task.md task list description — full structured body, not a summary
 
@@ -250,7 +250,7 @@ the task.md task list:
   activeForm: "Implementing [Component Name]"
 ```
 
-**`modelTier`** — `"mechanical"` | `"standard"` | `"advanced"` | `"frontier"`; `"advanced"` is the default ceiling, escalation **stops at `advanced`**. `"frontier"` is gated, 2x cost, needs per-task approval before `the task.md task list`. Full definitions and the offer contract: `skills/shared/task-format-reference.md`, `references/plan-authoring.md` → "Frontier offers".
+**`modelTier`** — `"mechanical"` | `"standard"` | `"advanced"` | `"frontier"`; `"advanced"` is the default ceiling, escalation **stops at `advanced`**. `"frontier"` is gated, 2x cost, needs per-task approval before `the task.md task list`. Full definitions and the offer contract: `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md`, `references/plan-authoring.md` → "Frontier offers".
 
 ### Native task mechanics
 

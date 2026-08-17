@@ -43,7 +43,7 @@ If the request is non-trivial AND `project-map.md` does not exist AND the projec
 
 ## Context-Mode Detection
 
-The session-start hook injects a context-mode-active flag. When active, data-processing work in routed skills is governed by `skills/shared/conductor/routing.md` — declare the job and follow its chain; state-probes, mutations, and file writes stay native. When inactive, use native tools.
+The session-start hook injects a context-mode-active flag. When active, data-processing work in routed skills is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job and follow its chain; state-probes, mutations, and file writes stay native. When inactive, use native tools.
 
 ## Stale Project Map Refresh
 
@@ -58,7 +58,7 @@ Read `project-map.md` to orient without re-globbing known files; when you need a
 - `superpowers:requesting-code-review` / `superpowers:receiving-code-review` — code review includes security review.
 - `superpowers:dispatching-parallel-agents` — independent parallel tasks outside plan execution.
 - `superpowers:claude-md-creator` — CLAUDE.md / AGENTS.md creation or update; never implement these directly.
-- `skills/shared/conductor/routing.md` — tool selection for data processing; auto-applied reference, not a Skill-tool invocation.
+- `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — tool selection for data processing; auto-applied reference, not a Skill-tool invocation.
 
 Internal, never routed directly: `superpowers:self-consistency-reasoner` (invoked by systematic-debugging and verification-before-completion); `superpowers:token-efficiency` (entry-sequence step 1, when available).
 

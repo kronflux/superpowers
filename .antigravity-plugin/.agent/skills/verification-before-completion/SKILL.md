@@ -35,7 +35,7 @@ BEFORE claiming any status or expressing satisfaction:
 Skip any step = lying, not verifying
 ```
 
-If context-mode is active, run verification commands via `ctx_execute` per the output-handling job in `skills/shared/conductor/routing.md` and echo the fresh output (exit code, failure count) per `skills/shared/evidence.md`.
+If context-mode is active, run verification commands via `ctx_execute` per the output-handling job in `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` and echo the fresh output (exit code, failure count) per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`.
 
 ## Common Failures
 
@@ -117,7 +117,7 @@ grep -rn "TODO\|FIXME\|placeholder\|NotImplementedError\|raise NotImplementedErr
 
 Adjust `<src-dir>` and `--include` patterns to the project's language and source structure. If any match falls in a file this task created or modified: the task is not done. Remove the stub or confirm with your human partner it is intentional before claiming completion.
 
-When context-mode is active, run this stub scan as a discovery job per `skills/shared/conductor/routing.md` (Grep-for-filter → `ctx_execute`); surface any matching file:line in-transcript.
+When context-mode is active, run this stub scan as a discovery job per `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` (Grep-for-filter → `ctx_execute`); surface any matching file:line in-transcript.
 
 ## Configuration Change Verification
 

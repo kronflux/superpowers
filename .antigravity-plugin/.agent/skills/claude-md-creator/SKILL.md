@@ -13,7 +13,7 @@ Empirical research (Gloaguen et al., 2026 — "Evaluating AGENTS.md") shows that
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Scanning config files to draft the context file is a discovery job. State-probes and file writes stay native in both modes.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Scanning config files to draft the context file is a discovery job. State-probes and file writes stay native in both modes.
 
 ## Trigger Conditions
 

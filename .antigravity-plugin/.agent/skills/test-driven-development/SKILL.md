@@ -57,7 +57,7 @@ Before writing the first test, verify the project has a test runner:
 
 Do not skip this step — a "failing test" that fails because the runner doesn't exist teaches nothing.
 
-Test commands are an output job (`skills/shared/conductor/routing.md`); echo pass/fail in-transcript.
+Test commands are an output job (`${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md`); echo pass/fail in-transcript.
 
 ## Red-Green-Refactor
 
@@ -142,11 +142,11 @@ Confirm:
 
 **Test errors?** Fix error, re-run until it fails correctly.
 
-Echo pass/fail in-transcript (output job, see Test Infrastructure Check above). On large failure output with middleware configured, run `summarize-test-failure` per `skills/shared/conductor/middleware.md` for a 5-line digest instead of manually scanning the dump.
+Echo pass/fail in-transcript (output job, see Test Infrastructure Check above). On large failure output with middleware configured, run `summarize-test-failure` per `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/middleware.md` for a 5-line digest instead of manually scanning the dump.
 
 ### GREEN - Minimal Code
 
-Write simplest code to pass the test. Before changing a symbol's signature, establish its call sites via `skills/shared/conductor/codegraph.md`.
+Write simplest code to pass the test. Before changing a symbol's signature, establish its call sites via `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/codegraph.md`.
 
 <Good>
 ```typescript

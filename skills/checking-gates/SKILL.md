@@ -83,11 +83,11 @@ If any of the three is missing for any criterion, HOW is NOT clear → Path A.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Gate evidence per `skills/shared/evidence.md`: `Gate:` and `AC: ... PROVEN BY ...` lines are scanned in the transcript, and evidence left in a sandbox triggers a false-positive block.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Gate evidence per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`: `Gate:` and `AC: ... PROVEN BY ...` lines are scanned in the transcript, and evidence left in a sandbox triggers a false-positive block.
 
 ## Integration
 
 - **Invoked from:** the PostToolUse / PreToolUse user-gate hook; or `/gate-check` slash command.
 - **May hand off to:** `superpowers:specifying-gates` (Path A).
 - **Returns to:** `superpowers:executing-plans` (or wherever it was invoked from) after TaskUpdate.
-- **References:** `superpowers:skills/shared/task-format-reference.md` for metadata schema.
+- **References:** `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` for metadata schema.

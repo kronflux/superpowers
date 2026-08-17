@@ -9,7 +9,7 @@ The `metadata` parameter on TaskCreate is accepted but **not returned by TaskGet
 - Cross-session resume can parse it from .tasks.json
 - Subagent dispatch can extract it for implementer prompts
 
-See `skills/shared/task-format-reference.md` for the full metadata schema.
+See `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` for the full metadata schema.
 
 ## TaskCreate description — why the full body, and the self-check
 

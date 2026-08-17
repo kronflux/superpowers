@@ -47,7 +47,7 @@ digraph when_to_use {
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Integration verification (the full project test suite after agents return) is an output job.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Integration verification (the full project test suite after agents return) is an output job.
 
 ## The Pattern
 
@@ -169,7 +169,7 @@ TaskCreate:
     ```
 ```
 
-See `skills/shared/task-format-reference.md` for the full format.
+See `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` for the full format.
 
 ### Monitor / Complete
 

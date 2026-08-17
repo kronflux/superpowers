@@ -13,7 +13,7 @@ Code review requires technical evaluation, not emotional performance.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. The YAGNI usage grep and codebase-verification reads are discovery jobs. Evidence handling per `skills/shared/evidence.md`.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. The YAGNI usage grep and codebase-verification reads are discovery jobs. Evidence handling per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`.
 
 ## The Response Pattern
 

@@ -18,7 +18,7 @@ Load plan, review critically, execute all tasks, report when complete.
 
 ## Tool Selection
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Evidence handling per `skills/shared/evidence.md`.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Evidence handling per `${CLAUDE_PLUGIN_ROOT}/skills/shared/evidence.md`.
 
 ## The Process
 

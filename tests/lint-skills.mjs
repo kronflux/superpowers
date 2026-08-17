@@ -17,7 +17,7 @@ const BAD_NS = /superpowers-(extended-cc|optimized):/g;
 
 // Conductor tool-selection sweep (Task 13): every swept SKILL.md must defer to the
 // canonical sentence instead of restating a legacy per-skill ctx tool-selection chain.
-const CANONICAL_SENTENCE = /Tool selection is governed by `skills\/shared\/conductor\/routing\.md`/;
+const CANONICAL_SENTENCE = /Tool selection is governed by `\$\{CLAUDE_PLUGIN_ROOT\}\/skills\/shared\/conductor\/routing\.md`/;
 const LEGACY_CHAIN = /ctx_fetch_and_index.*ctx_search|route data work.*ctx_/i;
 
 // Context economy budgets (Task 12).
@@ -98,6 +98,29 @@ for (const t of targets) {
   for (const w of warnings) console.warn(`${name}: WARN - ${w}`);
   if (errors.length) { failed = true; console.error(`${name}: FAIL\n  - ${errors.join("\n  - ")}`); }
   else console.log(`${name}: frontmatter OK; cross-refs OK; no blocked fetch patterns`);
+}
+
+// Anchor sweep (Task 3): a `skills/shared/` citation with no `${CLAUDE_PLUGIN_ROOT}/`
+// prefix gives the reader no way to resolve it against the plugin's installed
+// location. Covers every .md under skills/, including references/ subdirs and
+// skills/shared/ itself.
+const UNANCHORED_SHARED = /(?<!\$\{CLAUDE_PLUGIN_ROOT\}\/)skills\/shared\//;
+function walkMd(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walkMd(p, out);
+    else if (name.endsWith(".md")) out.push(p);
+  }
+  return out;
+}
+for (const file of walkMd("skills")) {
+  const src = readFileSync(file, "utf8");
+  src.split(/\r?\n/).forEach((line, i) => {
+    if (UNANCHORED_SHARED.test(line)) {
+      failed = true;
+      console.error(`${file}: FAIL\n  - unanchored skills/shared/ citation at line ${i + 1}: ${line.trim()}`);
+    }
+  });
 }
 
 // Conductor module byte budgets (Task 5).

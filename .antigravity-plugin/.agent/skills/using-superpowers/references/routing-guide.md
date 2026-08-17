@@ -37,13 +37,13 @@ If the request is non-trivial AND `project-map.md` does not exist AND the projec
 
 ## Complexity Tiers (Entry Sequence pre-step)
 
-- **Micro** — typo fix, single rename, ≤1-line config change, zero behavioral ambiguity. Skip the entry sequence entirely; just do it. Stretching "simple" past this is the rationalization the Red Flags table rejects.
+- **Micro** — typo fix, single rename, ≤1-line config change, zero behavioral ambiguity. Skip the entry sequence entirely; just do it. Stretching "simple" past this is a default classification, not something your own judgment can override — per the override-order line, only a user instruction or project context file outranks the skill.
 - **Lightweight** — ALL FOUR hold, and you state in one sentence each why: scope ~2 files or fewer; no new condition/gate/trigger; no user-visible change; no migration/data-shape change. Skip brainstorming/planning/worktrees/parallel-dispatch; go straight to implementation; the single required gate is `verification-before-completion`; still invoke a dedicated implementation skill if one exists for the task.
 - **Full** — everything else. A **hard override** forces Full immediately regardless of scope: a new condition/gate/trigger, anything the user sees/experiences, an edit to a file other components depend on, or a new path/outcome that didn't exist before. Route: `.agent/skills/brainstorming/SKILL.md` → `.agent/skills/writing-plans/SKILL.md` → dispatch (subagent-driven-development or executing-plans).
 
 ## Context-Mode Detection
 
-The session-start hook injects a context-mode-active flag. When active, data-processing work in routed skills is governed by `skills/shared/conductor/routing.md` — declare the job and follow its chain; state-probes, mutations, and file writes stay native. When inactive, use native tools.
+The session-start hook injects a context-mode-active flag. When active, data-processing work in routed skills is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job and follow its chain; state-probes, mutations, and file writes stay native. When inactive, use native tools.
 
 ## Stale Project Map Refresh
 
@@ -58,7 +58,7 @@ Read `project-map.md` to orient without re-globbing known files; when you need a
 - `.agent/skills/requesting-code-review/SKILL.md` / `.agent/skills/receiving-code-review/SKILL.md` — code review includes security review.
 - `.agent/skills/dispatching-parallel-agents/SKILL.md` — independent parallel tasks outside plan execution.
 - `.agent/skills/claude-md-creator/SKILL.md` — CLAUDE.md / AGENTS.md creation or update; never implement these directly.
-- `skills/shared/conductor/routing.md` — tool selection for data processing; auto-applied reference, not a Skill-tool invocation.
+- `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — tool selection for data processing; auto-applied reference, not a Skill-tool invocation.
 
 Internal, never routed directly: `.agent/skills/self-consistency-reasoner/SKILL.md` (invoked by systematic-debugging and verification-before-completion); `.agent/skills/token-efficiency/SKILL.md` (entry-sequence step 1, when available).
 

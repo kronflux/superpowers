@@ -41,7 +41,7 @@ Subagent (general-purpose):
     2. Write tests (following TDD if task says to)
     3. Verify implementation works
     4. Commit your work — stage YOUR files by explicit path; fix any staging or commit
-       mistake in place per skills/shared/git-hygiene.md (amend/reset, never an undo commit)
+       mistake in place per ${CLAUDE_PLUGIN_ROOT}/skills/shared/git-hygiene.md (amend/reset, never an undo commit)
     5. Self-review (see below)
     6. Report back
 

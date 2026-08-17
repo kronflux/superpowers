@@ -1,6 +1,6 @@
 # User-Gate Detection, Tagging, and Enforcement
 
-Detail moved out of `SKILL.md` to keep the core lean. The full metadata schema for all gate keys lives in `skills/shared/task-format-reference.md` → "User-Thrown Gates". Referenced from the "User-Thrown Gates" and "Gate enforcement note" pointers in `SKILL.md`.
+Detail moved out of `SKILL.md` to keep the core lean. The full metadata schema for all gate keys lives in `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` → "User-Thrown Gates". Referenced from the "User-Thrown Gates" and "Gate enforcement note" pointers in `SKILL.md`.
 
 ## User-Thrown Gates — Mechanical Detection + Tagging
 
@@ -55,7 +55,7 @@ Without the axes, "looks good, keep going" closes are legal; with axes, the coor
 
 **Do NOT ask the user questions during write-plan.** The opinionated default is "tag it and move on". Users who wanted questions said "brainstorm". If the user's brief is vague about a gate's HOW, the flag `requiresUserSpecification: true` routes the question to execute time where `/specify-gate` handles it in 3-5 short multiple-choice prompts.
 
-See `skills/shared/task-format-reference.md` → "User-Thrown Gates" for the full metadata schema with all six gate-related keys (`userGate`, `tags`, `requiresUserSpecification`, `gateScope`, `failurePolicy`, `subagentBrief`), and `docs/user-gate-flow.md` for the end-to-end flow.
+See `${CLAUDE_PLUGIN_ROOT}/skills/shared/task-format-reference.md` → "User-Thrown Gates" for the full metadata schema with all six gate-related keys (`userGate`, `tags`, `requiresUserSpecification`, `gateScope`, `failurePolicy`, `subagentBrief`), and `docs/user-gate-flow.md` for the end-to-end flow.
 
 ## Gate enforcement note (only when user-gate tasks were tagged AND hooks not yet registered)
 

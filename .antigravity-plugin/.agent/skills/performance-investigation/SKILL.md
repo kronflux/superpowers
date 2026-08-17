@@ -9,7 +9,7 @@ Measure first. Guess never. Fix once.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Running a profiler, benchmark, or measurement command EXECUTES code and stays native regardless of job. Analyzing the bulk output (top consumers, self vs total time) is a discovery job.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Running a profiler, benchmark, or measurement command EXECUTES code and stays native regardless of job. Analyzing the bulk output (top consumers, self vs total time) is a discovery job.
 
 ## Why This Exists
 

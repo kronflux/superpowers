@@ -40,7 +40,7 @@ Skills: `superpowers:<name>` via Skill tool. Detail: `references/routing-guide.m
 
 ## Skill Files
 
-Never Read a skill file to "check" it — invoke it via the Skill tool. Exception: `skills/shared/*.md` are reference documents; Read/link them freely.
+Never Read a skill file to "check" it — invoke it via the Skill tool. Exception: `${CLAUDE_PLUGIN_ROOT}/skills/shared/*.md` are reference documents; Read/link them freely.
 <!-- compact-core:end -->
 
 <SUBAGENT-STOP>
@@ -53,7 +53,7 @@ If you were dispatched as a subagent to execute a specific task, ignore this ski
 
 **Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
 
-Then follow the skill exactly. If it has a checklist, create a todo per item. Do not open with "I'm using X" — the harness already shows which skill is active, and `skills/shared/output-contract.md` governs what the first line carries instead.
+Then follow the skill exactly. If it has a checklist, create a todo per item. Do not open with "I'm using X" — the harness already shows which skill is active, and `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md` governs what the first line carries instead.
 
 ## Entry Sequence
 

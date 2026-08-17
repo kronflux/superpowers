@@ -9,7 +9,7 @@ Update one thing at a time. Verify after each. Never batch major upgrades.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Audit-command output and codebase API-usage searches are discovery jobs. Installs, test runs, and build runs are mutations/CPU-bound and stay native regardless of job. For version-specific external docs, follow `.agent/skills/skills/SKILL.md/shared/conductor/context7.md`.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Audit-command output and codebase API-usage searches are discovery jobs. Installs, test runs, and build runs are mutations/CPU-bound and stay native regardless of job. For version-specific external docs, follow `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/context7.md`.
 
 ## Why This Exists
 

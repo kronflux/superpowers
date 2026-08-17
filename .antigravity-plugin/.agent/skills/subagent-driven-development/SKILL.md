@@ -18,7 +18,7 @@ ledger and the tool results carry the record.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. `review-package` and `task-brief` analysis go through `ctx_execute_file` (discovery job).
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. `review-package` and `task-brief` analysis go through `ctx_execute_file` (discovery job).
 
 ## When to Use
 
@@ -102,7 +102,7 @@ conflicts that only emerge from implementation.
 
 ## Model Selection
 
-See [references/controller-operations.md](references/controller-operations.md#model-selection) — Model-tier selection by role, turn-count economics, and task-complexity signals. For mechanical vs. symbol-refactor vs. review dispatch decisions, see `skills/shared/conductor/middleware.md`'s Dispatch matrix.
+See [references/controller-operations.md](references/controller-operations.md#model-selection) — Model-tier selection by role, turn-count economics, and task-complexity signals. For mechanical vs. symbol-refactor vs. review dispatch decisions, see `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/middleware.md`'s Dispatch matrix.
 
 ## Handling Implementer Status
 

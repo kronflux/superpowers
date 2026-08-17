@@ -9,11 +9,11 @@ Core operating standard for all sessions. Apply permanently from activation.
 
 ## Adapter Link
 
-Tool selection is governed by `skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Direct fetch directives are hard-blocked when context-mode is active. Writes, mutations, and state-probes stay native regardless of job.
+Tool selection is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/routing.md` — declare the job (discovery / symbol-edit / docs / output / dispatch / memory) and follow its chain. Direct fetch directives are hard-blocked when context-mode is active. Writes, mutations, and state-probes stay native regardless of job.
 
 ## Response Rules
 
-Response shape — ordering, ranking, questions, forbidden language, and the pre-send check — is governed by `skills/shared/output-contract.md` and is not restated here. That contract exists because density and decidability are different objectives: output can be dense, filler-free, and still impossible for the reader to act on.
+Response shape — ordering, ranking, questions, forbidden language, and the pre-send check — is governed by `${CLAUDE_PLUGIN_ROOT}/skills/shared/output-contract.md` and is not restated here. That contract exists because density and decidability are different objectives: output can be dense, filler-free, and still impossible for the reader to act on.
 
 The one rule specific to token cost rather than readability: prefer structured output (JSON/YAML) when the result feeds a downstream step rather than a human reader.
 

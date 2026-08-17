@@ -52,7 +52,7 @@ Embed metadata as a `json:metadata` code fence at the end of the TaskCreate desc
 | `requireABCompare` | boolean | no | Shortcut for the canonical before/after pair. Equivalent to `requireEvidenceTokens: [["baseline","old","before","v0","v1","iter-0","iter0","original","pre"], ["new","refactored","after","v2","iter-1","iter1","post","updated","replacement"]]`. Use for empirical refactors where the default tokens match your vocabulary. For any other domain, use `requireEvidenceTokens` directly. |
 
 ### context-mode coexistence (critical)
-Gate hooks scan the transcript for `AC:` / `PROVEN BY` tokens and for `git commit`. When verification is computed via context-mode tools (ctx_execute/ctx_search), the raw output stays in the sandbox — it does NOT enter the transcript. You MUST echo the `AC: <criterion> — PROVEN BY <evidence>` lines into your assistant message even when the underlying computation ran in ctx. See superpowers:skills/shared/conductor/context-mode-adapter.md. Failing to do so triggers a false-positive gate block.
+Gate hooks scan the transcript for `AC:` / `PROVEN BY` tokens and for `git commit`. When verification is computed via context-mode tools (ctx_execute/ctx_search), the raw output stays in the sandbox — it does NOT enter the transcript. You MUST echo the `AC: <criterion> — PROVEN BY <evidence>` lines into your assistant message even when the underlying computation ran in ctx. See ${CLAUDE_PLUGIN_ROOT}/skills/shared/conductor/context-mode-adapter.md. Failing to do so triggers a false-positive gate block.
 
 ## User-Thrown Gates
 
