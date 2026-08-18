@@ -1,5 +1,39 @@
 # Superpowers Release Notes
 
+## 7.19.0 — conventional commits, enforced
+
+- **A commit message that does not follow Conventional Commits 1.0.0 is refused.** A `PreToolUse`
+  gate on Bash reads the message carried in a `git commit` and denies the command when it does not
+  parse: a lower-case type from `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
+  `revert`, `style`, `test`; an optional noun scope; a colon and one space; a lower-case
+  description with no trailing full stop, within 100 characters. A breaking change takes `!` before
+  the colon or an upper-case `BREAKING CHANGE:` footer. A body or footer begins one blank line
+  after what precedes it, wrapping at 100.
+
+  Previously the format appeared only inside examples in `skills/shared/git-hygiene.md` and was
+  required nowhere, so conformance varied commit to commit. That file now states the specification
+  and drops its claim that a commit message is reviewed rather than gated.
+
+- **The banned content classes are checked, not just documented.** `git-hygiene.md` has listed four
+  since it was written — references to the plan or a numbered task, internal counts, measurement
+  reported as achievement, and an opening verb describing the author's motion — and nothing
+  enforced them. The same gate now matches them in the description and body.
+
+  Every matcher is anchored to process narration, because a gate that refuses correct work gets
+  switched off. `fix: retry step 2 of the OAuth handshake` and `feat: raise the retry limit to 5
+  attempts` describe the software and are allowed; `feat: add gate per Task 3` and
+  `feat: add 11 categories of checks` are not.
+
+- **Only a message present in the command is read.** An editor-driven commit, `--amend --no-edit`,
+  `-F <file>`, and `--fixup`/`--squash` supply no text to inspect and pass through rather than
+  being guessed at. Heredoc bodies are stripped first, so a command that merely contains commit
+  text does not trigger the gate. A repository with no commits passes through, leaving a first
+  commit unblocked.
+
+- **Disabling it is the user's decision.** `.superpowers-no-commit-gate` at the project root turns
+  it off, matching the decline-marker convention; `git-hygiene.md` states that an agent does not
+  create that marker to get a commit through.
+
 ## 7.18.0 — the output style installs itself, and rules out verbose prose
 
 ### Output style
