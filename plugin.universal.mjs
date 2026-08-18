@@ -64,6 +64,12 @@ export default {
     },
     {
       event: 'PreToolUse',
+      matcher: 'Bash',
+      command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/commit-message-gate.js"',
+      platforms: ['claude-code'],
+    },
+    {
+      event: 'PreToolUse',
       matcher: 'Grep|Glob|Read',
       command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/conductor-nudges.js"',
       platforms: ['claude-code'],

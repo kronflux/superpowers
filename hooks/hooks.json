@@ -70,6 +70,15 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/commit-message-gate.js\""
+          }
+        ]
+      },
+      {
         "matcher": "Grep|Glob|Read",
         "hooks": [
           {

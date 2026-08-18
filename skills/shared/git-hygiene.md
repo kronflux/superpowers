@@ -16,6 +16,30 @@ bulk-staging permission prompt in `hooks/safety/block-dangerous-commands.js`.
 
 ## Commit messages
 
+Every commit follows [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/).
+This is required, not a house preference, and the only commit exempt from it is a repository's
+first. `hooks/commit-message-gate.js` denies a `git commit` whose inline message does not conform.
+
+```
+type(optional-scope): description
+
+optional body, after one blank line
+
+optional footers, after one blank line
+```
+
+- **Type** is one of `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`,
+  `style`, `test`, lower-case. `feat` is a new capability, `fix` is a defect repair; anything that
+  changes neither takes one of the others.
+- **Scope** is optional and is a noun naming a section of the codebase: `fix(parser):`.
+- **Description** follows the colon and a single space. Imperative, lower-case initial, no trailing
+  full stop. The first line is at most 100 characters.
+- **Breaking changes** take a `!` before the colon, a `BREAKING CHANGE:` footer, or both. The token
+  is upper-case; it is the one case-sensitive element in the specification.
+- **Body and footers** each begin one blank line after what precedes them. Lines wrap at 100.
+  A footer token uses `-` in place of spaces (`Refs`, `Reviewed-by`), matching the git trailer
+  convention.
+
 A comment says what the code **does**. A commit says what **changed**. Neither says what you did to
 arrive at either. "History belongs in the commit message" does not mean anything goes there — a
 commit describes the change in terms of the software's behavior, not your activity producing it.
@@ -36,10 +60,19 @@ GOOD: Comments naming a change and its cause are now detected. Bare sentence-ini
       undetected: they cannot be distinguished from present-state usage.
 ```
 
-State limitations and reasons as properties of the software, not as things you discovered. Imperative
-subject line. No attribution trailers (`Co-Authored-By`, `Generated-with`) unless the user asks.
+State limitations and reasons as properties of the software, not as things you discovered. No
+attribution trailers (`Co-Authored-By`, `Generated-with`) unless the user asks.
 
-Reviewed, not gated: a commit-msg hook fires after the work is done and is trivially bypassed.
+These four classes are checked in the description and body by the same gate that checks the format.
+The matchers are anchored to process narration, so a count or a step number that belongs to the
+software passes: `fix: retry step 2 of the OAuth handshake` and `feat: raise the retry limit to 5
+attempts` describe behavior and are allowed.
+
+**Gated, not merely reviewed.** A rejected commit reports which rule failed and the required shape.
+The gate reads only a message carried in the command, so an editor-driven commit, `--amend
+--no-edit`, and `-F <file>` pass through with nothing to inspect. Disabling it in a project is the
+user's call and takes an explicit instruction: `touch .superpowers-no-commit-gate`. Do not create
+that marker to get a commit through.
 
 ## History repair
 

@@ -27,8 +27,10 @@ manifests by the bump script.
   - `SKILL.md` core ≤ 12,288 B — lint **WARNs** above (split overflow into `references/`).
   - SessionStart payload ≤ 5,232 B — `tests/session-start-payload.test.js` **FAILs** above.
     Any edit to `skills/using-superpowers/SKILL.md` (its body is the payload) MUST re-run that spec.
-- Commit style: imperative subject, no attribution trailers (no `Co-Authored-By`, no
-  `Generated-with`).
+- Commit style: Conventional Commits 1.0.0, enforced by `hooks/commit-message-gate.js` —
+  `type(scope): description`, lower-case imperative description, no trailing full stop, first
+  line at most 100 characters. No attribution trailers (no `Co-Authored-By`, no
+  `Generated-with`). Full contract in `skills/shared/git-hygiene.md`.
 
 ## Directory map
 
